@@ -1,3 +1,9 @@
+import {
+  ForumCategory,
+  type ForumReply,
+  type ForumThread,
+  ThreadStatus,
+} from "@/backend";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,15 +17,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import {
-  type MockForumPost,
-  type MockForumThread,
-  getForumCategoryColor,
-  getForumThreadById,
-  getPostsByThreadId,
-} from "@/data/mockData";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "@tanstack/react-router";
 import {
@@ -28,18 +29,16 @@ import {
   ChevronRight,
   Clock,
   Eye,
-  Globe,
   Lock,
   MessageCircle,
   MessageSquare,
   Pin,
   ShieldAlert,
-  ThumbsUp,
-  Users,
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -51,8 +50,31 @@ const itemVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.28 } },
 };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+const CATEGORY_LABELS: Record<ForumCategory, string> = {
+  [ForumCategory.general]: "General Discussion",
+  [ForumCategory.resources]: "Resources",
+  [ForumCategory.regional]: "Regional News",
+  [ForumCategory.campaigns]: "Campaigns",
+  [ForumCategory.activism]: "Activism",
+  [ForumCategory.announcements]: "Announcements",
+};
+
+const CATEGORY_COLORS: Record<ForumCategory, string> = {
+  [ForumCategory.general]: "bg-blue-50 text-blue-700 border-blue-200",
+  [ForumCategory.resources]:
+    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  [ForumCategory.regional]: "bg-teal-50 text-teal-700 border-teal-200",
+  [ForumCategory.campaigns]: "bg-violet-50 text-violet-700 border-violet-200",
+  [ForumCategory.activism]: "bg-rose-50 text-rose-700 border-rose-200",
+  [ForumCategory.announcements]: "bg-amber-50 text-amber-700 border-amber-200",
+};
+
+function nanoToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
+function timeAgo(ns: bigint): string {
+  const diff = Date.now() - nanoToMs(ns);
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
@@ -63,8 +85,8 @@ function timeAgo(dateStr: string): string {
   return "just now";
 }
 
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+function formatDateTime(ns: bigint): string {
+  return new Date(nanoToMs(ns)).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -73,53 +95,12 @@ function formatDateTime(dateStr: string): string {
   });
 }
 
-function getRoleLabel(role: string): string {
-  switch (role) {
-    case "super_admin":
-      return "Super Admin";
-    case "admin":
-      return "Admin";
-    case "org_admin":
-      return "Org Admin";
-    case "activist":
-      return "Activist";
-    case "member":
-      return "Member";
-    default:
-      return "Guest";
-  }
+function truncatePrincipal(p: { toString(): string }): string {
+  const s = p.toString();
+  return s.length > 12 ? `${s.slice(0, 8)}…` : s;
 }
 
-function getRoleBadgeClasses(role: string): string {
-  switch (role) {
-    case "super_admin":
-    case "admin":
-      return "bg-red-50 text-red-700 border-red-200";
-    case "org_admin":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "activist":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    default:
-      return "bg-gray-50 text-gray-600 border-gray-200";
-  }
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function AuthorAvatar({
-  name,
-  size = "sm",
-}: {
-  name: string;
-  size?: "sm" | "md";
-}) {
+function getAvatarColor(principal: { toString(): string }): string {
   const colors = [
     "bg-blue-100 text-blue-700",
     "bg-emerald-100 text-emerald-700",
@@ -130,9 +111,21 @@ function AuthorAvatar({
     "bg-indigo-100 text-indigo-700",
     "bg-orange-100 text-orange-700",
   ];
-  const colorIndex = name.charCodeAt(0) % colors.length;
-  const colorClass = colors[colorIndex];
+  const s = principal.toString();
+  return colors[s.charCodeAt(0) % colors.length];
+}
+
+function PrincipalAvatar({
+  principal,
+  size = "sm",
+}: {
+  principal: { toString(): string };
+  size?: "sm" | "md";
+}) {
+  const colorClass = getAvatarColor(principal);
   const sizeClass = size === "md" ? "w-10 h-10 text-sm" : "w-8 h-8 text-xs";
+  const s = principal.toString();
+  const initials = s.slice(0, 2).toUpperCase();
 
   return (
     <div
@@ -142,45 +135,32 @@ function AuthorAvatar({
         colorClass,
       )}
     >
-      {getInitials(name)}
+      {initials}
     </div>
   );
 }
 
-function PostCard({
-  post,
+function ReplyCard({
+  reply,
   index,
 }: {
-  post: MockForumPost;
+  reply: ForumReply;
   index: number;
 }) {
-  const [upvoted, setUpvoted] = useState(false);
-  const [upvoteCount, setUpvoteCount] = useState(post.upvoteCount);
-
-  function handleUpvote() {
-    if (upvoted) {
-      setUpvoted(false);
-      setUpvoteCount((c) => c - 1);
-    } else {
-      setUpvoted(true);
-      setUpvoteCount((c) => c + 1);
-    }
-  }
-
   return (
     <motion.div
       variants={itemVariants}
-      data-ocid={`forum_detail.post.item.${index}`}
+      data-ocid={`forum_detail.reply.item.${index}`}
     >
       <div
         className={cn(
           "rounded-xl border p-4",
-          post.isModeratorNote
+          reply.isModeratorReply
             ? "border-amber-200 bg-amber-50/60"
             : "border-border bg-card",
         )}
       >
-        {post.isModeratorNote && (
+        {reply.isModeratorReply && (
           <div className="flex items-center gap-2 mb-3 pb-2 border-b border-amber-200">
             <ShieldAlert size={13} className="text-amber-600" />
             <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">
@@ -190,59 +170,49 @@ function PostCard({
         )}
 
         <div className="flex items-start gap-3">
-          <AuthorAvatar name={post.authorName} size="sm" />
+          <PrincipalAvatar principal={reply.createdBy} size="sm" />
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="text-sm font-semibold text-foreground">
-                {post.authorName}
-              </span>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] px-1.5 py-0 h-4",
-                  getRoleBadgeClasses(post.authorRole),
-                )}
-              >
-                {getRoleLabel(post.authorRole)}
-              </Badge>
-              <span className="text-[11px] text-muted-foreground">
-                {post.authorOrganization}
+                {truncatePrincipal(reply.createdBy)}
               </span>
               <span className="text-[11px] text-muted-foreground ml-auto flex items-center gap-1">
                 <Clock size={10} />
-                {timeAgo(post.createdAt)}
+                {timeAgo(reply.createdAt)}
               </span>
             </div>
 
             <p className="text-sm text-foreground leading-relaxed">
-              {post.content}
+              {reply.body}
             </p>
 
             <div className="flex items-center gap-3 mt-3 pt-2 border-t border-border/50">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-7 gap-1.5 text-xs px-2",
-                  upvoted
-                    ? "text-primary bg-primary/10 hover:bg-primary/15"
-                    : "text-muted-foreground hover:text-primary",
-                )}
-                onClick={handleUpvote}
-                data-ocid={`forum_detail.upvote_button.${index}`}
-              >
-                <ThumbsUp size={12} className={upvoted ? "fill-primary" : ""} />
-                <span>{upvoteCount}</span>
-              </Button>
               <span className="text-[10px] text-muted-foreground ml-auto">
-                {formatDateTime(post.createdAt)}
+                {formatDateTime(reply.createdAt)}
               </span>
             </div>
           </div>
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <Layout breadcrumb="Forums › Loading...">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      </div>
+    </Layout>
   );
 }
 
@@ -276,81 +246,140 @@ function ThreadNotFound() {
 export function ForumDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
   const { user } = useAuth();
+  const backend = useBackend();
 
-  // Local mock state for moderation
-  const originalThread = id ? getForumThreadById(id) : null;
-  const [isPinned, setIsPinned] = useState(originalThread?.isPinned ?? false);
-  const [isLocked, setIsLocked] = useState(originalThread?.isLocked ?? false);
-  const [isArchived, setIsArchived] = useState(
-    originalThread?.status === "archived",
-  );
+  const [thread, setThread] = useState<ForumThread | null>(null);
+  const [replies, setReplies] = useState<ForumReply[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const [isPinned, setIsPinned] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [isArchived, setIsArchived] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
 
-  // Reply state
   const [replyContent, setReplyContent] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replySuccess, setReplySuccess] = useState(false);
 
-  // Opening post upvote
-  const [threadUpvoted, setThreadUpvoted] = useState(false);
-  const [threadUpvoteCount, setThreadUpvoteCount] = useState(
-    originalThread?.upvoteCount ?? 0,
-  );
+  useEffect(() => {
+    if (!id || !backend) {
+      if (!backend) return; // wait for backend
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
 
-  if (!originalThread) {
-    return <ThreadNotFound />;
-  }
+    let cancelled = false;
+    async function load() {
+      try {
+        const threadId = BigInt(id as string);
+        const [threadData, repliesData] = await Promise.all([
+          backend!.getThread(threadId),
+          backend!.getReplies(threadId),
+        ]);
 
-  const thread: MockForumThread = {
-    ...originalThread,
-    isPinned,
-    isLocked,
-    status: isArchived
-      ? "archived"
-      : isPinned
-        ? "pinned"
-        : originalThread.status,
-  };
+        // Fire-and-forget view increment
+        backend!.incrementThreadView(threadId).catch(console.error);
 
-  const posts = getPostsByThreadId(thread.id);
-  const catColor = getForumCategoryColor(thread.category);
+        if (cancelled) return;
+
+        if (!threadData) {
+          setNotFound(true);
+        } else {
+          setThread(threadData);
+          setIsPinned(threadData.isPinned);
+          setIsLocked(threadData.status === ThreadStatus.locked);
+          setIsArchived(threadData.status === ThreadStatus.archived);
+          setReplies(repliesData);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, backend]);
 
   const isAdminRole =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
     user?.role === "org_admin";
 
-  function handleReply() {
-    if (!replyContent.trim()) return;
-    setReplySending(true);
-    setTimeout(() => {
-      setReplySending(false);
-      setReplySuccess(true);
-      setReplyContent("");
-      setTimeout(() => setReplySuccess(false), 3000);
-    }, 1000);
-  }
-
-  function handleArchiveConfirm() {
-    setIsArchived(true);
-    setIsLocked(true);
-    setArchiveDialogOpen(false);
-  }
-
-  function handleThreadUpvote() {
-    if (threadUpvoted) {
-      setThreadUpvoted(false);
-      setThreadUpvoteCount((c) => c - 1);
-    } else {
-      setThreadUpvoted(true);
-      setThreadUpvoteCount((c) => c + 1);
+  async function handlePin() {
+    if (!thread || !backend) return;
+    try {
+      await backend.pinThread(thread.id);
+      setIsPinned((v) => !v);
+      toast.success(isPinned ? "Thread unpinned" : "Thread pinned");
+    } catch {
+      toast.error("Failed to update pin status");
     }
   }
 
+  async function handleLock() {
+    if (!thread || !backend) return;
+    try {
+      await backend.lockThread(thread.id);
+      setIsLocked((v) => !v);
+      toast.success(isLocked ? "Thread unlocked" : "Thread locked");
+    } catch {
+      toast.error("Failed to update lock status");
+    }
+  }
+
+  async function handleArchiveConfirm() {
+    if (!thread || !backend) return;
+    try {
+      await backend.archiveThread(thread.id);
+      setIsArchived(true);
+      setIsLocked(true);
+      setArchiveDialogOpen(false);
+      toast.success("Thread archived");
+    } catch {
+      toast.error("Failed to archive thread");
+    }
+  }
+
+  async function handleReply() {
+    if (!replyContent.trim() || !thread || !backend) return;
+    setReplySending(true);
+    try {
+      await backend.replyToThread(thread.id, replyContent.trim());
+      const updatedReplies = await backend.getReplies(thread.id);
+      setReplies(updatedReplies);
+      setReplyContent("");
+      setReplySuccess(true);
+      toast.success("Reply posted!");
+      setTimeout(() => setReplySuccess(false), 3000);
+    } catch {
+      toast.error("Failed to post reply. Please try again.");
+    } finally {
+      setReplySending(false);
+    }
+  }
+
+  if (loading) return <PageSkeleton />;
+  if (notFound || !thread) return <ThreadNotFound />;
+
+  const catColor =
+    CATEGORY_COLORS[thread.category] ??
+    "bg-secondary text-foreground border-border";
+
   return (
-    <Layout breadcrumb={`Forums › ${thread.category} › ${thread.title}`}>
+    <Layout
+      breadcrumb={`Forums › ${
+        CATEGORY_LABELS[thread.category] ?? thread.category
+      } › ${thread.title}`}
+    >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-        {/* ── Back link + breadcrumb ── */}
+        {/* Back link */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -372,7 +401,7 @@ export function ForumDetailPage() {
               catColor,
             )}
           >
-            {thread.category}
+            {CATEGORY_LABELS[thread.category] ?? thread.category}
           </span>
           <ChevronRight size={11} className="text-border" />
           <span className="truncate max-w-xs text-foreground/70">
@@ -381,9 +410,8 @@ export function ForumDetailPage() {
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ── Main content column ── */}
+          {/* Main content */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Thread header card */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -392,12 +420,11 @@ export function ForumDetailPage() {
               <Card
                 className={cn(
                   "overflow-hidden",
-                  thread.isPinned && "ring-1 ring-amber-200/60",
+                  isPinned && "ring-1 ring-amber-200/60",
                   isArchived && "opacity-80",
                 )}
               >
-                {/* Status header bar */}
-                {(isArchived || isLocked || thread.isPinned) && (
+                {(isArchived || isLocked || isPinned) && (
                   <div
                     className={cn(
                       "px-4 py-2 flex items-center gap-2 text-xs font-medium",
@@ -414,8 +441,7 @@ export function ForumDetailPage() {
                       </>
                     ) : isLocked ? (
                       <>
-                        <Lock size={13} /> This thread is locked. No new replies
-                        can be posted.
+                        <Lock size={13} /> This thread is locked.
                       </>
                     ) : (
                       <>
@@ -427,13 +453,12 @@ export function ForumDetailPage() {
                 )}
 
                 <CardContent className="px-5 py-5">
-                  {/* Title + badges */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     <Badge
                       variant="outline"
                       className={cn("text-[10px] px-2 py-0.5 h-5", catColor)}
                     >
-                      {thread.category}
+                      {CATEGORY_LABELS[thread.category] ?? thread.category}
                     </Badge>
                     {isArchived && (
                       <Badge
@@ -453,7 +478,7 @@ export function ForumDetailPage() {
                         Locked
                       </Badge>
                     )}
-                    {thread.isPinned && (
+                    {isPinned && (
                       <Badge
                         variant="outline"
                         className="text-[10px] px-2 py-0.5 h-5 bg-amber-50 text-amber-700 border-amber-200"
@@ -468,49 +493,33 @@ export function ForumDetailPage() {
                     {thread.title}
                   </h1>
 
-                  {/* Author info + stats */}
                   <div className="flex flex-wrap items-center gap-3 mb-4 pb-4 border-b border-border/60 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <AuthorAvatar name={thread.authorName} size="sm" />
-                      <div>
-                        <span className="font-semibold text-foreground/90">
-                          {thread.authorName}
-                        </span>
-                        <span className="mx-1.5">·</span>
-                        <span className="flex items-center gap-1 inline-flex">
-                          <Globe size={10} />
-                          {thread.organization}
-                        </span>
-                      </div>
+                      <PrincipalAvatar principal={thread.createdBy} size="sm" />
+                      <span className="font-semibold text-foreground/90">
+                        {truncatePrincipal(thread.createdBy)}
+                      </span>
                     </div>
                     <span className="flex items-center gap-1">
                       <Clock size={10} />
                       {timeAgo(thread.createdAt)}
                     </span>
-
-                    {/* Stats */}
                     <div className="ml-auto flex items-center gap-3">
                       <span className="flex items-center gap-1">
                         <MessageCircle size={11} />
-                        {thread.replyCount} replies
+                        {Number(thread.replyCount)} replies
                       </span>
                       <span className="flex items-center gap-1">
                         <Eye size={11} />
-                        {thread.viewCount}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <ThumbsUp size={11} />
-                        {threadUpvoteCount}
+                        {Number(thread.viewCount)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Opening post content */}
                   <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-                    {thread.content}
+                    {thread.body}
                   </p>
 
-                  {/* Tags */}
                   {thread.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-4">
                       {thread.tags.map((tag) => (
@@ -524,89 +533,67 @@ export function ForumDetailPage() {
                     </div>
                   )}
 
-                  {/* Opening post actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-7 gap-1.5 text-xs px-2",
-                        threadUpvoted
-                          ? "text-primary bg-primary/10 hover:bg-primary/15"
-                          : "text-muted-foreground hover:text-primary",
-                      )}
-                      onClick={handleThreadUpvote}
-                      data-ocid="forum_detail.upvote_button.1"
-                    >
-                      <ThumbsUp
-                        size={12}
-                        className={threadUpvoted ? "fill-primary" : ""}
-                      />
-                      <span>{threadUpvoteCount}</span>
-                    </Button>
-
-                    {/* Moderation toolbar */}
-                    {isAdminRole && (
-                      <div className="ml-auto flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "h-7 text-xs gap-1.5",
-                            isPinned
-                              ? "border-amber-300 text-amber-700 hover:bg-amber-50"
-                              : "border-border",
-                          )}
-                          onClick={() => setIsPinned(!isPinned)}
-                          data-ocid="forum_detail.pin_button"
-                        >
-                          <Pin
-                            size={11}
-                            className={isPinned ? "fill-amber-500" : ""}
-                          />
-                          {isPinned ? "Unpin" : "Pin"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "h-7 text-xs gap-1.5",
-                            isLocked
-                              ? "border-gray-400 text-gray-700 hover:bg-gray-50"
-                              : "border-border",
-                          )}
-                          onClick={() => setIsLocked(!isLocked)}
-                          data-ocid="forum_detail.lock_button"
-                        >
-                          <Lock size={11} />
-                          {isLocked ? "Unlock" : "Lock"}
-                        </Button>
-                        {!isArchived && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1.5 border-slate-300 text-slate-600 hover:bg-slate-50"
-                            onClick={() => setArchiveDialogOpen(true)}
-                            data-ocid="forum_detail.archive_button"
-                          >
-                            <Archive size={11} />
-                            Archive
-                          </Button>
+                  {isAdminRole && (
+                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-7 text-xs gap-1.5",
+                          isPinned
+                            ? "border-amber-300 text-amber-700 hover:bg-amber-50"
+                            : "border-border",
                         )}
-                      </div>
-                    )}
-                  </div>
+                        onClick={handlePin}
+                        data-ocid="thread.pin.button"
+                      >
+                        <Pin
+                          size={11}
+                          className={isPinned ? "fill-amber-500" : ""}
+                        />
+                        {isPinned ? "Unpin" : "Pin"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "h-7 text-xs gap-1.5",
+                          isLocked
+                            ? "border-gray-400 text-gray-700 hover:bg-gray-50"
+                            : "border-border",
+                        )}
+                        onClick={handleLock}
+                        data-ocid="thread.lock.button"
+                      >
+                        <Lock size={11} />
+                        {isLocked ? "Unlock" : "Lock"}
+                      </Button>
+                      {!isArchived && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1.5 border-slate-300 text-slate-600 hover:bg-slate-50"
+                          onClick={() => setArchiveDialogOpen(true)}
+                          data-ocid="thread.archive.button"
+                        >
+                          <Archive size={11} />
+                          Archive
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* ── Replies Section ── */}
-            {posts.length > 0 && (
+            {/* Replies */}
+            {replies.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <MessageCircle size={15} className="text-primary" />
                   <h2 className="font-display font-semibold text-sm text-foreground">
-                    {posts.length} {posts.length === 1 ? "Reply" : "Replies"}
+                    {replies.length}{" "}
+                    {replies.length === 1 ? "Reply" : "Replies"}
                   </h2>
                   <Separator className="flex-1" />
                 </div>
@@ -617,14 +604,18 @@ export function ForumDetailPage() {
                   animate="visible"
                   className="space-y-3"
                 >
-                  {posts.map((post, i) => (
-                    <PostCard key={post.id} post={post} index={i + 1} />
+                  {replies.map((reply, i) => (
+                    <ReplyCard
+                      key={String(reply.id)}
+                      reply={reply}
+                      index={i + 1}
+                    />
                   ))}
                 </motion.div>
               </div>
             )}
 
-            {posts.length === 0 && (
+            {replies.length === 0 && (
               <div
                 className="text-center py-10 text-muted-foreground text-sm rounded-xl border border-border/50 bg-secondary/20"
                 data-ocid="forum_detail.replies.empty_state"
@@ -637,7 +628,7 @@ export function ForumDetailPage() {
               </div>
             )}
 
-            {/* ── Reply Form ── */}
+            {/* Reply Form */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -658,8 +649,8 @@ export function ForumDetailPage() {
                   )}
                   <p className="text-sm text-muted-foreground">
                     {isArchived
-                      ? "This thread is archived. No new replies can be posted."
-                      : "This thread is locked. No new replies can be posted."}
+                      ? "This thread is archived. No new replies."
+                      : "This thread is locked. No new replies."}
                   </p>
                 </div>
               ) : !user || user.role === "guest" ? (
@@ -685,7 +676,11 @@ export function ForumDetailPage() {
                   </CardHeader>
                   <CardContent className="px-5 pb-4 space-y-3">
                     <div className="flex items-start gap-3">
-                      <AuthorAvatar name={user.name} size="sm" />
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-primary">
+                          {user.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
                       <div className="flex-1">
                         <Textarea
                           placeholder="Share your thoughts on this discussion..."
@@ -693,7 +688,7 @@ export function ForumDetailPage() {
                           value={replyContent}
                           onChange={(e) => setReplyContent(e.target.value)}
                           className="resize-none"
-                          data-ocid="forum_detail.reply.textarea"
+                          data-ocid="forums.reply.input"
                         />
                       </div>
                     </div>
@@ -710,7 +705,7 @@ export function ForumDetailPage() {
                           disabled={!replyContent.trim() || replySending}
                           onClick={handleReply}
                           className="h-8 text-xs gap-1.5"
-                          data-ocid="forum_detail.reply.submit_button"
+                          data-ocid="forums.reply.submit_button"
                         >
                           {replySending ? "Posting..." : "Post Reply"}
                         </Button>
@@ -722,9 +717,8 @@ export function ForumDetailPage() {
             </motion.div>
           </div>
 
-          {/* ── Activity Sidebar (desktop) ── */}
+          {/* Sidebar */}
           <aside className="hidden lg:block space-y-4">
-            {/* Thread info */}
             <motion.div
               initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -733,7 +727,7 @@ export function ForumDetailPage() {
               <Card>
                 <CardHeader className="pb-2 pt-4 px-4">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Users size={13} className="text-blue-600" />
+                    <MessageSquare size={13} className="text-primary" />
                     Thread Info
                   </CardTitle>
                 </CardHeader>
@@ -741,44 +735,37 @@ export function ForumDetailPage() {
                   {[
                     {
                       label: "Author",
-                      value: thread.authorName,
-                      icon: <Users size={11} />,
+                      value: truncatePrincipal(thread.createdBy),
                     },
                     {
-                      label: "Organization",
-                      value: thread.organization,
-                      icon: <Globe size={11} />,
-                    },
-                    {
-                      label: "Region",
-                      value: thread.region,
-                      icon: <Globe size={11} />,
+                      label: "Category",
+                      value:
+                        CATEGORY_LABELS[thread.category] ?? thread.category,
                     },
                     {
                       label: "Posted",
-                      value: new Date(thread.createdAt).toLocaleDateString(
-                        "en-US",
-                        { month: "short", day: "numeric", year: "numeric" },
-                      ),
-                      icon: <Clock size={11} />,
+                      value: new Date(
+                        nanoToMs(thread.createdAt),
+                      ).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      }),
                     },
                     {
                       label: "Replies",
-                      value: thread.replyCount,
-                      icon: <MessageCircle size={11} />,
+                      value: Number(thread.replyCount),
                     },
                     {
                       label: "Views",
-                      value: thread.viewCount.toLocaleString(),
-                      icon: <Eye size={11} />,
+                      value: Number(thread.viewCount).toLocaleString(),
                     },
                   ].map((item) => (
                     <div
                       key={item.label}
                       className="flex items-center justify-between text-xs"
                     >
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        {item.icon}
+                      <span className="text-muted-foreground">
                         {item.label}
                       </span>
                       <span className="font-medium text-foreground/80 text-right max-w-[120px] truncate">
@@ -790,8 +777,7 @@ export function ForumDetailPage() {
               </Card>
             </motion.div>
 
-            {/* Recent thread activity */}
-            {posts.length > 0 && (
+            {replies.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, x: 12 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -801,33 +787,36 @@ export function ForumDetailPage() {
                   <CardHeader className="pb-2 pt-4 px-4">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
                       <Clock size={13} className="text-emerald-600" />
-                      Thread Activity
+                      Recent Replies
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pb-3 space-y-2">
-                    {posts
+                    {replies
                       .slice(-5)
                       .reverse()
-                      .map((post, i) => (
+                      .map((reply, i) => (
                         <div
-                          key={post.id}
+                          key={String(reply.id)}
                           className={cn(
                             "flex items-start gap-2 py-1.5",
-                            i < posts.slice(-5).length - 1 &&
+                            i < Math.min(replies.length, 5) - 1 &&
                               "border-b border-border/40",
                           )}
                         >
-                          <AuthorAvatar name={post.authorName} size="sm" />
+                          <PrincipalAvatar
+                            principal={reply.createdBy}
+                            size="sm"
+                          />
                           <div className="min-w-0 flex-1">
                             <p className="text-[11px] font-medium text-foreground/90 truncate">
-                              {post.authorName}
+                              {truncatePrincipal(reply.createdBy)}
                             </p>
                             <p className="text-[10px] text-muted-foreground line-clamp-1">
-                              {post.content.slice(0, 50)}
-                              {post.content.length > 50 && "…"}
+                              {reply.body.slice(0, 50)}
+                              {reply.body.length > 50 && "…"}
                             </p>
                             <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                              {timeAgo(post.createdAt)}
+                              {timeAgo(reply.createdAt)}
                             </p>
                           </div>
                         </div>
@@ -837,7 +826,6 @@ export function ForumDetailPage() {
               </motion.div>
             )}
 
-            {/* Related threads */}
             <motion.div
               initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -846,7 +834,7 @@ export function ForumDetailPage() {
               <Card>
                 <CardHeader className="pb-2 pt-4 px-4">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <MessageSquare size={13} className="text-primary" />
+                    <ArrowLeft size={13} className="text-primary" />
                     Back to Forums
                   </CardTitle>
                 </CardHeader>
@@ -870,7 +858,7 @@ export function ForumDetailPage() {
         </div>
       </div>
 
-      {/* ── Archive Confirm Dialog ── */}
+      {/* Archive Confirm Dialog */}
       <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
         <DialogContent data-ocid="forum_detail.archive_confirm.dialog">
           <DialogHeader>
@@ -880,8 +868,7 @@ export function ForumDetailPage() {
             </DialogTitle>
             <DialogDescription>
               This thread will be archived and locked. It will be preserved for
-              reference but no new replies can be posted. This action can be
-              reversed by a moderator.
+              reference but no new replies can be posted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">

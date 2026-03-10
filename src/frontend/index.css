@@ -140,4 +140,54 @@
     color: oklch(var(--sidebar-accent-foreground));
     border-left: 3px solid oklch(var(--sidebar-primary));
   }
+
+  /* Page header pattern */
+  .page-header {
+    @apply px-6 pt-6 pb-4;
+  }
+
+  .page-title {
+    font-family: "Mona Sans", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    @apply text-2xl font-bold text-primary tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  /* Card elevation system */
+  .card-base {
+    @apply bg-white rounded-xl border border-border shadow-xs transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-md hover:border-primary/20;
+  }
+
+  .card-active {
+    @apply border-primary shadow-sm;
+  }
+
+  /* Decorative globe mesh SVG for hero */
+  .globe-mesh {
+    background-image: radial-gradient(
+        circle at 25% 25%,
+        oklch(0.96 0.008 250 / 0.06) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 75% 75%,
+        oklch(0.78 0.14 85 / 0.04) 0%,
+        transparent 50%
+      );
+  }
+
+  /* Responsive grid helpers */
+  .product-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  .member-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
 }

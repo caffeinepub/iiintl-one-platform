@@ -1,3 +1,4 @@
+import { type Campaign, CampaignType } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { RoleGate } from "@/components/RoleGate";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +30,9 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import {
-  type CampaignCategory,
-  type CampaignStatus,
-  MOCK_CAMPAIGNS,
-  MOCK_CTAS,
-  MOCK_ORGANIZATIONS,
-  MOCK_PETITIONS,
-  type OrgRegion,
-  getCampaignCategoryColor,
-  getCampaignStatusBadgeClasses,
-} from "@/data/mockData";
+import { useI18n } from "@/context/I18nContext";
+import { MOCK_ORGANIZATIONS, type OrgRegion } from "@/data/mockData";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -49,8 +42,8 @@ import {
   Globe,
   Grid3x3,
   LayoutList,
+  Loader2,
   Megaphone,
-  PenSquare,
   Plus,
   Search,
   Star,
@@ -59,7 +52,8 @@ import {
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -71,20 +65,29 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
-type FilterTab = "all" | CampaignStatus;
+type BackendCampaignStatus = "active" | "completed" | "draft" | "archived";
+type FilterTab = "all" | BackendCampaignStatus;
 
-const CAMPAIGN_CATEGORIES: CampaignCategory[] = [
-  "Climate Justice",
-  "Digital Rights",
-  "Labor Rights",
-  "Electoral Reform",
-  "Women's Rights",
-  "Peace & Diplomacy",
-  "Economic Justice",
-  "Human Rights",
-  "Youth Empowerment",
-  "Immigration",
-];
+const CAMPAIGN_TYPE_LABELS: Record<string, string> = {
+  action: "Action",
+  awareness: "Awareness",
+  fundraiser: "Fundraiser",
+  petition: "Petition",
+};
+
+const CAMPAIGN_TYPE_COLORS: Record<string, string> = {
+  action: "bg-orange-50 text-orange-700 border-orange-200",
+  awareness: "bg-blue-50 text-blue-700 border-blue-200",
+  fundraiser: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  petition: "bg-indigo-50 text-indigo-700 border-indigo-200",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  active: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  completed: "bg-slate-50 text-slate-600 border-slate-200",
+  draft: "bg-amber-50 text-amber-700 border-amber-200",
+  archived: "bg-red-50 text-red-600 border-red-200",
+};
 
 const ORG_REGIONS: OrgRegion[] = [
   "Global",
@@ -97,17 +100,37 @@ const ORG_REGIONS: OrgRegion[] = [
   "South Asia",
 ];
 
+function bigintToDate(ns: bigint): Date {
+  return new Date(Number(ns) / 1_000_000);
+}
+
+function dateToBigint(dateStr: string): bigint {
+  return BigInt(new Date(dateStr).getTime()) * 1_000_000n;
+}
+
+function getCampaignProgress(campaign: Campaign): number {
+  if (!campaign.goal || campaign.goal === 0n) return 0;
+  return Math.min(
+    100,
+    Math.round((Number(campaign.progress) / Number(campaign.goal)) * 100),
+  );
+}
+
 function CreateCampaignDialog({
   open,
   onOpenChange,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  onCreated: () => void;
 }) {
+  const backend = useBackend();
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
+  const [campaignType, setCampaignType] = useState<CampaignType>(
+    CampaignType.petition,
+  );
   const [orgId, setOrgId] = useState("");
-  const [region, setRegion] = useState("");
   const [description, setDescription] = useState("");
   const [goal, setGoal] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -115,22 +138,53 @@ function CreateCampaignDialog({
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!title.trim()) return;
+    if (!backend) {
+      toast.error("Not connected to backend. Please log in.");
+      return;
+    }
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const tagList = tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const goalBig = goal ? BigInt(Math.round(Number(goal))) : 0n;
+      const startBig = startDate
+        ? dateToBigint(startDate)
+        : BigInt(Date.now()) * 1_000_000n;
+      const endBig = endDate
+        ? dateToBigint(endDate)
+        : startBig + BigInt(90 * 24 * 60 * 60) * 1_000_000_000n;
+
+      await backend.createCampaign(
+        title.trim(),
+        description.trim(),
+        campaignType,
+        orgId,
+        goalBig,
+        startBig,
+        endBig,
+        tagList,
+      );
+      toast.success("Campaign created successfully!");
       onOpenChange(false);
+      onCreated();
       setTitle("");
-      setCategory("");
+      setCampaignType(CampaignType.petition);
       setOrgId("");
-      setRegion("");
       setDescription("");
       setGoal("");
       setStartDate("");
       setEndDate("");
       setTags("");
-    }, 900);
+    } catch (err) {
+      toast.error("Failed to create campaign. Please try again.");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -164,15 +218,18 @@ function CreateCampaignDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Category</Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Label className="text-sm font-medium">Campaign Type</Label>
+              <Select
+                value={campaignType}
+                onValueChange={(v) => setCampaignType(v as CampaignType)}
+              >
                 <SelectTrigger data-ocid="campaigns.create_campaign.select">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CAMPAIGN_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {Object.values(CampaignType).map((ct) => (
+                    <SelectItem key={ct} value={ct}>
+                      {CAMPAIGN_TYPE_LABELS[ct] ?? ct}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -196,22 +253,6 @@ function CreateCampaignDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Region</Label>
-            <Select value={region} onValueChange={setRegion}>
-              <SelectTrigger data-ocid="campaigns.create_campaign.select">
-                <SelectValue placeholder="Select region" />
-              </SelectTrigger>
-              <SelectContent>
-                {ORG_REGIONS.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="camp-desc" className="text-sm font-medium">
               Description
             </Label>
@@ -227,15 +268,16 @@ function CreateCampaignDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="camp-goal" className="text-sm font-medium">
-              Campaign Goal
+              Goal (numeric target)
             </Label>
-            <Textarea
+            <Input
               id="camp-goal"
-              placeholder="What specific outcome does this campaign aim to achieve?"
-              rows={2}
+              type="number"
+              min="0"
+              placeholder="e.g. 10000 (signatures, participants, etc.)"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
-              data-ocid="campaigns.create_campaign.textarea"
+              data-ocid="campaigns.create_campaign.input"
             />
           </div>
 
@@ -293,7 +335,14 @@ function CreateCampaignDialog({
             disabled={!title.trim() || saving}
             data-ocid="campaigns.create_campaign.submit_button"
           >
-            {saving ? "Creating..." : "Create Campaign"}
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Campaign"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -305,56 +354,72 @@ function CampaignCard({
   campaign,
   index,
   viewMode,
+  onJoinLeave,
 }: {
-  campaign: (typeof MOCK_CAMPAIGNS)[0];
+  campaign: Campaign;
   index: number;
   viewMode: "grid" | "list";
+  onJoinLeave: (campaignId: string, joined: boolean) => Promise<void>;
 }) {
   const [joined, setJoined] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const petition = MOCK_PETITIONS.find((p) => p.campaignId === campaign.id);
-  const ctaCount = MOCK_CTAS.filter((c) => c.campaignId === campaign.id).length;
+  const typeKey =
+    typeof campaign.campaignType === "object"
+      ? Object.keys(campaign.campaignType as object)[0]
+      : String(campaign.campaignType);
+  const statusKey =
+    typeof campaign.status === "object"
+      ? Object.keys(campaign.status as object)[0]
+      : String(campaign.status);
 
-  const catColor = getCampaignCategoryColor(campaign.category);
-  const statusColor = getCampaignStatusBadgeClasses(campaign.status);
+  const typeLabel = CAMPAIGN_TYPE_LABELS[typeKey] ?? typeKey;
+  const typeColor = CAMPAIGN_TYPE_COLORS[typeKey] ?? "";
+  const statusColor = STATUS_COLORS[statusKey] ?? "";
+  const progressPct = getCampaignProgress(campaign);
 
-  const sigPct = petition
-    ? Math.round((petition.currentSignatures / petition.targetSignatures) * 100)
-    : 0;
+  const startDateObj = bigintToDate(campaign.startDate);
+  const endDateObj = bigintToDate(campaign.endDate);
+
+  async function handleJoinLeave() {
+    setActionLoading(true);
+    try {
+      await onJoinLeave(campaign.id, joined);
+      setJoined(!joined);
+    } catch {
+      // error handled by parent
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   if (viewMode === "list") {
     return (
       <motion.div variants={cardVariants} data-ocid={`campaigns.item.${index}`}>
-        <Card
-          className={cn(
-            "border-border hover:shadow-md transition-all duration-200 group",
-            campaign.featured && "ring-1 ring-amber-200 bg-amber-50/30",
-          )}
-        >
+        <Card className="border-border hover:shadow-md transition-all duration-200 group">
           <CardContent className="px-4 py-3">
             <div className="flex items-start gap-4">
-              {/* Left: Status dot */}
+              {/* Status dot */}
               <div
                 className={cn(
                   "w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5",
-                  campaign.status === "active"
+                  statusKey === "active"
                     ? "bg-emerald-500"
-                    : campaign.status === "upcoming"
+                    : statusKey === "draft"
                       ? "bg-amber-500"
-                      : campaign.status === "paused"
-                        ? "bg-orange-400"
-                        : "bg-slate-400",
+                      : statusKey === "completed"
+                        ? "bg-slate-400"
+                        : "bg-red-400",
                 )}
               />
-
               {/* Main content */}
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <Badge
                     variant="outline"
-                    className={cn("text-[10px] px-1.5 py-0 h-4", catColor)}
+                    className={cn("text-[10px] px-1.5 py-0 h-4", typeColor)}
                   >
-                    {campaign.category}
+                    {typeLabel}
                   </Badge>
                   <Badge
                     variant="outline"
@@ -363,24 +428,14 @@ function CampaignCard({
                       statusColor,
                     )}
                   >
-                    {campaign.status}
+                    {statusKey}
                   </Badge>
-                  {campaign.featured && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200"
-                    >
-                      <Star size={8} className="mr-0.5 fill-amber-500" />
-                      Featured
-                    </Badge>
-                  )}
                 </div>
-
                 <h3 className="font-display font-semibold text-foreground text-sm group-hover:text-primary transition-colors">
                   {campaign.title}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {campaign.organization} · {campaign.region}
+                  Org: {campaign.orgId}
                 </p>
               </div>
 
@@ -388,11 +443,11 @@ function CampaignCard({
               <div className="hidden sm:flex items-center gap-4 flex-shrink-0 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Users size={11} />
-                  {campaign.participantCount.toLocaleString()}
+                  {Number(campaign.supporterCount).toLocaleString()}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Zap size={11} />
-                  {ctaCount}
+                  <Star size={11} />
+                  {progressPct}%
                 </span>
               </div>
 
@@ -402,10 +457,17 @@ function CampaignCard({
                   size="sm"
                   variant={joined ? "secondary" : "outline"}
                   className="h-7 text-xs"
-                  onClick={() => setJoined(!joined)}
+                  onClick={handleJoinLeave}
+                  disabled={actionLoading}
                   data-ocid={`campaigns.join_button.${index}`}
                 >
-                  {joined ? "Joined ✓" : "Join"}
+                  {actionLoading ? (
+                    <Loader2 size={10} className="animate-spin" />
+                  ) : joined ? (
+                    "Joined ✓"
+                  ) : (
+                    "Join"
+                  )}
                 </Button>
                 <Button
                   asChild
@@ -428,27 +490,15 @@ function CampaignCard({
   // Grid mode
   return (
     <motion.div variants={cardVariants} data-ocid={`campaigns.item.${index}`}>
-      <Card
-        className={cn(
-          "h-full flex flex-col border-border hover:shadow-md transition-all duration-200 group overflow-hidden",
-          campaign.featured &&
-            "ring-1 ring-amber-200 shadow-sm shadow-amber-100",
-        )}
-      >
-        {/* Category color accent */}
+      <Card className="h-full flex flex-col border-border hover:shadow-md transition-all duration-200 group overflow-hidden">
+        {/* Type color accent */}
         <div
           className={cn(
             "h-0.5 w-full",
-            campaign.category === "Climate Justice" && "bg-green-400",
-            campaign.category === "Digital Rights" && "bg-blue-400",
-            campaign.category === "Labor Rights" && "bg-orange-400",
-            campaign.category === "Electoral Reform" && "bg-indigo-400",
-            campaign.category === "Women's Rights" && "bg-pink-400",
-            campaign.category === "Peace & Diplomacy" && "bg-sky-400",
-            campaign.category === "Youth Empowerment" && "bg-purple-400",
-            campaign.category === "Human Rights" && "bg-red-400",
-            campaign.category === "Economic Justice" && "bg-yellow-400",
-            campaign.category === "Immigration" && "bg-teal-400",
+            typeKey === "petition" && "bg-indigo-400",
+            typeKey === "fundraiser" && "bg-emerald-400",
+            typeKey === "awareness" && "bg-blue-400",
+            typeKey === "action" && "bg-orange-400",
           )}
         />
 
@@ -456,9 +506,9 @@ function CampaignCard({
           <div className="flex flex-wrap gap-1.5 mb-2">
             <Badge
               variant="outline"
-              className={cn("text-[10px] px-1.5 py-0 h-4", catColor)}
+              className={cn("text-[10px] px-1.5 py-0 h-4", typeColor)}
             >
-              {campaign.category}
+              {typeLabel}
             </Badge>
             <Badge
               variant="outline"
@@ -467,17 +517,8 @@ function CampaignCard({
                 statusColor,
               )}
             >
-              {campaign.status}
+              {statusKey}
             </Badge>
-            {campaign.featured && (
-              <Badge
-                variant="outline"
-                className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200 ml-auto"
-              >
-                <Star size={8} className="mr-0.5 fill-amber-500" />
-                Featured
-              </Badge>
-            )}
           </div>
 
           <h3 className="font-display font-semibold text-foreground text-sm leading-snug group-hover:text-primary transition-colors">
@@ -485,9 +526,7 @@ function CampaignCard({
           </h3>
           <div className="flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
             <Globe size={10} />
-            <span>
-              {campaign.organization} · {campaign.region}
-            </span>
+            <span className="truncate">Org: {campaign.orgId}</span>
           </div>
         </CardHeader>
 
@@ -496,18 +535,18 @@ function CampaignCard({
             {campaign.description}
           </p>
 
-          {/* Petition progress */}
-          {petition && (
+          {/* Progress bar */}
+          {campaign.goal > 0n && (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <span>
-                  {petition.currentSignatures.toLocaleString()} signatures
+                  {Number(campaign.progress).toLocaleString()} progress
                 </span>
-                <span>{sigPct}%</span>
+                <span>{progressPct}%</span>
               </div>
-              <Progress value={sigPct} className="h-1.5" />
+              <Progress value={progressPct} className="h-1.5" />
               <p className="text-[10px] text-muted-foreground">
-                of {petition.targetSignatures.toLocaleString()} target
+                of {Number(campaign.goal).toLocaleString()} goal
               </p>
             </div>
           )}
@@ -517,16 +556,14 @@ function CampaignCard({
             <span className="flex items-center gap-1">
               <Users size={10} />
               <strong className="text-foreground">
-                {campaign.participantCount.toLocaleString()}
+                {Number(campaign.supporterCount).toLocaleString()}
               </strong>{" "}
-              joined
+              supporters
             </span>
             <span className="flex items-center gap-1">
               <Zap size={10} />
-              <strong className="text-foreground">
-                {campaign.actionCount.toLocaleString()}
-              </strong>{" "}
-              actions
+              <strong className="text-foreground">{progressPct}%</strong>{" "}
+              complete
             </span>
           </div>
 
@@ -534,32 +571,38 @@ function CampaignCard({
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <Calendar size={10} />
             <span>
-              {new Date(campaign.startDate).toLocaleDateString("en-US", {
+              {startDateObj.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
               })}
-              {campaign.endDate &&
-                ` → ${new Date(campaign.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+              {" → "}
+              {endDateObj.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
             </span>
           </div>
 
           {/* Tags */}
-          <div className="flex flex-wrap gap-1">
-            {campaign.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded"
-              >
-                #{tag}
-              </span>
-            ))}
-            {campaign.tags.length > 3 && (
-              <span className="text-[10px] text-muted-foreground px-1 py-0.5">
-                +{campaign.tags.length - 3} more
-              </span>
-            )}
-          </div>
+          {campaign.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {campaign.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded"
+                >
+                  #{tag}
+                </span>
+              ))}
+              {campaign.tags.length > 3 && (
+                <span className="text-[10px] text-muted-foreground px-1 py-0.5">
+                  +{campaign.tags.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="px-4 pb-4 pt-0 flex items-center gap-2">
@@ -579,10 +622,17 @@ function CampaignCard({
             size="sm"
             variant={joined ? "secondary" : "outline"}
             className="h-8 text-xs px-3"
-            onClick={() => setJoined(!joined)}
+            onClick={handleJoinLeave}
+            disabled={actionLoading}
             data-ocid={`campaigns.join_button.${index}`}
           >
-            {joined ? "Joined ✓" : "Join"}
+            {actionLoading ? (
+              <Loader2 size={10} className="animate-spin" />
+            ) : joined ? (
+              "Joined ✓"
+            ) : (
+              "Join"
+            )}
           </Button>
         </CardFooter>
       </Card>
@@ -592,9 +642,16 @@ function CampaignCard({
 
 export function CampaignsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
+  const backend = useBackend();
+
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [createOpen, setCreateOpen] = useState(false);
@@ -604,37 +661,99 @@ export function CampaignsPage() {
     user?.role === "admin" ||
     user?.role === "org_admin";
 
-  const filtered = MOCK_CAMPAIGNS.filter((c) => {
+  const loadCampaigns = useCallback(async () => {
+    if (!backend) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await backend.listCampaigns();
+      setCampaigns(data);
+    } catch (err) {
+      setError("Failed to load campaigns. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [backend]);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
+
+  async function handleJoinLeave(campaignId: string, currentlyJoined: boolean) {
+    if (!backend) {
+      toast.error("Please log in to join campaigns.");
+      return;
+    }
+    try {
+      if (currentlyJoined) {
+        await backend.leaveCampaign(campaignId);
+        toast.success("Left campaign.");
+      } else {
+        await backend.joinCampaign(campaignId);
+        toast.success("Joined campaign!");
+      }
+      await loadCampaigns();
+    } catch (err) {
+      toast.error("Action failed. Please try again.");
+      console.error(err);
+    }
+  }
+
+  const getStatusKey = (campaign: Campaign): string => {
+    return typeof campaign.status === "object"
+      ? Object.keys(campaign.status as object)[0]
+      : String(campaign.status);
+  };
+
+  const getTypeKey = (campaign: Campaign): string => {
+    return typeof campaign.campaignType === "object"
+      ? Object.keys(campaign.campaignType as object)[0]
+      : String(campaign.campaignType);
+  };
+
+  const filtered = campaigns.filter((c) => {
     const q = search.toLowerCase();
     const matchesSearch =
       !search ||
       c.title.toLowerCase().includes(q) ||
-      c.organization.toLowerCase().includes(q) ||
-      c.tags.some((t) => t.toLowerCase().includes(q));
+      c.description.toLowerCase().includes(q) ||
+      c.tags.some((tag) => tag.toLowerCase().includes(q));
 
-    const matchesTab = activeTab === "all" || c.status === activeTab;
+    const statusKey = getStatusKey(c);
+    const matchesTab = activeTab === "all" || statusKey === activeTab;
 
-    const matchesCat =
-      categoryFilter === "all" || c.category === categoryFilter;
+    const typeKey = getTypeKey(c);
+    const matchesType = typeFilter === "all" || typeKey === typeFilter;
 
-    const matchesRegion = regionFilter === "all" || c.region === regionFilter;
-
-    return matchesSearch && matchesTab && matchesCat && matchesRegion;
+    return matchesSearch && matchesTab && matchesType;
   });
 
-  // Stats
-  const activeCount = MOCK_CAMPAIGNS.filter(
-    (c) => c.status === "active",
+  // Stats derived from loaded campaigns
+  const activeCount = campaigns.filter(
+    (c) => getStatusKey(c) === "active",
   ).length;
-  const totalParticipants = MOCK_CAMPAIGNS.reduce(
-    (sum, c) => sum + c.participantCount,
+  const totalSupporters = campaigns.reduce(
+    (sum, c) => sum + Number(c.supporterCount),
     0,
   );
-  const totalPetitions = MOCK_PETITIONS.length;
-  const totalCTAs = MOCK_CTAS.length;
+  const draftCount = campaigns.filter(
+    (c) => getStatusKey(c) === "draft",
+  ).length;
+  const completedCount = campaigns.filter(
+    (c) => getStatusKey(c) === "completed",
+  ).length;
+
+  const tabCounts: Record<string, number> = {
+    all: campaigns.length,
+    active: activeCount,
+    draft: draftCount,
+    completed: completedCount,
+    archived: campaigns.filter((c) => getStatusKey(c) === "archived").length,
+  };
 
   return (
-    <Layout breadcrumb="Campaigns">
+    <Layout breadcrumb={t.campaigns.title}>
       <div className="p-6 max-w-7xl mx-auto">
         {/* ── Page Header ── */}
         <motion.div
@@ -646,10 +765,10 @@ export function CampaignsPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-primary tracking-tight flex items-center gap-2.5">
               <Megaphone size={22} className="opacity-80" />
-              Campaigns
+              {t.campaigns.title}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Discover, launch, and participate in civic campaigns worldwide.
+              {t.campaigns.subtitle}
             </p>
             <div className="mt-3 civic-rule w-12" />
           </div>
@@ -662,7 +781,7 @@ export function CampaignsPage() {
               data-ocid="campaigns.create_campaign.open_modal_button"
             >
               <Plus size={14} />
-              Create Campaign
+              {t.campaigns.createCampaign}
             </Button>
           )}
         </motion.div>
@@ -677,25 +796,25 @@ export function CampaignsPage() {
           {[
             {
               label: "Active Campaigns",
-              value: activeCount,
+              value: loading ? "—" : activeCount,
               icon: <Megaphone size={15} className="text-emerald-600" />,
               bg: "bg-emerald-50",
             },
             {
-              label: "Total Participants",
-              value: totalParticipants.toLocaleString(),
+              label: "Total Supporters",
+              value: loading ? "—" : totalSupporters.toLocaleString(),
               icon: <Users size={15} className="text-blue-600" />,
               bg: "bg-blue-50",
             },
             {
-              label: "Petitions",
-              value: totalPetitions,
+              label: "Completed",
+              value: loading ? "—" : completedCount,
               icon: <CheckCircle2 size={15} className="text-indigo-600" />,
               bg: "bg-indigo-50",
             },
             {
-              label: "Calls to Action",
-              value: totalCTAs,
+              label: "Drafts",
+              value: loading ? "—" : draftCount,
               icon: <Zap size={15} className="text-amber-600" />,
               bg: "bg-amber-50",
             },
@@ -737,7 +856,7 @@ export function CampaignsPage() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <Input
-                placeholder="Search campaigns, orgs, tags..."
+                placeholder="Search campaigns, tags..."
                 className="pl-8 h-9 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -767,7 +886,7 @@ export function CampaignsPage() {
             </div>
           </div>
 
-          {/* Row 2: Status Tabs + Category/Region Filters */}
+          {/* Row 2: Status Tabs + Type Filter */}
           <div className="flex flex-wrap gap-3">
             <Tabs
               value={activeTab}
@@ -776,37 +895,11 @@ export function CampaignsPage() {
               <TabsList className="h-9">
                 {(
                   [
-                    {
-                      value: "all",
-                      label: "All",
-                      count: MOCK_CAMPAIGNS.length,
-                    },
-                    {
-                      value: "active",
-                      label: "Active",
-                      count: MOCK_CAMPAIGNS.filter((c) => c.status === "active")
-                        .length,
-                    },
-                    {
-                      value: "upcoming",
-                      label: "Upcoming",
-                      count: MOCK_CAMPAIGNS.filter(
-                        (c) => c.status === "upcoming",
-                      ).length,
-                    },
-                    {
-                      value: "completed",
-                      label: "Completed",
-                      count: MOCK_CAMPAIGNS.filter(
-                        (c) => c.status === "completed",
-                      ).length,
-                    },
-                    {
-                      value: "paused",
-                      label: "Paused",
-                      count: MOCK_CAMPAIGNS.filter((c) => c.status === "paused")
-                        .length,
-                    },
+                    { value: "all", label: "All" },
+                    { value: "active", label: "Active" },
+                    { value: "draft", label: "Drafts" },
+                    { value: "completed", label: "Completed" },
+                    { value: "archived", label: "Archived" },
                   ] as const
                 ).map((tab) => (
                   <TabsTrigger
@@ -816,9 +909,9 @@ export function CampaignsPage() {
                     data-ocid="campaigns.status_filter.tab"
                   >
                     {tab.label}
-                    {tab.count > 0 && (
+                    {!loading && tabCounts[tab.value] > 0 && (
                       <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
-                        {tab.count}
+                        {tabCounts[tab.value]}
                       </span>
                     )}
                   </TabsTrigger>
@@ -826,18 +919,18 @@ export function CampaignsPage() {
               </TabsList>
             </Tabs>
 
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger
                 className="w-44 h-9 text-xs"
-                data-ocid="campaigns.category_filter.select"
+                data-ocid="campaigns.type_filter.select"
               >
-                <SelectValue placeholder="All categories" />
+                <SelectValue placeholder="All types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {CAMPAIGN_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
+                <SelectItem value="all">All Types</SelectItem>
+                {Object.values(CampaignType).map((ct) => (
+                  <SelectItem key={ct} value={ct}>
+                    {CAMPAIGN_TYPE_LABELS[ct] ?? ct}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -863,80 +956,114 @@ export function CampaignsPage() {
         </motion.div>
 
         {/* ── Results count ── */}
-        {(search || categoryFilter !== "all" || regionFilter !== "all") && (
+        {!loading && (search || typeFilter !== "all") && (
           <p className="text-xs text-muted-foreground mb-4">
-            Showing {filtered.length} of {MOCK_CAMPAIGNS.length} campaigns
+            Showing {filtered.length} of {campaigns.length} campaigns
           </p>
         )}
 
-        {/* ── Campaign Cards ── */}
-        {filtered.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-24 text-center"
-            data-ocid="campaigns.empty_state"
+        {/* ── Loading State ── */}
+        {loading && (
+          <div
+            className="flex flex-col items-center justify-center py-24 gap-3"
+            data-ocid="campaigns.loading_state"
           >
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-              <Megaphone size={24} className="text-muted-foreground/50" />
-            </div>
-            <h3 className="font-display font-semibold text-foreground mb-1">
-              No campaigns found
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              {search
-                ? `No campaigns match "${search}". Try a different search term.`
-                : "No campaigns match your current filters."}
+            <Loader2 size={32} className="animate-spin text-primary/50" />
+            <p className="text-sm text-muted-foreground">
+              Loading campaigns...
             </p>
-            {canCreate && (
-              <Button
-                size="sm"
-                className="mt-4 gap-2"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus size={13} />
-                Create First Campaign
-              </Button>
-            )}
-          </motion.div>
-        ) : viewMode === "grid" ? (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-            {filtered.map((campaign, i) => (
-              <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-                index={i + 1}
-                viewMode="grid"
-              />
-            ))}
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="space-y-2"
-          >
-            {filtered.map((campaign, i) => (
-              <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-                index={i + 1}
-                viewMode="list"
-              />
-            ))}
-          </motion.div>
+          </div>
         )}
+
+        {/* ── Error State ── */}
+        {!loading && error && (
+          <div
+            className="flex flex-col items-center justify-center py-24 text-center gap-3"
+            data-ocid="campaigns.error_state"
+          >
+            <p className="text-sm text-destructive">{error}</p>
+            <Button size="sm" variant="outline" onClick={loadCampaigns}>
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {/* ── Campaign Cards ── */}
+        {!loading &&
+          !error &&
+          (filtered.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+              data-ocid="campaigns.empty_state"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+                <Megaphone size={24} className="text-muted-foreground/50" />
+              </div>
+              <h3 className="font-display font-semibold text-foreground mb-1">
+                No campaigns found
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                {search
+                  ? `No campaigns match "${search}". Try a different search term.`
+                  : "No campaigns match your current filters."}
+              </p>
+              {canCreate && (
+                <Button
+                  size="sm"
+                  className="mt-4 gap-2"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus size={13} />
+                  Create First Campaign
+                </Button>
+              )}
+            </motion.div>
+          ) : viewMode === "grid" ? (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              {filtered.map((campaign, i) => (
+                <CampaignCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  index={i + 1}
+                  viewMode="grid"
+                  onJoinLeave={handleJoinLeave}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="space-y-2"
+            >
+              {filtered.map((campaign, i) => (
+                <CampaignCard
+                  key={campaign.id}
+                  campaign={campaign}
+                  index={i + 1}
+                  viewMode="list"
+                  onJoinLeave={handleJoinLeave}
+                />
+              ))}
+            </motion.div>
+          ))}
       </div>
 
       {/* Create Campaign Modal */}
       <RoleGate roles={["super_admin", "admin", "org_admin"]}>
-        <CreateCampaignDialog open={createOpen} onOpenChange={setCreateOpen} />
+        <CreateCampaignDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={loadCampaigns}
+        />
       </RoleGate>
     </Layout>
   );

@@ -10,7 +10,170 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface _SERVICE { 'ping' : ActorMethod<[], string> }
+export interface Campaign {
+  'id' : string,
+  'status' : CampaignStatus,
+  'title' : string,
+  'endDate' : bigint,
+  'orgId' : string,
+  'goal' : bigint,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'tags' : Array<string>,
+  'description' : string,
+  'progress' : bigint,
+  'supporterCount' : bigint,
+  'campaignType' : CampaignType,
+  'startDate' : bigint,
+}
+export type CampaignStatus = { 'active' : null } |
+  { 'completed' : null } |
+  { 'draft' : null } |
+  { 'archived' : null };
+export type CampaignType = { 'action' : null } |
+  { 'awareness' : null } |
+  { 'fundraiser' : null } |
+  { 'petition' : null };
+export type ForumCategory = { 'resources' : null } |
+  { 'general' : null } |
+  { 'regional' : null } |
+  { 'campaigns' : null } |
+  { 'activism' : null } |
+  { 'announcements' : null };
+export interface ForumReply {
+  'id' : bigint,
+  'body' : string,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'isModeratorReply' : boolean,
+  'threadId' : bigint,
+}
+export interface ForumThread {
+  'id' : bigint,
+  'status' : ThreadStatus,
+  'title' : string,
+  'orgId' : [] | [string],
+  'body' : string,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'tags' : Array<string>,
+  'viewCount' : bigint,
+  'replyCount' : bigint,
+  'category' : ForumCategory,
+  'isPinned' : boolean,
+}
+export interface OrgMember {
+  'userId' : string,
+  'joinedAt' : bigint,
+  'role' : OrgMemberRole,
+}
+export type OrgMemberRole = { 'member' : null } |
+  { 'admin' : null };
+export type OrgStatus = { 'active' : null } |
+  { 'archived' : null };
+export interface Organization {
+  'id' : string,
+  'region' : string,
+  'status' : OrgStatus,
+  'members' : Array<OrgMember>,
+  'orgType' : string,
+  'foundedYear' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'createdBy' : Principal,
+  'description' : string,
+  'website' : string,
+}
+export type ThreadStatus = { 'open' : null } |
+  { 'locked' : null } |
+  { 'archived' : null };
+export interface UserProfile {
+  'bio' : string,
+  'displayName' : string,
+  'email' : string,
+  'avatarUrl' : string,
+}
+export type UserRole = { 'admin' : null } |
+  { 'user' : null } |
+  { 'guest' : null };
+export interface _SERVICE {
+  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'archiveCampaign' : ActorMethod<[string], boolean>,
+  'archiveOrg' : ActorMethod<[string], boolean>,
+  'archiveThread' : ActorMethod<[bigint], boolean>,
+  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'createCampaign' : ActorMethod<
+    [
+      string,
+      string,
+      CampaignType,
+      string,
+      bigint,
+      bigint,
+      bigint,
+      Array<string>,
+    ],
+    string
+  >,
+  'createOrg' : ActorMethod<
+    [string, string, string, string, string, bigint],
+    string
+  >,
+  'createThread' : ActorMethod<
+    [string, string, ForumCategory, [] | [string], Array<string>],
+    bigint
+  >,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCampaign' : ActorMethod<[string], [] | [Campaign]>,
+  'getCampaignProgress' : ActorMethod<
+    [string],
+    [] | [{ 'goal' : bigint, 'progress' : bigint }]
+  >,
+  'getCampaignSupporterCount' : ActorMethod<[string], [] | [bigint]>,
+  'getOrg' : ActorMethod<[string], [] | [Organization]>,
+  'getOrgMembers' : ActorMethod<[string], Array<OrgMember>>,
+  'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
+  'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
+  'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'incrementThreadView' : ActorMethod<[bigint], boolean>,
+  'isCallerAdmin' : ActorMethod<[], boolean>,
+  'joinCampaign' : ActorMethod<[string], boolean>,
+  'joinOrg' : ActorMethod<[string], boolean>,
+  'leaveCampaign' : ActorMethod<[string], boolean>,
+  'leaveOrg' : ActorMethod<[string], boolean>,
+  'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
+  'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
+  'listCampaigns' : ActorMethod<[], Array<Campaign>>,
+  'listCampaignsByOrg' : ActorMethod<[string], Array<Campaign>>,
+  'listOrgs' : ActorMethod<[], Array<Organization>>,
+  'listThreads' : ActorMethod<[], Array<ForumThread>>,
+  'listThreadsByCategory' : ActorMethod<[ForumCategory], Array<ForumThread>>,
+  'listThreadsByOrg' : ActorMethod<[string], Array<ForumThread>>,
+  'lockThread' : ActorMethod<[bigint], boolean>,
+  'pinThread' : ActorMethod<[bigint], boolean>,
+  'registerUser' : ActorMethod<[string, string], string>,
+  'replyToThread' : ActorMethod<[bigint, string], bigint>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateCampaign' : ActorMethod<
+    [
+      string,
+      string,
+      string,
+      CampaignType,
+      bigint,
+      bigint,
+      bigint,
+      Array<string>,
+    ],
+    boolean
+  >,
+  'updateOrg' : ActorMethod<
+    [string, string, string, string, string, string, bigint],
+    boolean
+  >,
+}
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;

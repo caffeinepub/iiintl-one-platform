@@ -89,25 +89,1075 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface backendInterface {
-    ping(): Promise<string>;
+export interface Campaign {
+    id: string;
+    status: CampaignStatus;
+    title: string;
+    endDate: bigint;
+    orgId: string;
+    goal: bigint;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    description: string;
+    progress: bigint;
+    supporterCount: bigint;
+    campaignType: CampaignType;
+    startDate: bigint;
 }
+export interface ForumReply {
+    id: bigint;
+    body: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    isModeratorReply: boolean;
+    threadId: bigint;
+}
+export interface OrgMember {
+    userId: string;
+    joinedAt: bigint;
+    role: OrgMemberRole;
+}
+export interface Organization {
+    id: string;
+    region: string;
+    status: OrgStatus;
+    members: Array<OrgMember>;
+    orgType: string;
+    foundedYear: bigint;
+    name: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    description: string;
+    website: string;
+}
+export interface UserProfile {
+    bio: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string;
+}
+export interface ForumThread {
+    id: bigint;
+    status: ThreadStatus;
+    title: string;
+    orgId?: string;
+    body: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    viewCount: bigint;
+    replyCount: bigint;
+    category: ForumCategory;
+    isPinned: boolean;
+}
+export enum CampaignStatus {
+    active = "active",
+    completed = "completed",
+    draft = "draft",
+    archived = "archived"
+}
+export enum CampaignType {
+    action = "action",
+    awareness = "awareness",
+    fundraiser = "fundraiser",
+    petition = "petition"
+}
+export enum ForumCategory {
+    resources = "resources",
+    general = "general",
+    regional = "regional",
+    campaigns = "campaigns",
+    activism = "activism",
+    announcements = "announcements"
+}
+export enum OrgMemberRole {
+    member = "member",
+    admin = "admin"
+}
+export enum OrgStatus {
+    active = "active",
+    archived = "archived"
+}
+export enum ThreadStatus {
+    open = "open",
+    locked = "locked",
+    archived = "archived"
+}
+export enum UserRole {
+    admin = "admin",
+    user = "user",
+    guest = "guest"
+}
+export interface backendInterface {
+    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    archiveCampaign(id: string): Promise<boolean>;
+    archiveOrg(orgId: string): Promise<boolean>;
+    archiveThread(threadId: bigint): Promise<boolean>;
+    assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createCampaign(title: string, description: string, campaignType: CampaignType, orgId: string, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<string>;
+    createOrg(name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<string>;
+    createThread(title: string, body: string, category: ForumCategory, orgId: string | null, tags: Array<string>): Promise<bigint>;
+    getCallerUserProfile(): Promise<UserProfile | null>;
+    getCallerUserRole(): Promise<UserRole>;
+    getCampaign(id: string): Promise<Campaign | null>;
+    getCampaignProgress(campaignId: string): Promise<{
+        goal: bigint;
+        progress: bigint;
+    } | null>;
+    getCampaignSupporterCount(campaignId: string): Promise<bigint | null>;
+    getOrg(orgId: string): Promise<Organization | null>;
+    getOrgMembers(orgId: string): Promise<Array<OrgMember>>;
+    getReplies(threadId: bigint): Promise<Array<ForumReply>>;
+    getThread(threadId: bigint): Promise<ForumThread | null>;
+    getUserOrgs(userId: string): Promise<Array<Organization>>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
+    incrementThreadView(threadId: bigint): Promise<boolean>;
+    isCallerAdmin(): Promise<boolean>;
+    joinCampaign(campaignId: string): Promise<boolean>;
+    joinOrg(orgId: string): Promise<boolean>;
+    leaveCampaign(campaignId: string): Promise<boolean>;
+    leaveOrg(orgId: string): Promise<boolean>;
+    listActiveCampaigns(): Promise<Array<Campaign>>;
+    listActiveOrgs(): Promise<Array<Organization>>;
+    listCampaigns(): Promise<Array<Campaign>>;
+    listCampaignsByOrg(orgId: string): Promise<Array<Campaign>>;
+    listOrgs(): Promise<Array<Organization>>;
+    listThreads(): Promise<Array<ForumThread>>;
+    listThreadsByCategory(category: ForumCategory): Promise<Array<ForumThread>>;
+    listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;
+    lockThread(threadId: bigint): Promise<boolean>;
+    pinThread(threadId: bigint): Promise<boolean>;
+    registerUser(displayName: string, email: string): Promise<string>;
+    replyToThread(threadId: bigint, body: string): Promise<bigint>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
+    updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
+}
+import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, ThreadStatus as _ThreadStatus, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
-    async ping(): Promise<string> {
+    async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.ping();
+                const result = await this.actor._initializeAccessControlWithSecret(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.ping();
+            const result = await this.actor._initializeAccessControlWithSecret(arg0);
             return result;
         }
     }
+    async archiveCampaign(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.archiveCampaign(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.archiveCampaign(arg0);
+            return result;
+        }
+    }
+    async archiveOrg(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.archiveOrg(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.archiveOrg(arg0);
+            return result;
+        }
+    }
+    async archiveThread(arg0: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.archiveThread(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.archiveThread(arg0);
+            return result;
+        }
+    }
+    async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async createCampaign(arg0: string, arg1: string, arg2: CampaignType, arg3: string, arg4: bigint, arg5: bigint, arg6: bigint, arg7: Array<string>): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createCampaign(arg0, arg1, to_candid_CampaignType_n3(this._uploadFile, this._downloadFile, arg2), arg3, arg4, arg5, arg6, arg7);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createCampaign(arg0, arg1, to_candid_CampaignType_n3(this._uploadFile, this._downloadFile, arg2), arg3, arg4, arg5, arg6, arg7);
+            return result;
+        }
+    }
+    async createOrg(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: bigint): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createOrg(arg0, arg1, arg2, arg3, arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createOrg(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
+    async createThread(arg0: string, arg1: string, arg2: ForumCategory, arg3: string | null, arg4: Array<string>): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createThread(arg0, arg1, to_candid_ForumCategory_n5(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n7(this._uploadFile, this._downloadFile, arg3), arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createThread(arg0, arg1, to_candid_ForumCategory_n5(this._uploadFile, this._downloadFile, arg2), to_candid_opt_n7(this._uploadFile, this._downloadFile, arg3), arg4);
+            return result;
+        }
+    }
+    async getCallerUserProfile(): Promise<UserProfile | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCallerUserProfile();
+                return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCallerUserProfile();
+            return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCallerUserRole(): Promise<UserRole> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCallerUserRole();
+                return from_candid_UserRole_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCallerUserRole();
+            return from_candid_UserRole_n9(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCampaign(arg0: string): Promise<Campaign | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCampaign(arg0);
+                return from_candid_opt_n11(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCampaign(arg0);
+            return from_candid_opt_n11(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCampaignProgress(arg0: string): Promise<{
+        goal: bigint;
+        progress: bigint;
+    } | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCampaignProgress(arg0);
+                return from_candid_opt_n18(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCampaignProgress(arg0);
+            return from_candid_opt_n18(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getCampaignSupporterCount(arg0: string): Promise<bigint | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCampaignSupporterCount(arg0);
+                return from_candid_opt_n19(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCampaignSupporterCount(arg0);
+            return from_candid_opt_n19(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOrg(arg0: string): Promise<Organization | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrg(arg0);
+                return from_candid_opt_n20(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrg(arg0);
+            return from_candid_opt_n20(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOrgMembers(arg0: string): Promise<Array<OrgMember>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOrgMembers(arg0);
+                return from_candid_vec_n25(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOrgMembers(arg0);
+            return from_candid_vec_n25(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getReplies(arg0: bigint): Promise<Array<ForumReply>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getReplies(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getReplies(arg0);
+            return result;
+        }
+    }
+    async getThread(arg0: bigint): Promise<ForumThread | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getThread(arg0);
+                return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getThread(arg0);
+            return from_candid_opt_n30(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getUserOrgs(arg0: string): Promise<Array<Organization>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUserOrgs(arg0);
+                return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUserOrgs(arg0);
+            return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getUserProfile(arg0);
+                return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getUserProfile(arg0);
+            return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async incrementThreadView(arg0: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.incrementThreadView(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.incrementThreadView(arg0);
+            return result;
+        }
+    }
+    async isCallerAdmin(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isCallerAdmin();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async joinCampaign(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.joinCampaign(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.joinCampaign(arg0);
+            return result;
+        }
+    }
+    async joinOrg(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.joinOrg(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.joinOrg(arg0);
+            return result;
+        }
+    }
+    async leaveCampaign(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.leaveCampaign(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.leaveCampaign(arg0);
+            return result;
+        }
+    }
+    async leaveOrg(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.leaveOrg(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.leaveOrg(arg0);
+            return result;
+        }
+    }
+    async listActiveCampaigns(): Promise<Array<Campaign>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listActiveCampaigns();
+                return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listActiveCampaigns();
+            return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listActiveOrgs(): Promise<Array<Organization>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listActiveOrgs();
+                return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listActiveOrgs();
+            return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listCampaigns(): Promise<Array<Campaign>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listCampaigns();
+                return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listCampaigns();
+            return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listCampaignsByOrg(arg0: string): Promise<Array<Campaign>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listCampaignsByOrg(arg0);
+                return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listCampaignsByOrg(arg0);
+            return from_candid_vec_n39(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listOrgs(): Promise<Array<Organization>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listOrgs();
+                return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listOrgs();
+            return from_candid_vec_n38(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listThreads(): Promise<Array<ForumThread>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listThreads();
+                return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listThreads();
+            return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listThreadsByCategory(arg0: ForumCategory): Promise<Array<ForumThread>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listThreadsByCategory(to_candid_ForumCategory_n5(this._uploadFile, this._downloadFile, arg0));
+                return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listThreadsByCategory(to_candid_ForumCategory_n5(this._uploadFile, this._downloadFile, arg0));
+            return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listThreadsByOrg(arg0: string): Promise<Array<ForumThread>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listThreadsByOrg(arg0);
+                return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listThreadsByOrg(arg0);
+            return from_candid_vec_n40(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async lockThread(arg0: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.lockThread(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.lockThread(arg0);
+            return result;
+        }
+    }
+    async pinThread(arg0: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.pinThread(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.pinThread(arg0);
+            return result;
+        }
+    }
+    async registerUser(arg0: string, arg1: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerUser(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerUser(arg0, arg1);
+            return result;
+        }
+    }
+    async replyToThread(arg0: bigint, arg1: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.replyToThread(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.replyToThread(arg0, arg1);
+            return result;
+        }
+    }
+    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveCallerUserProfile(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveCallerUserProfile(arg0);
+            return result;
+        }
+    }
+    async updateCampaign(arg0: string, arg1: string, arg2: string, arg3: CampaignType, arg4: bigint, arg5: bigint, arg6: bigint, arg7: Array<string>): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateCampaign(arg0, arg1, arg2, to_candid_CampaignType_n3(this._uploadFile, this._downloadFile, arg3), arg4, arg5, arg6, arg7);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateCampaign(arg0, arg1, arg2, to_candid_CampaignType_n3(this._uploadFile, this._downloadFile, arg3), arg4, arg5, arg6, arg7);
+            return result;
+        }
+    }
+    async updateOrg(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateOrg(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateOrg(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+            return result;
+        }
+    }
+}
+function from_candid_CampaignStatus_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignStatus): CampaignStatus {
+    return from_candid_variant_n15(_uploadFile, _downloadFile, value);
+}
+function from_candid_CampaignType_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignType): CampaignType {
+    return from_candid_variant_n17(_uploadFile, _downloadFile, value);
+}
+function from_candid_Campaign_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Campaign): Campaign {
+    return from_candid_record_n13(_uploadFile, _downloadFile, value);
+}
+function from_candid_ForumCategory_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ForumCategory): ForumCategory {
+    return from_candid_variant_n37(_uploadFile, _downloadFile, value);
+}
+function from_candid_ForumThread_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ForumThread): ForumThread {
+    return from_candid_record_n32(_uploadFile, _downloadFile, value);
+}
+function from_candid_OrgMemberRole_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgMemberRole): OrgMemberRole {
+    return from_candid_variant_n29(_uploadFile, _downloadFile, value);
+}
+function from_candid_OrgMember_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgMember): OrgMember {
+    return from_candid_record_n27(_uploadFile, _downloadFile, value);
+}
+function from_candid_OrgStatus_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _OrgStatus): OrgStatus {
+    return from_candid_variant_n24(_uploadFile, _downloadFile, value);
+}
+function from_candid_Organization_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Organization): Organization {
+    return from_candid_record_n22(_uploadFile, _downloadFile, value);
+}
+function from_candid_ThreadStatus_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ThreadStatus): ThreadStatus {
+    return from_candid_variant_n34(_uploadFile, _downloadFile, value);
+}
+function from_candid_UserRole_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n10(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Campaign]): Campaign | null {
+    return value.length === 0 ? null : from_candid_Campaign_n12(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [{
+        goal: bigint;
+        progress: bigint;
+    }]): {
+    goal: bigint;
+    progress: bigint;
+} | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [bigint]): bigint | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Organization]): Organization | null {
+    return value.length === 0 ? null : from_candid_Organization_n21(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_ForumThread]): ForumThread | null {
+    return value.length === 0 ? null : from_candid_ForumThread_n31(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_opt_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    status: _CampaignStatus;
+    title: string;
+    endDate: bigint;
+    orgId: string;
+    goal: bigint;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    description: string;
+    progress: bigint;
+    supporterCount: bigint;
+    campaignType: _CampaignType;
+    startDate: bigint;
+}): {
+    id: string;
+    status: CampaignStatus;
+    title: string;
+    endDate: bigint;
+    orgId: string;
+    goal: bigint;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    description: string;
+    progress: bigint;
+    supporterCount: bigint;
+    campaignType: CampaignType;
+    startDate: bigint;
+} {
+    return {
+        id: value.id,
+        status: from_candid_CampaignStatus_n14(_uploadFile, _downloadFile, value.status),
+        title: value.title,
+        endDate: value.endDate,
+        orgId: value.orgId,
+        goal: value.goal,
+        createdAt: value.createdAt,
+        createdBy: value.createdBy,
+        tags: value.tags,
+        description: value.description,
+        progress: value.progress,
+        supporterCount: value.supporterCount,
+        campaignType: from_candid_CampaignType_n16(_uploadFile, _downloadFile, value.campaignType),
+        startDate: value.startDate
+    };
+}
+function from_candid_record_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    region: string;
+    status: _OrgStatus;
+    members: Array<_OrgMember>;
+    orgType: string;
+    foundedYear: bigint;
+    name: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    description: string;
+    website: string;
+}): {
+    id: string;
+    region: string;
+    status: OrgStatus;
+    members: Array<OrgMember>;
+    orgType: string;
+    foundedYear: bigint;
+    name: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    description: string;
+    website: string;
+} {
+    return {
+        id: value.id,
+        region: value.region,
+        status: from_candid_OrgStatus_n23(_uploadFile, _downloadFile, value.status),
+        members: from_candid_vec_n25(_uploadFile, _downloadFile, value.members),
+        orgType: value.orgType,
+        foundedYear: value.foundedYear,
+        name: value.name,
+        createdAt: value.createdAt,
+        createdBy: value.createdBy,
+        description: value.description,
+        website: value.website
+    };
+}
+function from_candid_record_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    userId: string;
+    joinedAt: bigint;
+    role: _OrgMemberRole;
+}): {
+    userId: string;
+    joinedAt: bigint;
+    role: OrgMemberRole;
+} {
+    return {
+        userId: value.userId,
+        joinedAt: value.joinedAt,
+        role: from_candid_OrgMemberRole_n28(_uploadFile, _downloadFile, value.role)
+    };
+}
+function from_candid_record_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
+    status: _ThreadStatus;
+    title: string;
+    orgId: [] | [string];
+    body: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    viewCount: bigint;
+    replyCount: bigint;
+    category: _ForumCategory;
+    isPinned: boolean;
+}): {
+    id: bigint;
+    status: ThreadStatus;
+    title: string;
+    orgId?: string;
+    body: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    tags: Array<string>;
+    viewCount: bigint;
+    replyCount: bigint;
+    category: ForumCategory;
+    isPinned: boolean;
+} {
+    return {
+        id: value.id,
+        status: from_candid_ThreadStatus_n33(_uploadFile, _downloadFile, value.status),
+        title: value.title,
+        orgId: record_opt_to_undefined(from_candid_opt_n35(_uploadFile, _downloadFile, value.orgId)),
+        body: value.body,
+        createdAt: value.createdAt,
+        createdBy: value.createdBy,
+        tags: value.tags,
+        viewCount: value.viewCount,
+        replyCount: value.replyCount,
+        category: from_candid_ForumCategory_n36(_uploadFile, _downloadFile, value.category),
+        isPinned: value.isPinned
+    };
+}
+function from_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    admin: null;
+} | {
+    user: null;
+} | {
+    guest: null;
+}): UserRole {
+    return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
+}
+function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    active: null;
+} | {
+    completed: null;
+} | {
+    draft: null;
+} | {
+    archived: null;
+}): CampaignStatus {
+    return "active" in value ? CampaignStatus.active : "completed" in value ? CampaignStatus.completed : "draft" in value ? CampaignStatus.draft : "archived" in value ? CampaignStatus.archived : value;
+}
+function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    action: null;
+} | {
+    awareness: null;
+} | {
+    fundraiser: null;
+} | {
+    petition: null;
+}): CampaignType {
+    return "action" in value ? CampaignType.action : "awareness" in value ? CampaignType.awareness : "fundraiser" in value ? CampaignType.fundraiser : "petition" in value ? CampaignType.petition : value;
+}
+function from_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    active: null;
+} | {
+    archived: null;
+}): OrgStatus {
+    return "active" in value ? OrgStatus.active : "archived" in value ? OrgStatus.archived : value;
+}
+function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    member: null;
+} | {
+    admin: null;
+}): OrgMemberRole {
+    return "member" in value ? OrgMemberRole.member : "admin" in value ? OrgMemberRole.admin : value;
+}
+function from_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    open: null;
+} | {
+    locked: null;
+} | {
+    archived: null;
+}): ThreadStatus {
+    return "open" in value ? ThreadStatus.open : "locked" in value ? ThreadStatus.locked : "archived" in value ? ThreadStatus.archived : value;
+}
+function from_candid_variant_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    resources: null;
+} | {
+    general: null;
+} | {
+    regional: null;
+} | {
+    campaigns: null;
+} | {
+    activism: null;
+} | {
+    announcements: null;
+}): ForumCategory {
+    return "resources" in value ? ForumCategory.resources : "general" in value ? ForumCategory.general : "regional" in value ? ForumCategory.regional : "campaigns" in value ? ForumCategory.campaigns : "activism" in value ? ForumCategory.activism : "announcements" in value ? ForumCategory.announcements : value;
+}
+function from_candid_vec_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_OrgMember>): Array<OrgMember> {
+    return value.map((x)=>from_candid_OrgMember_n26(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Organization>): Array<Organization> {
+    return value.map((x)=>from_candid_Organization_n21(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Campaign>): Array<Campaign> {
+    return value.map((x)=>from_candid_Campaign_n12(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_ForumThread>): Array<ForumThread> {
+    return value.map((x)=>from_candid_ForumThread_n31(_uploadFile, _downloadFile, x));
+}
+function to_candid_CampaignType_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CampaignType): _CampaignType {
+    return to_candid_variant_n4(_uploadFile, _downloadFile, value);
+}
+function to_candid_ForumCategory_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ForumCategory): _ForumCategory {
+    return to_candid_variant_n6(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
+    return to_candid_variant_n2(_uploadFile, _downloadFile, value);
+}
+function to_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
+}
+function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
+    admin: null;
+} | {
+    user: null;
+} | {
+    guest: null;
+} {
+    return value == UserRole.admin ? {
+        admin: null
+    } : value == UserRole.user ? {
+        user: null
+    } : value == UserRole.guest ? {
+        guest: null
+    } : value;
+}
+function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CampaignType): {
+    action: null;
+} | {
+    awareness: null;
+} | {
+    fundraiser: null;
+} | {
+    petition: null;
+} {
+    return value == CampaignType.action ? {
+        action: null
+    } : value == CampaignType.awareness ? {
+        awareness: null
+    } : value == CampaignType.fundraiser ? {
+        fundraiser: null
+    } : value == CampaignType.petition ? {
+        petition: null
+    } : value;
+}
+function to_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ForumCategory): {
+    resources: null;
+} | {
+    general: null;
+} | {
+    regional: null;
+} | {
+    campaigns: null;
+} | {
+    activism: null;
+} | {
+    announcements: null;
+} {
+    return value == ForumCategory.resources ? {
+        resources: null
+    } : value == ForumCategory.general ? {
+        general: null
+    } : value == ForumCategory.regional ? {
+        regional: null
+    } : value == ForumCategory.campaigns ? {
+        campaigns: null
+    } : value == ForumCategory.activism ? {
+        activism: null
+    } : value == ForumCategory.announcements ? {
+        announcements: null
+    } : value;
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -278,6 +279,7 @@ const itemVariants: Variants = {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function FAQPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [feedbackQuestion, setFeedbackQuestion] = useState("");
@@ -308,7 +310,7 @@ export function FAQPage() {
   }
 
   return (
-    <Layout breadcrumb="Knowledge › FAQ">
+    <Layout breadcrumb={`${t.sidebar.knowledge} › ${t.sidebar.faq}`}>
       <div className="p-6 max-w-4xl mx-auto">
         {/* ── Page Header ── */}
         <motion.div
@@ -321,11 +323,10 @@ export function FAQPage() {
             <HelpCircle size={26} className="text-primary" />
           </div>
           <h1 className="text-3xl font-display font-bold text-primary tracking-tight">
-            Frequently Asked Questions
+            {t.faq.title}
           </h1>
           <p className="text-muted-foreground text-sm mt-2 max-w-xl mx-auto">
-            Find answers to common questions about IIIntl One — from getting
-            started to advanced platform features.
+            {t.faq.subtitle}
           </p>
           <div className="mt-4 civic-rule w-12 mx-auto" />
         </motion.div>
@@ -342,7 +343,7 @@ export function FAQPage() {
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Search questions and answers..."
+            placeholder={t.faq.searchPlaceholder}
             className="pl-10 h-10 text-sm"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

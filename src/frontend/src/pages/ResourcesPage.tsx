@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
@@ -762,6 +763,7 @@ function ResourceCard({
 
 export function ResourcesPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -794,7 +796,7 @@ export function ResourcesPage() {
   const featuredCount = MOCK_RESOURCES.filter((r) => r.featured).length;
 
   return (
-    <Layout breadcrumb="Knowledge › Resources">
+    <Layout breadcrumb={`${t.sidebar.knowledge} › ${t.resources.title}`}>
       <div className="p-6 max-w-7xl mx-auto">
         {/* ── Page Header ── */}
         <motion.div
@@ -806,11 +808,10 @@ export function ResourcesPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-primary tracking-tight flex items-center gap-2.5">
               <BookOpen size={22} className="opacity-80" />
-              Resource Library
+              {t.resources.title}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Guides, reports, policy briefs, and training materials for civic
-              leaders worldwide.
+              {t.resources.subtitle}
             </p>
             <div className="mt-3 civic-rule w-12" />
           </div>
@@ -823,7 +824,7 @@ export function ResourcesPage() {
               data-ocid="resources.add_resource.open_modal_button"
             >
               <Plus size={14} />
-              Add Resource
+              {t.resources.addResource}
             </Button>
           )}
         </motion.div>
@@ -897,7 +898,7 @@ export function ResourcesPage() {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <Input
-              placeholder="Search resources, topics, organizations..."
+              placeholder={t.resources.searchPlaceholder}
               className="pl-8 h-9 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

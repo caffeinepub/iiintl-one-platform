@@ -1,3 +1,5 @@
+import { ForumCategory, type ForumThread, ThreadStatus } from "@/backend";
+import type { backendInterface } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { RoleGate } from "@/components/RoleGate";
 import { Badge } from "@/components/ui/badge";
@@ -20,15 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import {
-  type ForumCategory,
-  MOCK_FORUM_THREADS,
-  type OrgRegion,
-  getForumCategoryColor,
-} from "@/data/mockData";
+import { useI18n } from "@/context/I18nContext";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -36,7 +35,6 @@ import {
   ChevronRight,
   Clock,
   Eye,
-  Globe,
   Layers,
   Lock,
   MessageCircle,
@@ -45,12 +43,12 @@ import {
   Plus,
   Search,
   Tag,
-  ThumbsUp,
   Users,
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -62,56 +60,98 @@ const itemVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.28 } },
 };
 
-type FilterTab = "all" | "pinned" | "archived" | "myregion";
+type FilterTab = "all" | "pinned" | "archived";
 
-const FORUM_CATEGORIES: ForumCategory[] = [
-  "General Discussion",
-  "Climate & Environment",
-  "Digital Rights",
-  "Labor & Economic Justice",
-  "Democracy & Elections",
-  "Women's Rights",
-  "Youth & Education",
-  "Peace & Diplomacy",
-  "Org Announcements",
-  "Regional News",
-];
+const CATEGORY_LABELS: Record<ForumCategory, string> = {
+  [ForumCategory.general]: "General Discussion",
+  [ForumCategory.resources]: "Resources",
+  [ForumCategory.regional]: "Regional News",
+  [ForumCategory.campaigns]: "Campaigns",
+  [ForumCategory.activism]: "Activism",
+  [ForumCategory.announcements]: "Announcements",
+};
 
-const ORG_REGIONS: OrgRegion[] = [
-  "Global",
-  "Americas",
-  "Europe",
-  "Africa",
-  "Asia-Pacific",
-  "Middle East",
-  "Caribbean",
-  "South Asia",
+const CATEGORY_COLORS: Record<ForumCategory, string> = {
+  [ForumCategory.general]: "bg-blue-50 text-blue-700 border-blue-200",
+  [ForumCategory.resources]:
+    "bg-emerald-50 text-emerald-700 border-emerald-200",
+  [ForumCategory.regional]: "bg-teal-50 text-teal-700 border-teal-200",
+  [ForumCategory.campaigns]: "bg-violet-50 text-violet-700 border-violet-200",
+  [ForumCategory.activism]: "bg-rose-50 text-rose-700 border-rose-200",
+  [ForumCategory.announcements]: "bg-amber-50 text-amber-700 border-amber-200",
+};
+
+const BACKEND_CATEGORIES: ForumCategory[] = [
+  ForumCategory.general,
+  ForumCategory.resources,
+  ForumCategory.regional,
+  ForumCategory.campaigns,
+  ForumCategory.activism,
+  ForumCategory.announcements,
 ];
 
 const SORT_OPTIONS = [
   { value: "latest", label: "Latest Activity" },
   { value: "replies", label: "Most Replies" },
   { value: "views", label: "Most Views" },
-  { value: "upvotes", label: "Most Upvoted" },
 ];
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+function nanoToMs(ns: bigint): number {
+  return Number(ns / 1_000_000n);
+}
+
+function timeAgo(ns: bigint): string {
+  const diff = Date.now() - nanoToMs(ns);
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
   if (days >= 7) return `${Math.floor(days / 7)}w ago`;
   if (days >= 1) return `${days}d ago`;
   if (hours >= 1) return `${hours}h ago`;
-  return `${mins}m ago`;
+  if (mins >= 1) return `${mins}m ago`;
+  return "just now";
+}
+
+function truncatePrincipal(p: { toString(): string }): string {
+  const s = p.toString();
+  return s.length > 12 ? `${s.slice(0, 8)}…` : s;
+}
+
+function ThreadSkeleton() {
+  return (
+    <div className="space-y-2">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Card key={i} className="border-border">
+          <CardContent className="px-4 py-3.5">
+            <div className="flex items-start gap-3">
+              <Skeleton className="w-8 h-8 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-1/4" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+              <div className="hidden sm:flex flex-col items-end gap-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 }
 
 function CreateThreadDialog({
   open,
   onOpenChange,
+  onCreated,
+  backend,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  onCreated: () => void;
+  backend: backendInterface | null;
 }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>("");
@@ -119,24 +159,41 @@ function CreateThreadDialog({
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function handleSubmit() {
-    if (!title.trim() || !category || !content.trim()) return;
+  async function handleSubmit() {
+    if (!title.trim() || !category || !content.trim() || !backend) return;
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const tagList = tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      await backend.createThread(
+        title.trim(),
+        content.trim(),
+        category as ForumCategory,
+        null,
+        tagList,
+      );
+      toast.success("Thread posted successfully!");
+      onCreated();
       onOpenChange(false);
       setTitle("");
       setCategory("");
       setContent("");
       setTags("");
-    }, 1000);
+    } catch (err) {
+      toast.error("Failed to post thread. Please try again.");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
-        data-ocid="forums.new_thread.modal"
+        data-ocid="forums.create_thread.dialog"
       >
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
@@ -168,13 +225,13 @@ function CreateThreadDialog({
               Category <span className="text-destructive">*</span>
             </Label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger data-ocid="forums.new_thread.select">
+              <SelectTrigger data-ocid="forums.category.select">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {FORUM_CATEGORIES.map((cat) => (
+                {BACKEND_CATEGORIES.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat}
+                    {CATEGORY_LABELS[cat]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -207,7 +264,7 @@ function CreateThreadDialog({
               placeholder="e.g. climate, organizing, africa"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              data-ocid="forums.new_thread.input"
+              data-ocid="forums.tags.input"
             />
           </div>
         </div>
@@ -216,14 +273,14 @@ function CreateThreadDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            data-ocid="forums.new_thread.cancel_button"
+            data-ocid="forums.create_thread.cancel_button"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!title.trim() || !category || !content.trim() || saving}
-            data-ocid="forums.new_thread.submit_button"
+            data-ocid="forums.create_thread.submit_button"
           >
             {saving ? "Posting..." : "Post Thread"}
           </Button>
@@ -233,9 +290,7 @@ function CreateThreadDialog({
   );
 }
 
-function ThreadStatusBadge({
-  thread,
-}: { thread: (typeof MOCK_FORUM_THREADS)[0] }) {
+function ThreadStatusBadge({ thread }: { thread: ForumThread }) {
   if (thread.isPinned) {
     return (
       <Badge
@@ -247,7 +302,7 @@ function ThreadStatusBadge({
       </Badge>
     );
   }
-  if (thread.isLocked || thread.status === "locked") {
+  if (thread.status === ThreadStatus.locked) {
     return (
       <Badge
         variant="outline"
@@ -258,7 +313,7 @@ function ThreadStatusBadge({
       </Badge>
     );
   }
-  if (thread.status === "archived") {
+  if (thread.status === ThreadStatus.archived) {
     return (
       <Badge
         variant="outline"
@@ -276,10 +331,12 @@ function ThreadRow({
   thread,
   index,
 }: {
-  thread: (typeof MOCK_FORUM_THREADS)[0];
+  thread: ForumThread;
   index: number;
 }) {
-  const catColor = getForumCategoryColor(thread.category);
+  const catColor =
+    CATEGORY_COLORS[thread.category] ??
+    "bg-secondary text-foreground border-border";
 
   return (
     <motion.div
@@ -290,22 +347,21 @@ function ThreadRow({
         className={cn(
           "border-border hover:shadow-sm transition-all duration-200 group overflow-hidden",
           thread.isPinned && "ring-1 ring-amber-200/60 bg-amber-50/20",
-          thread.status === "archived" && "opacity-75",
+          thread.status === ThreadStatus.archived && "opacity-75",
         )}
       >
         <CardContent className="px-4 py-3.5">
           <div className="flex items-start gap-3">
-            {/* Status icon column */}
             <div className="flex-shrink-0 mt-0.5">
               {thread.isPinned ? (
                 <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
                   <Pin size={14} className="text-amber-600 fill-amber-500" />
                 </div>
-              ) : thread.isLocked ? (
+              ) : thread.status === ThreadStatus.locked ? (
                 <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
                   <Lock size={14} className="text-gray-500" />
                 </div>
-              ) : thread.status === "archived" ? (
+              ) : thread.status === ThreadStatus.archived ? (
                 <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
                   <Archive size={14} className="text-slate-500" />
                 </div>
@@ -316,23 +372,20 @@ function ThreadRow({
               )}
             </div>
 
-            {/* Main content */}
             <div className="flex-1 min-w-0">
-              {/* Top row: category + status badges */}
               <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 <Badge
                   variant="outline"
                   className={cn("text-[10px] px-1.5 py-0 h-4", catColor)}
                 >
-                  {thread.category}
+                  {CATEGORY_LABELS[thread.category] ?? thread.category}
                 </Badge>
                 <ThreadStatusBadge thread={thread} />
               </div>
 
-              {/* Title */}
               <Link
                 to="/forums/$id"
-                params={{ id: thread.id }}
+                params={{ id: String(thread.id) }}
                 className="block"
               >
                 <h3 className="font-display font-semibold text-sm text-foreground leading-snug group-hover:text-primary transition-colors cursor-pointer line-clamp-2">
@@ -340,18 +393,12 @@ function ThreadRow({
                 </h3>
               </Link>
 
-              {/* Author + meta row */}
               <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Users size={10} />
                   <span className="font-medium text-foreground/80">
-                    {thread.authorName}
+                    {truncatePrincipal(thread.createdBy)}
                   </span>
-                </span>
-                <span className="text-border">·</span>
-                <span className="flex items-center gap-1">
-                  <Globe size={10} />
-                  {thread.organization}
                 </span>
                 <span className="text-border">·</span>
                 <span className="flex items-center gap-1">
@@ -360,10 +407,9 @@ function ThreadRow({
                 </span>
               </div>
 
-              {/* Tags */}
               {thread.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
-                  {thread.tags.slice(0, 2).map((tag) => (
+                  {thread.tags.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
                       className="flex items-center gap-0.5 text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded"
@@ -372,69 +418,58 @@ function ThreadRow({
                       {tag}
                     </span>
                   ))}
-                  {thread.tags.length > 2 && (
+                  {thread.tags.length > 3 && (
                     <span className="text-[10px] text-muted-foreground px-1 py-0.5">
-                      +{thread.tags.length - 2}
+                      +{thread.tags.length - 3}
                     </span>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Right: Stats + Last activity */}
-            <div className="hidden sm:flex flex-col items-end gap-2 flex-shrink-0 min-w-[100px]">
+            <div className="hidden sm:flex flex-col items-end gap-2 flex-shrink-0 min-w-[80px]">
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1" title="Replies">
                   <MessageCircle size={11} />
-                  {thread.replyCount}
+                  {Number(thread.replyCount)}
                 </span>
                 <span className="flex items-center gap-1" title="Views">
                   <Eye size={11} />
-                  {thread.viewCount}
-                </span>
-                <span className="flex items-center gap-1" title="Upvotes">
-                  <ThumbsUp size={11} />
-                  {thread.upvoteCount}
+                  {Number(thread.viewCount)}
                 </span>
               </div>
               <div className="text-[10px] text-muted-foreground text-right">
-                <span className="block">Last reply</span>
+                <span className="block">Posted</span>
                 <span className="font-medium text-foreground/70">
-                  {timeAgo(thread.lastActivityAt)}
+                  {timeAgo(thread.createdAt)}
                 </span>
               </div>
             </div>
 
-            {/* Arrow */}
             <Button
               asChild
               variant="ghost"
               size="sm"
               className="flex-shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity self-center"
             >
-              <Link to="/forums/$id" params={{ id: thread.id }}>
+              <Link to="/forums/$id" params={{ id: String(thread.id) }}>
                 <ChevronRight size={15} />
               </Link>
             </Button>
           </div>
 
-          {/* Mobile stats row */}
           <div className="flex items-center gap-3 mt-2 sm:hidden text-[11px] text-muted-foreground border-t border-border/50 pt-2">
             <span className="flex items-center gap-1">
               <MessageCircle size={11} />
-              {thread.replyCount} replies
+              {Number(thread.replyCount)} replies
             </span>
             <span className="flex items-center gap-1">
               <Eye size={11} />
-              {thread.viewCount}
-            </span>
-            <span className="flex items-center gap-1">
-              <ThumbsUp size={11} />
-              {thread.upvoteCount}
+              {Number(thread.viewCount)}
             </span>
             <span className="ml-auto flex items-center gap-1">
               <Clock size={10} />
-              {timeAgo(thread.lastActivityAt)}
+              {timeAgo(thread.createdAt)}
             </span>
           </div>
         </CardContent>
@@ -445,12 +480,17 @@ function ThreadRow({
 
 export function ForumsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
+  const backend = useBackend();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [regionFilter, setRegionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("latest");
   const [createOpen, setCreateOpen] = useState(false);
+
+  const [threads, setThreads] = useState<ForumThread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const canCreate =
     user?.role === "super_admin" ||
@@ -459,68 +499,79 @@ export function ForumsPage() {
     user?.role === "member" ||
     user?.role === "activist";
 
-  // Filter logic
-  const filtered = MOCK_FORUM_THREADS.filter((t) => {
+  const loadThreads = useCallback(async () => {
+    if (!backend) return;
+    setLoading(true);
+    setError(null);
+    try {
+      let data: ForumThread[];
+      if (categoryFilter !== "all") {
+        data = await backend.listThreadsByCategory(
+          categoryFilter as ForumCategory,
+        );
+      } else {
+        data = await backend.listThreads();
+      }
+      setThreads(data);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load threads. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [backend, categoryFilter]);
+
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
+
+  const filtered = threads.filter((thread) => {
     const q = search.toLowerCase();
     const matchesSearch =
       !search ||
-      t.title.toLowerCase().includes(q) ||
-      t.content.toLowerCase().includes(q) ||
-      t.tags.some((tag) => tag.toLowerCase().includes(q)) ||
-      t.authorName.toLowerCase().includes(q);
+      thread.title.toLowerCase().includes(q) ||
+      thread.tags.some((tag) => tag.toLowerCase().includes(q));
 
     const matchesTab =
       activeTab === "all"
-        ? true
+        ? thread.status !== ThreadStatus.archived
         : activeTab === "pinned"
-          ? t.isPinned
+          ? thread.isPinned
           : activeTab === "archived"
-            ? t.status === "archived"
-            : activeTab === "myregion"
-              ? t.region === user?.organization
-              : true;
+            ? thread.status === ThreadStatus.archived
+            : true;
 
-    const matchesCat =
-      categoryFilter === "all" || t.category === categoryFilter;
-    const matchesRegion = regionFilter === "all" || t.region === regionFilter;
-
-    return matchesSearch && matchesTab && matchesCat && matchesRegion;
+    return matchesSearch && matchesTab;
   });
 
-  // Sort: pinned threads always at top, then apply sort
   const sorted = [...filtered].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
     switch (sortBy) {
       case "replies":
-        return b.replyCount - a.replyCount;
+        return Number(b.replyCount - a.replyCount);
       case "views":
-        return b.viewCount - a.viewCount;
-      case "upvotes":
-        return b.upvoteCount - a.upvoteCount;
-      default: // latest
-        return (
-          new Date(b.lastActivityAt).getTime() -
-          new Date(a.lastActivityAt).getTime()
-        );
+        return Number(b.viewCount - a.viewCount);
+      default:
+        return Number(b.createdAt - a.createdAt);
     }
   });
 
-  // Stats
-  const totalPosts = MOCK_FORUM_THREADS.reduce((s, t) => s + t.replyCount, 0);
-  const uniqueAuthors = new Set(MOCK_FORUM_THREADS.map((t) => t.authorId)).size;
-  const pinnedCount = MOCK_FORUM_THREADS.filter((t) => t.isPinned).length;
+  const totalPosts = threads.reduce((s, t) => s + Number(t.replyCount), 0);
+  const pinnedCount = threads.filter((t) => t.isPinned).length;
+  const archivedCount = threads.filter(
+    (t) => t.status === ThreadStatus.archived,
+  ).length;
 
-  // Category counts
-  const categoryCounts = FORUM_CATEGORIES.map((cat) => ({
+  const categoryCounts = BACKEND_CATEGORIES.map((cat) => ({
     cat,
-    count: MOCK_FORUM_THREADS.filter((t) => t.category === cat).length,
+    count: threads.filter((t) => t.category === cat).length,
   }));
 
   return (
-    <Layout breadcrumb="Community › Forums">
+    <Layout breadcrumb={`${t.sidebar.community} › ${t.forums.title}`}>
       <div className="p-6 max-w-7xl mx-auto">
-        {/* ── Page Header ── */}
+        {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -530,11 +581,10 @@ export function ForumsPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-primary tracking-tight flex items-center gap-2.5">
               <MessageSquare size={22} className="opacity-80" />
-              Community Forums
+              {t.forums.title}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Open discussions with activists, organizers, and civic leaders
-              worldwide.
+              {t.forums.subtitle}
             </p>
             <div className="mt-3 civic-rule w-12" />
           </div>
@@ -544,15 +594,15 @@ export function ForumsPage() {
               size="sm"
               className="gap-2 h-9 self-start sm:self-auto flex-shrink-0"
               onClick={() => setCreateOpen(true)}
-              data-ocid="forums.new_thread.open_modal_button"
+              data-ocid="forums.new_thread_button"
             >
               <Plus size={14} />
-              New Thread
+              {t.forums.newThread}
             </Button>
           )}
         </motion.div>
 
-        {/* ── Stats Bar ── */}
+        {/* Stats Bar */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -562,27 +612,27 @@ export function ForumsPage() {
           {[
             {
               label: "Total Threads",
-              value: MOCK_FORUM_THREADS.length,
+              value: threads.length,
               icon: <MessageSquare size={15} className="text-primary" />,
               bg: "bg-primary/5",
             },
             {
-              label: "Total Posts",
+              label: "Total Replies",
               value: totalPosts,
               icon: <MessageCircle size={15} className="text-blue-600" />,
               bg: "bg-blue-50",
             },
             {
-              label: "Active Members",
-              value: uniqueAuthors,
-              icon: <Users size={15} className="text-emerald-600" />,
-              bg: "bg-emerald-50",
+              label: "Pinned",
+              value: pinnedCount,
+              icon: <Pin size={15} className="text-amber-600" />,
+              bg: "bg-amber-50",
             },
             {
               label: "Categories",
-              value: FORUM_CATEGORIES.length,
-              icon: <Layers size={15} className="text-amber-600" />,
-              bg: "bg-amber-50",
+              value: BACKEND_CATEGORIES.length,
+              icon: <Layers size={15} className="text-emerald-600" />,
+              bg: "bg-emerald-50",
             },
           ].map((stat) => (
             <div
@@ -607,7 +657,7 @@ export function ForumsPage() {
           ))}
         </motion.div>
 
-        {/* ── Main layout: sidebar + thread list ── */}
+        {/* Main layout */}
         <div className="flex gap-6">
           {/* Category Sidebar (desktop) */}
           <motion.aside
@@ -632,10 +682,11 @@ export function ForumsPage() {
                       ? "font-semibold text-primary bg-primary/5"
                       : "text-foreground/80",
                   )}
+                  data-ocid="forums.category.tab"
                 >
                   <span>All Categories</span>
                   <span className="text-muted-foreground font-mono">
-                    {MOCK_FORUM_THREADS.length}
+                    {threads.length}
                   </span>
                 </button>
                 {categoryCounts.map(({ cat, count }) =>
@@ -650,8 +701,11 @@ export function ForumsPage() {
                           ? "font-semibold text-primary bg-primary/5"
                           : "text-foreground/80",
                       )}
+                      data-ocid="forums.category.tab"
                     >
-                      <span className="truncate mr-2">{cat}</span>
+                      <span className="truncate mr-2">
+                        {CATEGORY_LABELS[cat]}
+                      </span>
                       <span className="text-muted-foreground font-mono flex-shrink-0">
                         {count}
                       </span>
@@ -662,23 +716,21 @@ export function ForumsPage() {
             </div>
           </motion.aside>
 
-          {/* Thread list column */}
+          {/* Thread list */}
           <div className="flex-1 min-w-0">
-            {/* ── Search + Filter Bar ── */}
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.07 }}
               className="space-y-3 mb-4"
             >
-              {/* Row 1: Search */}
               <div className="relative">
                 <Search
                   size={14}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
-                  placeholder="Search threads, authors, tags..."
+                  placeholder="Search threads, tags..."
                   className="pl-8 h-9 text-sm"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -686,7 +738,6 @@ export function ForumsPage() {
                 />
               </div>
 
-              {/* Row 2: Tabs + Filters */}
               <div className="flex flex-wrap gap-2 items-center">
                 <Tabs
                   value={activeTab}
@@ -698,8 +749,8 @@ export function ForumsPage() {
                         {
                           value: "all",
                           label: "All",
-                          count: MOCK_FORUM_THREADS.filter(
-                            (t) => t.status !== "archived",
+                          count: threads.filter(
+                            (t) => t.status !== ThreadStatus.archived,
                           ).length,
                         },
                         {
@@ -710,9 +761,7 @@ export function ForumsPage() {
                         {
                           value: "archived",
                           label: "Archived",
-                          count: MOCK_FORUM_THREADS.filter(
-                            (t) => t.status === "archived",
-                          ).length,
+                          count: archivedCount,
                         },
                       ] as const
                     ).map((tab) => (
@@ -739,7 +788,6 @@ export function ForumsPage() {
                   </TabsList>
                 </Tabs>
 
-                {/* Mobile category filter */}
                 <div className="lg:hidden">
                   <Select
                     value={categoryFilter}
@@ -747,37 +795,20 @@ export function ForumsPage() {
                   >
                     <SelectTrigger
                       className="w-40 h-9 text-xs"
-                      data-ocid="forums.category_filter.select"
+                      data-ocid="forums.category.select"
                     >
                       <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      {FORUM_CATEGORIES.map((cat) => (
+                      {BACKEND_CATEGORIES.map((cat) => (
                         <SelectItem key={cat} value={cat}>
-                          {cat}
+                          {CATEGORY_LABELS[cat]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                <Select value={regionFilter} onValueChange={setRegionFilter}>
-                  <SelectTrigger
-                    className="w-36 h-9 text-xs"
-                    data-ocid="forums.region_filter.select"
-                  >
-                    <SelectValue placeholder="All regions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Regions</SelectItem>
-                    {ORG_REGIONS.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
 
                 <Select value={sortBy} onValueChange={setSortBy}>
                   <SelectTrigger
@@ -797,15 +828,25 @@ export function ForumsPage() {
               </div>
             </motion.div>
 
-            {/* Results count */}
-            {(search || categoryFilter !== "all" || regionFilter !== "all") && (
+            {(search || categoryFilter !== "all") && (
               <p className="text-xs text-muted-foreground mb-3">
-                Showing {sorted.length} of {MOCK_FORUM_THREADS.length} threads
+                Showing {sorted.length} of {threads.length} threads
               </p>
             )}
 
-            {/* ── Thread List ── */}
-            {sorted.length === 0 ? (
+            {loading ? (
+              <ThreadSkeleton />
+            ) : error ? (
+              <div
+                className="flex flex-col items-center justify-center py-16 text-center"
+                data-ocid="forums.error_state"
+              >
+                <p className="text-sm text-destructive mb-3">{error}</p>
+                <Button size="sm" variant="outline" onClick={loadThreads}>
+                  Retry
+                </Button>
+              </div>
+            ) : sorted.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -845,7 +886,11 @@ export function ForumsPage() {
                 className="space-y-2"
               >
                 {sorted.map((thread, i) => (
-                  <ThreadRow key={thread.id} thread={thread} index={i + 1} />
+                  <ThreadRow
+                    key={String(thread.id)}
+                    thread={thread}
+                    index={i + 1}
+                  />
                 ))}
               </motion.div>
             )}
@@ -853,11 +898,15 @@ export function ForumsPage() {
         </div>
       </div>
 
-      {/* Create Thread Modal */}
       <RoleGate
         roles={["super_admin", "admin", "org_admin", "member", "activist"]}
       >
-        <CreateThreadDialog open={createOpen} onOpenChange={setCreateOpen} />
+        <CreateThreadDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={loadThreads}
+          backend={backend}
+        />
       </RoleGate>
     </Layout>
   );

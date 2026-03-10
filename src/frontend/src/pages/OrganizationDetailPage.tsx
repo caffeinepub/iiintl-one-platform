@@ -1,3 +1,4 @@
+import type { OrgMember, Organization } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { RoleGate } from "@/components/RoleGate";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -18,16 +20,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import {
-  MOCK_ORGANIZATIONS,
-  MOCK_ORG_ACTIVITIES,
-  getInitials,
-  getMembersByOrgId,
-  getOrgById,
-  getOrgColorClasses,
-  getRoleBadgeClasses,
-  getStatusBadgeClasses,
-} from "@/data/mockData";
+import { MOCK_ORG_ACTIVITIES, getOrgColorClasses } from "@/data/mockData";
+import { useActor } from "@/hooks/useActor";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "@tanstack/react-router";
 import {
@@ -47,7 +41,8 @@ import {
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const itemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
@@ -59,7 +54,7 @@ const containerVariants: Variants = {
   visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
 };
 
-// Mock campaigns for each org
+// Mock campaigns per org — retained as local mock (not in Organizations backend yet)
 const MOCK_CAMPAIGNS_BY_ORG: Record<
   string,
   Array<{
@@ -107,106 +102,6 @@ const MOCK_CAMPAIGNS_BY_ORG: Record<
       status: "Completed",
       dates: "Nov 2025 – Jan 2026",
       participants: 340,
-    },
-  ],
-  "org-3": [
-    {
-      id: "c6",
-      title: "Climate Adaptation Fund Advocacy",
-      status: "Active",
-      dates: "Feb 1 – Jul 31, 2026",
-      participants: 52,
-    },
-    {
-      id: "c7",
-      title: "Community Water Access Project",
-      status: "Active",
-      dates: "Mar 15 – Sep 15, 2026",
-      participants: 61,
-    },
-  ],
-  "org-4": [
-    {
-      id: "c8",
-      title: "EU Digital Rights Watch",
-      status: "Active",
-      dates: "Jan 1 – Dec 31, 2026",
-      participants: 108,
-    },
-    {
-      id: "c9",
-      title: "Anti-Disinformation Coalition",
-      status: "Upcoming",
-      dates: "Apr 1 – Oct 1, 2026",
-      participants: 27,
-    },
-  ],
-  "org-5": [
-    {
-      id: "c10",
-      title: "APAC Internet Freedom Index",
-      status: "Active",
-      dates: "Feb 1 – Jun 30, 2026",
-      participants: 84,
-    },
-  ],
-  "org-6": [
-    {
-      id: "c11",
-      title: "Interfaith Peace Dialogue Series",
-      status: "Active",
-      dates: "Mar 1 – Aug 31, 2026",
-      participants: 38,
-    },
-  ],
-  "org-7": [
-    {
-      id: "c12",
-      title: "Youth Climate Strike 2026",
-      status: "Active",
-      dates: "Mar – Jun 2026",
-      participants: 142,
-    },
-    {
-      id: "c13",
-      title: "Global Youth Parliament",
-      status: "Upcoming",
-      dates: "Sep 2026",
-      participants: 60,
-    },
-  ],
-  "org-8": [
-    {
-      id: "c14",
-      title: "Biometric Surveillance Ban",
-      status: "Active",
-      dates: "Jan – Dec 2026",
-      participants: 23,
-    },
-    {
-      id: "c15",
-      title: "Digital Security Training Initiative",
-      status: "Active",
-      dates: "Feb – Jul 2026",
-      participants: 17,
-    },
-  ],
-  "org-9": [
-    {
-      id: "c16",
-      title: "Loss & Damage Reparations Now",
-      status: "Active",
-      dates: "Feb – Jun 2026",
-      participants: 31,
-    },
-  ],
-  "org-10": [
-    {
-      id: "c17",
-      title: "Electoral Integrity Monitor 2026",
-      status: "Active",
-      dates: "Jan – Dec 2026",
-      participants: 48,
     },
   ],
 };
@@ -258,25 +153,170 @@ function ActivityIconBg({ type }: { type: string }) {
   }
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
 export function OrganizationDetailPage() {
   const { id } = useParams({ strict: false }) as { id?: string };
   const { user } = useAuth();
+  const { actor } = useActor();
   const [memberSearch, setMemberSearch] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Find the org
-  const org = id ? getOrgById(id) : MOCK_ORGANIZATIONS[0];
+  const [org, setOrg] = useState<Organization | null>(null);
+  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+
+  // settings form state
+  const settingsNameRef = useRef<HTMLInputElement>(null);
+  const settingsDescRef = useRef<HTMLTextAreaElement>(null);
+  const settingsWebsiteRef = useRef<HTMLInputElement>(null);
 
   const isAdminRole =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
     user?.role === "org_admin";
 
-  if (!org) {
+  const fetchOrg = useCallback(async () => {
+    if (!id || !actor) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [orgData, membersData, userOrgs] = await Promise.all([
+        actor.getOrg(id),
+        actor.getOrgMembers(id),
+        user
+          ? actor.getUserOrgs(user.id)
+          : Promise.resolve([] as Organization[]),
+      ]);
+      setOrg(orgData);
+      setMembers(membersData);
+      setIsMember(userOrgs.some((o) => o.id === id));
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load organization details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [id, user, actor]);
+
+  useEffect(() => {
+    fetchOrg();
+  }, [fetchOrg]);
+
+  async function handleJoin() {
+    if (!id) return;
+    setJoining(true);
+    try {
+      if (!actor) return;
+      await actor.joinOrg(id);
+      toast.success("Joined organization successfully");
+      await fetchOrg();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to join organization.");
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  async function handleLeave() {
+    if (!id) return;
+    setJoining(true);
+    try {
+      if (!actor) return;
+      await actor.leaveOrg(id);
+      toast.success("Left organization");
+      await fetchOrg();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to leave organization.");
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    if (!org || !id) return;
+    setSavingSettings(true);
+    try {
+      const name = settingsNameRef.current?.value ?? org.name;
+      const description = settingsDescRef.current?.value ?? org.description;
+      const website = settingsWebsiteRef.current?.value ?? org.website;
+      if (!actor) return;
+      await actor.updateOrg(
+        id,
+        name,
+        description,
+        org.region,
+        org.orgType,
+        website,
+        org.foundedYear,
+      );
+      toast.success("Organization updated successfully");
+      await fetchOrg();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save changes.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleArchive() {
+    if (!id) return;
+    setArchiving(true);
+    try {
+      if (!actor) return;
+      await actor.archiveOrg(id);
+      toast.success("Organization archived");
+      await fetchOrg();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to archive organization.");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  // ── Loading ──
+  if (loading) {
+    return (
+      <Layout breadcrumb="Organizations › Loading...">
+        <div
+          className="p-6 max-w-6xl mx-auto space-y-4"
+          data-ocid="org_detail.loading_state"
+        >
+          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-9 w-64" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Error ──
+  if (error || !org) {
     return (
       <Layout breadcrumb="Organizations › Not Found">
-        <div className="p-6 text-center">
-          <p className="text-muted-foreground">Organization not found.</p>
+        <div className="p-6 text-center" data-ocid="org_detail.error_state">
+          <p className="text-muted-foreground">
+            {error ?? "Organization not found."}
+          </p>
           <Button asChild variant="outline" className="mt-4">
             <Link to="/organizations">← Back to Organizations</Link>
           </Button>
@@ -285,13 +325,15 @@ export function OrganizationDetailPage() {
     );
   }
 
-  const colors = getOrgColorClasses(org.color);
-  const members = getMembersByOrgId(org.id);
+  const colorKey = org.id.charCodeAt(org.id.length - 1) % 6;
+  const colorPalette = ["blue", "green", "purple", "orange", "red", "teal"];
+  const colors = getOrgColorClasses(colorPalette[colorKey]);
   const campaigns = MOCK_CAMPAIGNS_BY_ORG[org.id] ?? [];
+
   const filteredMembers = members.filter(
     (m) =>
       !memberSearch ||
-      m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+      m.userId.toLowerCase().includes(memberSearch.toLowerCase()) ||
       m.role.toLowerCase().includes(memberSearch.toLowerCase()),
   );
 
@@ -321,7 +363,6 @@ export function OrganizationDetailPage() {
             }}
           />
           <div className="relative px-6 py-8">
-            {/* Back link */}
             <Button
               asChild
               variant="ghost"
@@ -336,7 +377,6 @@ export function OrganizationDetailPage() {
             </Button>
 
             <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-              {/* Org avatar */}
               <div
                 className={cn(
                   "w-16 h-16 rounded-2xl flex items-center justify-center font-display font-bold text-xl text-white flex-shrink-0 shadow-lg",
@@ -349,25 +389,25 @@ export function OrganizationDetailPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <Badge className="text-[10px] px-2 py-0.5 bg-white/20 text-white border-white/30 font-semibold">
-                    {org.type}
+                    {org.orgType}
                   </Badge>
                   <Badge className="text-[10px] px-2 py-0.5 bg-white/20 text-white border-white/30">
                     <Globe size={9} className="mr-1" />
                     {org.region}
                   </Badge>
+                  {org.status !== "active" && (
+                    <Badge className="text-[10px] px-2 py-0.5 bg-orange-500/80 text-white border-orange-400/30">
+                      {org.status}
+                    </Badge>
+                  )}
                 </div>
                 <h1 className="text-2xl font-display font-bold text-white tracking-tight">
                   {org.name}
                 </h1>
-                {org.tagline && (
-                  <p className="text-white/70 text-sm mt-0.5 italic">
-                    {org.tagline}
-                  </p>
-                )}
                 <div className="flex flex-wrap items-center gap-4 mt-2 text-white/60 text-xs">
                   <span className="flex items-center gap-1">
                     <Calendar size={11} />
-                    Est. {org.foundedYear}
+                    Est. {Number(org.foundedYear)}
                   </span>
                   {org.website && (
                     <a
@@ -384,18 +424,33 @@ export function OrganizationDetailPage() {
               </div>
 
               <div className="flex gap-2 flex-shrink-0">
-                <Button
-                  size="sm"
-                  className="h-8 text-xs bg-white text-primary hover:bg-white/90 font-semibold"
-                  data-ocid="org_detail.join_button"
-                >
-                  Join Organization
-                </Button>
+                {isMember ? (
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-white/20 text-white hover:bg-white/30 font-semibold"
+                    onClick={handleLeave}
+                    disabled={joining}
+                    data-ocid="org_detail.leave_button"
+                  >
+                    {joining ? "Leaving..." : "Leave Organization"}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs bg-white text-primary hover:bg-white/90 font-semibold"
+                    onClick={handleJoin}
+                    disabled={joining}
+                    data-ocid="org_detail.join_button"
+                  >
+                    {joining ? "Joining..." : "Join Organization"}
+                  </Button>
+                )}
                 <RoleGate roles={["super_admin", "admin", "org_admin"]}>
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-8 text-xs border-white/30 text-white hover:bg-white/10"
+                    onClick={() => setActiveTab("settings")}
                     data-ocid="org_detail.manage_button"
                   >
                     <Settings size={12} className="mr-1.5" />
@@ -407,27 +462,22 @@ export function OrganizationDetailPage() {
           </div>
 
           {/* Stats bar */}
-          <div className="bg-white/10 border-t border-white/10 px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white/10 border-t border-white/10 px-6 py-3 grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
               {
                 label: "Members",
-                value: org.memberCount.toLocaleString(),
+                value: members.length.toLocaleString(),
                 icon: <Users size={13} />,
               },
               {
                 label: "Campaigns",
-                value: org.campaignCount,
+                value: campaigns.length,
                 icon: <Megaphone size={13} />,
               },
               {
-                label: "Resources",
-                value: org.resourceCount,
-                icon: <BookOpen size={13} />,
-              },
-              {
-                label: "Activities",
-                value: org.activityCount.toLocaleString(),
-                icon: <Activity size={13} />,
+                label: "Founded",
+                value: Number(org.foundedYear),
+                icon: <Calendar size={13} />,
               },
             ].map((stat) => (
               <div key={stat.label} className="flex items-center gap-2">
@@ -459,7 +509,7 @@ export function OrganizationDetailPage() {
                 className="text-xs"
                 data-ocid="org_detail.tab"
               >
-                Members ({org.memberCount})
+                Members ({members.length})
               </TabsTrigger>
               <TabsTrigger
                 value="campaigns"
@@ -597,24 +647,14 @@ export function OrganizationDetailPage() {
                         <div className="flex flex-wrap gap-1.5">
                           {members.slice(0, 8).map((m, i) => (
                             <div
-                              key={m.id}
+                              key={m.userId}
                               className="group relative"
-                              title={`${m.name} — ${m.role.replace("_", " ")}`}
+                              title={`${m.userId} — ${m.role}`}
                               data-ocid={`org_detail.members.item.${i + 1}`}
                             >
                               <Avatar className="h-9 w-9 ring-2 ring-white hover:ring-primary transition-all cursor-pointer">
-                                <AvatarFallback
-                                  className={cn(
-                                    "text-[11px] font-bold",
-                                    getRoleBadgeClasses(m.role)
-                                      .replace("border", "")
-                                      .replace("bg-", "bg-")
-                                      .split(" ")
-                                      .slice(0, 2)
-                                      .join(" "),
-                                  )}
-                                >
-                                  {getInitials(m.name)}
+                                <AvatarFallback className="text-[11px] font-bold bg-secondary">
+                                  {getInitials(m.userId)}
                                 </AvatarFallback>
                               </Avatar>
                             </div>
@@ -727,22 +767,18 @@ export function OrganizationDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Member</TableHead>
+                        <TableHead className="text-xs">Member ID</TableHead>
                         <TableHead className="text-xs">Role</TableHead>
-                        <TableHead className="text-xs hidden sm:table-cell">
-                          Region
-                        </TableHead>
                         <TableHead className="text-xs hidden md:table-cell">
                           Joined
                         </TableHead>
-                        <TableHead className="text-xs">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredMembers.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={3}
                             className="text-center text-xs text-muted-foreground py-8"
                             data-ocid="org_detail.members.empty_state"
                           >
@@ -752,7 +788,7 @@ export function OrganizationDetailPage() {
                       ) : (
                         filteredMembers.map((m, i) => (
                           <TableRow
-                            key={m.id}
+                            key={m.userId}
                             data-ocid={`org_detail.members.row.${i + 1}`}
                             className="hover:bg-secondary/30"
                           >
@@ -760,53 +796,31 @@ export function OrganizationDetailPage() {
                               <div className="flex items-center gap-2.5">
                                 <Avatar className="h-7 w-7">
                                   <AvatarFallback className="text-[10px] font-bold bg-secondary">
-                                    {getInitials(m.name)}
+                                    {getInitials(m.userId)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                  <p className="text-xs font-semibold">
-                                    {m.name}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {m.title ?? m.email}
-                                  </p>
-                                </div>
+                                <p className="text-xs font-semibold font-mono">
+                                  {m.userId.slice(0, 16)}…
+                                </p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
-                                className={cn(
-                                  "text-[10px] px-1.5 py-0 h-4 font-medium capitalize",
-                                  getRoleBadgeClasses(m.role),
-                                )}
+                                className="text-[10px] px-1.5 py-0 h-4 font-medium capitalize"
                               >
-                                {m.role.replace("_", " ")}
+                                {m.role}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <span className="text-xs text-muted-foreground">
-                                {m.region}
-                              </span>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
                               <span className="text-xs text-muted-foreground">
-                                {new Date(m.joinedDate).toLocaleDateString(
-                                  "en-US",
-                                  { month: "short", year: "numeric" },
-                                )}
+                                {new Date(
+                                  Number(m.joinedAt) / 1_000_000,
+                                ).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  year: "numeric",
+                                })}
                               </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "text-[10px] px-1.5 py-0 h-4 capitalize",
-                                  getStatusBadgeClasses(m.status),
-                                )}
-                              >
-                                {m.status}
-                              </Badge>
                             </TableCell>
                           </TableRow>
                         ))
@@ -946,6 +960,7 @@ export function OrganizationDetailPage() {
                           Organization Name
                         </Label>
                         <Input
+                          ref={settingsNameRef}
                           defaultValue={org.name}
                           data-ocid="org_detail.settings_name_input"
                         />
@@ -955,6 +970,7 @@ export function OrganizationDetailPage() {
                           Description
                         </Label>
                         <Textarea
+                          ref={settingsDescRef}
                           defaultValue={org.description}
                           rows={3}
                           data-ocid="org_detail.settings_desc_textarea"
@@ -963,6 +979,7 @@ export function OrganizationDetailPage() {
                       <div className="space-y-1.5">
                         <Label className="text-sm font-medium">Website</Label>
                         <Input
+                          ref={settingsWebsiteRef}
                           defaultValue={org.website ?? ""}
                           placeholder="https://example.org"
                           data-ocid="org_detail.settings_website_input"
@@ -972,9 +989,11 @@ export function OrganizationDetailPage() {
                         <Button
                           size="sm"
                           className="h-9 text-sm"
+                          onClick={handleSaveSettings}
+                          disabled={savingSettings}
                           data-ocid="org_detail.settings_save_button"
                         >
-                          Save Changes
+                          {savingSettings ? "Saving..." : "Save Changes"}
                         </Button>
                       </div>
                     </CardContent>
@@ -1003,28 +1022,15 @@ export function OrganizationDetailPage() {
                           variant="outline"
                           size="sm"
                           className="flex-shrink-0 border-orange-300 text-orange-700 hover:bg-orange-50"
+                          onClick={handleArchive}
+                          disabled={archiving || org.status === "archived"}
                           data-ocid="org_detail.archive_button"
                         >
-                          Archive
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 p-3 bg-white rounded-lg border border-destructive/20">
-                        <div>
-                          <p className="text-sm font-medium text-destructive">
-                            Delete Organization
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Permanently delete this organization and all
-                            associated data. This cannot be undone.
-                          </p>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="flex-shrink-0"
-                          data-ocid="org_detail.delete_button"
-                        >
-                          Delete
+                          {archiving
+                            ? "Archiving..."
+                            : org.status === "archived"
+                              ? "Archived"
+                              : "Archive"}
                         </Button>
                       </div>
                     </CardContent>

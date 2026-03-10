@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -194,9 +195,10 @@ const ACTIVITY_FEED = [
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
 
   return (
-    <Layout breadcrumb="Dashboard">
+    <Layout breadcrumb={t.dashboard.title}>
       <div className="p-6 max-w-7xl mx-auto">
         <motion.div
           variants={containerVariants}
@@ -211,7 +213,7 @@ export function DashboardPage() {
           >
             <div>
               <h1 className="text-2xl font-display font-bold text-primary tracking-tight">
-                Welcome back, {user?.name?.split(" ")[0]} 👋
+                {t.dashboard.welcome}, {user?.name?.split(" ")[0]}
               </h1>
               <p className="text-muted-foreground text-sm mt-0.5">
                 Here&apos;s an overview of your platform activity
@@ -235,7 +237,7 @@ export function DashboardPage() {
             {STATS.map((stat) => (
               <Card
                 key={stat.label}
-                className="border-border hover:shadow-md transition-shadow"
+                className="border-border hover:shadow-md hover:border-primary/20 transition-all duration-200"
                 data-ocid={stat.ocid}
               >
                 <CardContent className="p-4">

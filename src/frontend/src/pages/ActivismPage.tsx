@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useI18n } from "@/context/I18nContext";
 import {
   MOCK_CAMPAIGNS,
   MOCK_CAMPAIGN_UPDATES,
@@ -160,6 +161,7 @@ const ACTIVISM_TYPES = [
 ];
 
 export function ActivismPage() {
+  const { t } = useI18n();
   const [signedPetitions, setSignedPetitions] = useState<Set<string>>(
     new Set(),
   );
@@ -186,7 +188,7 @@ export function ActivismPage() {
   );
 
   return (
-    <Layout breadcrumb="Activism Hub">
+    <Layout breadcrumb={t.activism.title}>
       <div className="max-w-7xl mx-auto">
         {/* ── Hero Section ── */}
         <motion.div
@@ -206,10 +208,10 @@ export function ActivismPage() {
           <div className="relative max-w-2xl">
             <Badge className="mb-3 bg-white/20 text-white border-white/30 text-[11px] font-semibold">
               <Zap size={10} className="mr-1 fill-white" />
-              Activism Hub
+              {t.activism.title}
             </Badge>
             <h1 className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight mb-3">
-              Your toolkit for civic action.
+              {t.activism.subtitle}
             </h1>
             <p className="text-white/70 text-base leading-relaxed mb-6">
               Discover petitions, calls-to-action, events, and ways to make your

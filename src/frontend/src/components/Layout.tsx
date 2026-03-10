@@ -13,10 +13,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { type UserRole, useAuth } from "@/context/AuthContext";
+import { LANGUAGES, useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   BarChart3,
+  Bell,
   BookMarked,
   BookOpen,
   Building2,
@@ -42,15 +44,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
-
-const LANGUAGES = [
-  { code: "EN", label: "English" },
-  { code: "FR", label: "Français" },
-  { code: "ES", label: "Español" },
-  { code: "AR", label: "العربية" },
-  { code: "ZH", label: "中文" },
-];
+import { useEffect, useState } from "react";
 
 const ROLE_OPTIONS: { role: UserRole; label: string; color: string }[] = [
   { role: "super_admin", label: "Super Admin", color: "text-red-600" },
@@ -68,136 +62,12 @@ interface NavLink {
   ocid: string;
 }
 
-const SIDEBAR_SECTIONS: { title: string; links: NavLink[] }[] = [
-  {
-    title: "Main",
-    links: [
-      {
-        to: "/dashboard",
-        label: "Dashboard",
-        icon: <LayoutDashboard size={16} />,
-        ocid: "sidebar.dashboard_link",
-      },
-      {
-        to: "/organizations",
-        label: "Organizations",
-        icon: <Building2 size={16} />,
-        ocid: "sidebar.orgs_link",
-      },
-      {
-        to: "/campaigns",
-        label: "Campaigns",
-        icon: <Megaphone size={16} />,
-        ocid: "sidebar.campaigns_link",
-      },
-      {
-        to: "/activism",
-        label: "Activism",
-        icon: <Zap size={16} />,
-        ocid: "sidebar.activism_link",
-      },
-    ],
-  },
-  {
-    title: "Community",
-    links: [
-      {
-        to: "/forums",
-        label: "Forums",
-        icon: <MessageSquare size={16} />,
-        ocid: "sidebar.forums_link",
-      },
-      {
-        to: "/members",
-        label: "Members",
-        icon: <Users size={16} />,
-        ocid: "sidebar.members_link",
-      },
-      {
-        to: "/members",
-        label: "Directory",
-        icon: <BookMarked size={16} />,
-        ocid: "sidebar.directory_link",
-      },
-    ],
-  },
-  {
-    title: "Knowledge",
-    links: [
-      {
-        to: "/resources",
-        label: "Resources",
-        icon: <BookOpen size={16} />,
-        ocid: "sidebar.resources_link",
-      },
-      {
-        to: "/faq",
-        label: "FAQ",
-        icon: <HelpCircle size={16} />,
-        ocid: "sidebar.faq_link",
-      },
-      {
-        to: "/docs",
-        label: "Documentation",
-        icon: <FileText size={16} />,
-        ocid: "sidebar.docs_link",
-      },
-    ],
-  },
-  {
-    title: "Commerce",
-    links: [
-      {
-        to: "/store",
-        label: "Store",
-        icon: <ShoppingBag size={16} />,
-        ocid: "sidebar.store_link",
-      },
-      {
-        to: "/cart",
-        label: "Orders",
-        icon: <ShoppingCart size={16} />,
-        ocid: "sidebar.orders_link",
-      },
-    ],
-  },
-];
-
-const ADMIN_LINKS: NavLink[] = [
-  {
-    to: "/admin",
-    label: "Users",
-    icon: <UserCog size={16} />,
-    ocid: "sidebar.admin_link",
-  },
-  {
-    to: "/admin",
-    label: "Settings",
-    icon: <Settings size={16} />,
-    ocid: "sidebar.settings_link",
-  },
-  {
-    to: "/admin",
-    label: "Reports",
-    icon: <BarChart3 size={16} />,
-    ocid: "sidebar.reports_link",
-  },
-];
-
-const TOP_NAV_LINKS = [
-  { to: "/", label: "Home", ocid: "nav.home_link" },
-  { to: "/organizations", label: "Organizations", ocid: "nav.orgs_link" },
-  { to: "/campaigns", label: "Campaigns", ocid: "nav.campaigns_link" },
-  { to: "/forums", label: "Forums", ocid: "nav.forums_link" },
-  { to: "/resources", label: "Resources", ocid: "nav.resources_link" },
-  { to: "/store", label: "Store", ocid: "nav.store_link" },
-];
-
 function SidebarContent({
   collapsed,
   onLinkClick,
 }: { collapsed: boolean; onLinkClick?: () => void }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const location = useLocation();
   const isAdmin =
     user?.role === "admin" ||
@@ -209,10 +79,126 @@ function SidebarContent({
     return location.pathname.startsWith(to);
   };
 
+  const sidebarSections: { title: string; links: NavLink[] }[] = [
+    {
+      title: t.sidebar.main,
+      links: [
+        {
+          to: "/dashboard",
+          label: t.sidebar.dashboard,
+          icon: <LayoutDashboard size={16} />,
+          ocid: "sidebar.dashboard_link",
+        },
+        {
+          to: "/organizations",
+          label: t.sidebar.organizations,
+          icon: <Building2 size={16} />,
+          ocid: "sidebar.orgs_link",
+        },
+        {
+          to: "/campaigns",
+          label: t.sidebar.campaigns,
+          icon: <Megaphone size={16} />,
+          ocid: "sidebar.campaigns_link",
+        },
+        {
+          to: "/activism",
+          label: t.sidebar.activism,
+          icon: <Zap size={16} />,
+          ocid: "sidebar.activism_link",
+        },
+      ],
+    },
+    {
+      title: t.sidebar.community,
+      links: [
+        {
+          to: "/forums",
+          label: t.sidebar.forums,
+          icon: <MessageSquare size={16} />,
+          ocid: "sidebar.forums_link",
+        },
+        {
+          to: "/members",
+          label: t.sidebar.members,
+          icon: <Users size={16} />,
+          ocid: "sidebar.members_link",
+        },
+        {
+          to: "/members",
+          label: t.sidebar.directory,
+          icon: <BookMarked size={16} />,
+          ocid: "sidebar.directory_link",
+        },
+      ],
+    },
+    {
+      title: t.sidebar.knowledge,
+      links: [
+        {
+          to: "/resources",
+          label: t.sidebar.resources,
+          icon: <BookOpen size={16} />,
+          ocid: "sidebar.resources_link",
+        },
+        {
+          to: "/faq",
+          label: t.sidebar.faq,
+          icon: <HelpCircle size={16} />,
+          ocid: "sidebar.faq_link",
+        },
+        {
+          to: "/docs",
+          label: t.sidebar.documentation,
+          icon: <FileText size={16} />,
+          ocid: "sidebar.docs_link",
+        },
+      ],
+    },
+    {
+      title: t.sidebar.commerce,
+      links: [
+        {
+          to: "/store",
+          label: t.sidebar.store,
+          icon: <ShoppingBag size={16} />,
+          ocid: "sidebar.store_link",
+        },
+        {
+          to: "/cart",
+          label: t.sidebar.orders,
+          icon: <ShoppingCart size={16} />,
+          ocid: "sidebar.orders_link",
+        },
+      ],
+    },
+  ];
+
+  const adminLinks: NavLink[] = [
+    {
+      to: "/admin",
+      label: t.sidebar.users,
+      icon: <UserCog size={16} />,
+      ocid: "sidebar.admin_link",
+    },
+    {
+      to: "/admin",
+      label: t.sidebar.settings,
+      icon: <Settings size={16} />,
+      ocid: "sidebar.settings_link",
+    },
+    {
+      to: "/admin",
+      label: t.sidebar.reports,
+      icon: <BarChart3 size={16} />,
+      ocid: "sidebar.reports_link",
+    },
+  ];
+
   return (
     <ScrollArea className="flex-1 overflow-y-auto">
       <div className="py-3">
-        {SIDEBAR_SECTIONS.map((section) => (
+        {sidebarSections.map((section) => (
           <div key={section.title} className="mb-1">
             {!collapsed && (
               <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 font-display">
@@ -252,10 +238,10 @@ function SidebarContent({
           <div className="mb-1">
             {!collapsed && (
               <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-primary/80 font-display">
-                Admin
+                {t.sidebar.admin}
               </p>
             )}
-            {ADMIN_LINKS.map((link) => (
+            {adminLinks.map((link) => (
               <Link
                 key={link.ocid}
                 to={link.to}
@@ -283,13 +269,29 @@ function SidebarContent({
 interface LayoutProps {
   children: React.ReactNode;
   breadcrumb?: string;
+  hideFooter?: boolean;
 }
 
-export function Layout({ children, breadcrumb }: LayoutProps) {
+export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeLang, setActiveLang] = useState("EN");
+  const [scrolled, setScrolled] = useState(false);
   const { user, logout, switchRole, isAuthenticated } = useAuth();
+  const { language, setLanguage, t } = useI18n();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const mainEl = document.querySelector("main");
+      setScrolled(mainEl ? mainEl.scrollTop > 8 : window.scrollY > 8);
+    };
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.addEventListener("scroll", handleScroll, { passive: true });
+      return () => mainEl.removeEventListener("scroll", handleScroll);
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const initials = user?.name
     ? user.name
@@ -382,6 +384,15 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                     >
                       {user.role.replace("_", " ")}
                     </Badge>
+                    <div className="mt-1">
+                      <Link
+                        to="/profile"
+                        className="text-[10px] text-sidebar-foreground/50 hover:text-sidebar-primary transition-colors underline-offset-2 hover:underline"
+                        data-ocid="sidebar.view_profile_link"
+                      >
+                        View Profile
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -393,7 +404,12 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
       {/* ── Main Column ── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* ── Top Navigation Bar ── */}
-        <header className="h-16 bg-white border-b border-border flex items-center px-4 lg:px-6 gap-4 flex-shrink-0 shadow-xs z-20">
+        <header
+          className={cn(
+            "h-16 bg-white border-b border-border flex items-center px-4 lg:px-6 gap-4 flex-shrink-0 z-20 transition-shadow duration-200",
+            scrolled ? "shadow-topbar-scrolled" : "shadow-topbar",
+          )}
+        >
           {/* Mobile menu trigger (only when authenticated) */}
           {isAuthenticated && (
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -475,15 +491,46 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
           {/* Logo (desktop, visible in topbar) */}
           <Link
             to="/"
-            className="hidden lg:flex items-center gap-2 mr-2"
+            className="hidden lg:flex items-center gap-2 mr-2 group"
             data-ocid="nav.topbar_home_link"
           >
-            <div className="civic-rule w-6" style={{ height: "2px" }} />
+            <div className="w-7 h-7 rounded-md civic-gradient flex items-center justify-center flex-shrink-0 group-hover:opacity-90 transition-opacity">
+              <span className="text-white font-display font-bold text-xs">
+                II
+              </span>
+            </div>
+            <div className="flex flex-col leading-none">
+              <span className="font-display font-bold text-primary text-sm tracking-tight">
+                IIIntl One
+              </span>
+              <span className="text-[9px] text-muted-foreground/70 tracking-wide">
+                Independent · Interdependent
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-1 flex-1">
-            {TOP_NAV_LINKS.map((link) => (
+            {[
+              { to: "/", label: t.nav.home, ocid: "nav.home_link" },
+              {
+                to: "/organizations",
+                label: t.nav.organizations,
+                ocid: "nav.orgs_link",
+              },
+              {
+                to: "/campaigns",
+                label: t.nav.campaigns,
+                ocid: "nav.campaigns_link",
+              },
+              { to: "/forums", label: t.nav.forums, ocid: "nav.forums_link" },
+              {
+                to: "/resources",
+                label: t.nav.resources,
+                ocid: "nav.resources_link",
+              },
+              { to: "/store", label: t.nav.store, ocid: "nav.store_link" },
+            ].map((link) => (
               <Link
                 key={link.ocid}
                 to={link.to}
@@ -513,6 +560,20 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
 
           {/* Right side controls */}
           <div className="flex items-center gap-2 ml-auto">
+            {/* Notification Bell (authenticated users only) */}
+            {isAuthenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 relative"
+                data-ocid="nav.notifications_button"
+                aria-label="Notifications"
+              >
+                <Bell size={16} className="text-muted-foreground" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full ring-2 ring-white" />
+              </Button>
+            )}
+
             {/* Language Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -523,7 +584,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                   data-ocid="nav.language_select"
                 >
                   <Globe size={13} className="text-muted-foreground" />
-                  {activeLang}
+                  {language}
                   <ChevronDown size={11} className="text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
@@ -535,16 +596,22 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                 {LANGUAGES.map((lang) => (
                   <DropdownMenuItem
                     key={lang.code}
-                    onClick={() => setActiveLang(lang.code)}
+                    onClick={() => setLanguage(lang.code)}
                     className={cn(
                       "text-sm",
-                      activeLang === lang.code && "font-semibold text-primary",
+                      language === lang.code && "font-semibold text-primary",
                     )}
+                    data-ocid={`nav.language_${lang.code.toLowerCase()}`}
                   >
                     <span className="font-mono text-xs text-muted-foreground w-8">
                       {lang.code}
                     </span>
                     {lang.label}
+                    {lang.dir === "rtl" && (
+                      <span className="ml-auto text-[9px] text-muted-foreground">
+                        RTL
+                      </span>
+                    )}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -562,7 +629,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                   asChild
                   data-ocid="nav.login_button"
                 >
-                  <Link to="/login">Sign In</Link>
+                  <Link to="/login">{t.nav.signIn}</Link>
                 </Button>
                 <Button
                   size="sm"
@@ -570,7 +637,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                   asChild
                   data-ocid="nav.register_button"
                 >
-                  <Link to="/register">Get Started</Link>
+                  <Link to="/register">{t.nav.getStarted}</Link>
                 </Button>
               </div>
             )}
@@ -620,7 +687,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                       className="flex items-center gap-2 cursor-pointer"
                       data-ocid="nav.profile_link"
                     >
-                      <User size={14} /> Profile
+                      <User size={14} /> {t.nav.profile}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -629,7 +696,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                       className="flex items-center gap-2 cursor-pointer"
                       data-ocid="nav.dashboard_link"
                     >
-                      <LayoutDashboard size={14} /> Dashboard
+                      <LayoutDashboard size={14} /> {t.nav.dashboard}
                     </Link>
                   </DropdownMenuItem>
                   {(user?.role === "admin" || user?.role === "super_admin") && (
@@ -639,7 +706,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                         className="flex items-center gap-2 cursor-pointer"
                         data-ocid="nav.admin_link"
                       >
-                        <Settings size={14} /> Admin Panel
+                        <Settings size={14} /> {t.nav.adminPanel}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -648,7 +715,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                     <Shuffle size={11} />
-                    Switch Role (Demo)
+                    {t.nav.switchRole}
                   </DropdownMenuLabel>
                   {ROLE_OPTIONS.map((opt) => (
                     <DropdownMenuItem
@@ -676,7 +743,7 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
                     className="text-destructive focus:text-destructive cursor-pointer"
                     data-ocid="nav.logout_button"
                   >
-                    <LogOut size={14} className="mr-2" /> Logout
+                    <LogOut size={14} className="mr-2" /> {t.nav.logout}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -686,12 +753,18 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
 
         {/* Breadcrumb bar */}
         {breadcrumb && (
-          <div className="bg-secondary/40 border-b border-border px-6 py-2">
-            <p className="text-xs text-muted-foreground font-medium tracking-wide">
-              <span className="text-primary/60">IIIntl One</span>
-              <span className="mx-2 text-border">›</span>
-              <span>{breadcrumb}</span>
-            </p>
+          <div className="bg-secondary/30 border-b border-border px-6 py-2.5 flex items-center gap-1.5">
+            <Link
+              to="/"
+              className="text-xs text-primary/50 hover:text-primary font-medium transition-colors"
+              data-ocid="breadcrumb.home_link"
+            >
+              IIIntl One
+            </Link>
+            <span className="text-border text-xs">/</span>
+            <span className="text-xs text-foreground/70 font-medium">
+              {breadcrumb}
+            </span>
           </div>
         )}
 
@@ -712,20 +785,69 @@ export function Layout({ children, breadcrumb }: LayoutProps) {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-border bg-white px-6 py-3 flex-shrink-0">
-          <p className="text-xs text-muted-foreground text-center">
-            © {new Date().getFullYear()} IIIntl One Platform — Independent ·
-            Interdependent · International. Built with ♥ using{" "}
-            <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              caffeine.ai
-            </a>
-          </p>
-        </footer>
+        {!hideFooter && (
+          <footer className="border-t border-border bg-white px-6 py-4 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 max-w-7xl mx-auto">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded civic-gradient flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-display font-bold text-[9px]">
+                    II
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  © {new Date().getFullYear()} IIIntl One — Independent ·
+                  Interdependent · International
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <nav
+                  className="flex items-center gap-3"
+                  aria-label="Footer navigation"
+                >
+                  {[
+                    { to: "/faq", label: "FAQ", ocid: "footer.faq_link" },
+                    { to: "/docs", label: "Docs", ocid: "footer.docs_link" },
+                    { to: "/store", label: "Store", ocid: "footer.store_link" },
+                    {
+                      to: "/organizations",
+                      label: "Orgs",
+                      ocid: "footer.orgs_link",
+                    },
+                    {
+                      to: "/forums",
+                      label: "Forums",
+                      ocid: "footer.forums_link",
+                    },
+                  ].map((link) => (
+                    <Link
+                      key={link.ocid}
+                      to={link.to}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                      data-ocid={link.ocid}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+                <Separator
+                  orientation="vertical"
+                  className="h-3 hidden sm:block"
+                />
+                <p className="text-xs text-muted-foreground hidden sm:block">
+                  Built with ♥ using{" "}
+                  <a
+                    href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    caffeine.ai
+                  </a>
+                </p>
+              </div>
+            </div>
+          </footer>
+        )}
       </div>
     </div>
   );

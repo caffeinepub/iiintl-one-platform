@@ -2079,3 +2079,783 @@ export function getForumCategoryColor(category: ForumCategory): string {
       return "bg-gray-100 text-gray-600 border-gray-200";
   }
 }
+
+// ─── Store Types ──────────────────────────────────────────────────────────────
+
+export type ProductCategory =
+  | "Books & Publications"
+  | "Apparel"
+  | "Digital Resources"
+  | "Art & Crafts"
+  | "Food & Goods"
+  | "Equipment & Tools"
+  | "Services"
+  | "Merchandise";
+
+export type OrderStatus = "processing" | "shipped" | "delivered" | "cancelled";
+
+export interface MockVendor {
+  id: string;
+  name: string;
+  region: OrgRegion;
+  description: string;
+  memberSince: string;
+  rating: number;
+  reviewCount: number;
+  productCount: number;
+  totalSales: number;
+  contactEmail: string;
+  specialties: string[];
+}
+
+export interface MockProduct {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  vendorId: string;
+  vendor: string;
+  category: ProductCategory;
+  region: OrgRegion;
+  rating: number;
+  reviewCount: number;
+  stock: number;
+  tags: string[];
+  featured: boolean;
+  createdAt: string;
+}
+
+export interface MockProductReview {
+  id: string;
+  productId: string;
+  authorName: string;
+  rating: number;
+  comment: string;
+  date: string;
+}
+
+export interface MockOrderItem {
+  productId: string;
+  productName: string;
+  vendor: string;
+  price: number;
+  quantity: number;
+}
+
+export interface MockOrder {
+  id: string;
+  orderNumber: string;
+  date: string;
+  status: OrderStatus;
+  items: MockOrderItem[];
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+}
+
+// ─── Mock Vendors ─────────────────────────────────────────────────────────────
+
+export const MOCK_VENDORS: MockVendor[] = [
+  {
+    id: "vendor-1",
+    name: "AfroPress Books",
+    region: "Africa",
+    description:
+      "Africa's foremost independent publishing collective, bringing voices from across the continent to a global audience. We specialize in political theory, social movements, and African history.",
+    memberSince: "2021-04-10",
+    rating: 4.8,
+    reviewCount: 214,
+    productCount: 48,
+    totalSales: 1820,
+    contactEmail: "press@afropress.org",
+    specialties: ["Books & Publications", "Digital Resources"],
+  },
+  {
+    id: "vendor-2",
+    name: "Pacific Collective",
+    region: "Asia-Pacific",
+    description:
+      "A workers' cooperative of artisans and craftspeople from across the Pacific islands. Every purchase directly supports island community livelihoods and climate resilience programs.",
+    memberSince: "2021-09-15",
+    rating: 4.7,
+    reviewCount: 187,
+    productCount: 34,
+    totalSales: 1240,
+    contactEmail: "collective@pacificcoop.org",
+    specialties: ["Art & Crafts", "Merchandise"],
+  },
+  {
+    id: "vendor-3",
+    name: "Americas Solidarity Shop",
+    region: "Americas",
+    description:
+      "The official merchandise and resource store of the Americas Chapter. Proceeds support labor rights campaigns, migrant worker legal aid, and youth organizing programs across the Western Hemisphere.",
+    memberSince: "2020-03-01",
+    rating: 4.6,
+    reviewCount: 302,
+    productCount: 67,
+    totalSales: 4100,
+    contactEmail: "shop@americas.iiintl.org",
+    specialties: ["Apparel", "Merchandise", "Services"],
+  },
+  {
+    id: "vendor-4",
+    name: "EuroAction Store",
+    region: "Europe",
+    description:
+      "European civic advocacy tools, publications, and branded materials for organizers and campaign teams. Shipping across all EU member states and the UK.",
+    memberSince: "2020-07-20",
+    rating: 4.5,
+    reviewCount: 156,
+    productCount: 41,
+    totalSales: 2780,
+    contactEmail: "store@euroaction.eu",
+    specialties: ["Books & Publications", "Equipment & Tools", "Apparel"],
+  },
+  {
+    id: "vendor-5",
+    name: "South Asia Cooperative",
+    region: "South Asia",
+    description:
+      "A fair-trade cooperative connecting artisans, farmers, and knowledge workers across South Asia with the global IIIntl One community. All vendors are verified cooperative members.",
+    memberSince: "2021-11-08",
+    rating: 4.9,
+    reviewCount: 98,
+    productCount: 29,
+    totalSales: 870,
+    contactEmail: "cooperative@sacooperative.in",
+    specialties: ["Art & Crafts", "Food & Goods", "Digital Resources"],
+  },
+  {
+    id: "vendor-6",
+    name: "Middle East Artisans",
+    region: "Middle East",
+    description:
+      "Handcrafted goods from artisan collectives across the Middle East and North Africa. Each item carries the story of its maker and contributes to community economic empowerment programs.",
+    memberSince: "2022-02-14",
+    rating: 4.7,
+    reviewCount: 74,
+    productCount: 22,
+    totalSales: 590,
+    contactEmail: "artisans@meartisans.org",
+    specialties: ["Art & Crafts", "Food & Goods"],
+  },
+];
+
+// ─── Mock Products ────────────────────────────────────────────────────────────
+
+export const MOCK_PRODUCTS: MockProduct[] = [
+  {
+    id: "prod-1",
+    title: "Decolonizing Democracy: A Practitioner's Guide",
+    description:
+      "A comprehensive guide for civic organizers working to dismantle colonial power structures in democratic institutions. Draws on 30 case studies from African, Asian, and Latin American civic movements. Includes facilitator worksheets, community dialogue frameworks, and policy advocacy templates used successfully across three continents.",
+    price: 24.99,
+    vendorId: "vendor-1",
+    vendor: "AfroPress Books",
+    category: "Books & Publications",
+    region: "Africa",
+    rating: 4.9,
+    reviewCount: 87,
+    stock: 142,
+    tags: ["democracy", "decolonization", "organizing", "policy"],
+    featured: true,
+    createdAt: "2026-01-15",
+  },
+  {
+    id: "prod-2",
+    title: "Solidarity Tote Bag — IIIntl One",
+    description:
+      "Heavy-duty organic cotton tote bag with the IIIntl One emblem and 'Independent · Interdependent · International' text in 5 languages. Ethically manufactured by the Americas Solidarity cooperative. Durable enough for daily use, designed to spark conversations wherever you carry it.",
+    price: 18.0,
+    vendorId: "vendor-3",
+    vendor: "Americas Solidarity Shop",
+    category: "Merchandise",
+    region: "Americas",
+    rating: 4.7,
+    reviewCount: 143,
+    stock: 280,
+    tags: ["tote", "organic", "solidarity", "merchandise"],
+    featured: true,
+    createdAt: "2026-01-20",
+  },
+  {
+    id: "prod-3",
+    title: "Hand-Woven Pandanus Basket — Pacific Islands",
+    description:
+      "Traditional pandanus leaf baskets hand-woven by artisan women's cooperatives in Fiji and Vanuatu. Each basket takes 4-6 hours to complete and the weaving pattern reflects the maker's island origin. Comes with a card naming the artisan and describing the pattern's cultural significance.",
+    price: 42.0,
+    vendorId: "vendor-2",
+    vendor: "Pacific Collective",
+    category: "Art & Crafts",
+    region: "Asia-Pacific",
+    rating: 5.0,
+    reviewCount: 34,
+    stock: 18,
+    tags: ["handwoven", "pacific", "artisan", "fair-trade"],
+    featured: true,
+    createdAt: "2026-02-01",
+  },
+  {
+    id: "prod-4",
+    title: "Campaign Strategy Masterclass — Digital Course",
+    description:
+      "A 12-module online course developed by IIIntl One campaign veterans covering: goal-setting, coalition building, media strategy, digital mobilization, legislator engagement, and sustaining momentum. Includes 8 hours of video, downloadable toolkits, and access to a private alumni cohort forum.",
+    price: 79.0,
+    vendorId: "vendor-3",
+    vendor: "Americas Solidarity Shop",
+    category: "Digital Resources",
+    region: "Americas",
+    rating: 4.8,
+    reviewCount: 62,
+    stock: 999,
+    tags: ["online course", "campaign strategy", "training", "digital"],
+    featured: true,
+    createdAt: "2026-01-10",
+  },
+  {
+    id: "prod-5",
+    title: "EU Digital Rights Observer Kit",
+    description:
+      "Professional toolkit for civil society observers monitoring digital rights legislation in the European Union. Includes annotated EU law reference cards, meeting notes templates, key stakeholder contact directories, and a pocket guide to EU legislative procedure. Updated for 2026.",
+    price: 35.0,
+    vendorId: "vendor-4",
+    vendor: "EuroAction Store",
+    category: "Equipment & Tools",
+    region: "Europe",
+    rating: 4.6,
+    reviewCount: 29,
+    stock: 75,
+    tags: ["eu", "digital rights", "observer", "toolkit"],
+    featured: false,
+    createdAt: "2026-02-10",
+  },
+  {
+    id: "prod-6",
+    title: "Kashmiri Pashmina Shawl — Artisan Made",
+    description:
+      "Authentic Pashmina wool shawls hand-spun and woven by artisan families in Kashmir. Each shawl takes approximately 72 hours to complete. The South Asia Cooperative pays artisans 3x the standard market rate and funds children's education programs in weaving communities.",
+    price: 89.0,
+    vendorId: "vendor-5",
+    vendor: "South Asia Cooperative",
+    category: "Art & Crafts",
+    region: "South Asia",
+    rating: 5.0,
+    reviewCount: 23,
+    stock: 12,
+    tags: ["pashmina", "kashmir", "artisan", "wool"],
+    featured: false,
+    createdAt: "2026-02-15",
+  },
+  {
+    id: "prod-7",
+    title: "Organic Yemeni Sidr Honey — 500g",
+    description:
+      "Pure, unfiltered Sidr honey harvested from wild lotus trees in the mountains of Yemen by family beekeepers. Sidr honey is among the rarest in the world and is known for its exceptional flavor and natural health properties. Supports Yemeni beekeeping families directly affected by conflict.",
+    price: 38.0,
+    vendorId: "vendor-6",
+    vendor: "Middle East Artisans",
+    category: "Food & Goods",
+    region: "Middle East",
+    rating: 4.9,
+    reviewCount: 41,
+    stock: 35,
+    tags: ["honey", "organic", "yemen", "fair-trade"],
+    featured: false,
+    createdAt: "2026-02-20",
+  },
+  {
+    id: "prod-8",
+    title: "Activist Hoodie — Climate Justice",
+    description:
+      "Premium 300gsm organic cotton hoodie with bold 'Climate Justice Now' graphic and IIIntl One branding on the back. Available in deep navy, forest green, and charcoal. Made in a certified Fair Trade facility in Portugal. Sizing runs large — order down if between sizes.",
+    price: 65.0,
+    vendorId: "vendor-4",
+    vendor: "EuroAction Store",
+    category: "Apparel",
+    region: "Europe",
+    rating: 4.5,
+    reviewCount: 78,
+    stock: 94,
+    tags: ["hoodie", "climate justice", "apparel", "organic cotton"],
+    featured: false,
+    createdAt: "2026-01-25",
+  },
+  {
+    id: "prod-9",
+    title: "African Political Philosophy — Selected Readings",
+    description:
+      "A curated anthology of 20th and 21st century African political philosophy, featuring works by Frantz Fanon, Ngũgĩ wa Thiong'o, Wangari Maathai, Achille Mbembe, and emerging contemporary thinkers. Edited by the AfroPress academic board with contextual introductions for each piece.",
+    price: 32.0,
+    vendorId: "vendor-1",
+    vendor: "AfroPress Books",
+    category: "Books & Publications",
+    region: "Africa",
+    rating: 4.8,
+    reviewCount: 54,
+    stock: 88,
+    tags: ["philosophy", "african thought", "anthology", "politics"],
+    featured: false,
+    createdAt: "2026-01-30",
+  },
+  {
+    id: "prod-10",
+    title: "Tapa Cloth Wall Hanging — Fiji",
+    description:
+      "Traditional Fijian tapa cloth (masi) painted with ancestral geometric designs using natural dyes. Dimensions approximately 60cm × 90cm. Handmade by artisan women of the Pacific Collective's Fiji chapter. Each piece is unique and comes with a certificate of authenticity and maker biography.",
+    price: 75.0,
+    vendorId: "vendor-2",
+    vendor: "Pacific Collective",
+    category: "Art & Crafts",
+    region: "Asia-Pacific",
+    rating: 4.9,
+    reviewCount: 19,
+    stock: 7,
+    tags: ["tapa", "fiji", "wall art", "traditional"],
+    featured: true,
+    createdAt: "2026-02-05",
+  },
+  {
+    id: "prod-11",
+    title: "Community Organizing Handbook — 3rd Edition",
+    description:
+      "The definitive field guide for grassroots community organizers, now in its third edition with updated chapters on digital mobilization and hybrid campaigning. Covers: power mapping, one-on-ones, base-building, media strategy, and sustaining volunteer energy. Used in IIIntl One's Youth Leadership Academy curriculum.",
+    price: 19.99,
+    vendorId: "vendor-1",
+    vendor: "AfroPress Books",
+    category: "Books & Publications",
+    region: "Africa",
+    rating: 4.7,
+    reviewCount: 112,
+    stock: 220,
+    tags: ["organizing", "handbook", "grassroots", "campaigns"],
+    featured: false,
+    createdAt: "2026-01-08",
+  },
+  {
+    id: "prod-12",
+    title: "Fair Trade Darjeeling Tea Collection — 250g",
+    description:
+      "A curated selection of three Darjeeling first-flush teas sourced from worker-owned tea gardens in West Bengal. The South Asia Cooperative pays 40% above market rate and funds healthcare for plantation workers. Packaging is fully compostable. Includes tasting notes and steeping guide.",
+    price: 22.0,
+    vendorId: "vendor-5",
+    vendor: "South Asia Cooperative",
+    category: "Food & Goods",
+    region: "South Asia",
+    rating: 4.8,
+    reviewCount: 47,
+    stock: 62,
+    tags: ["tea", "darjeeling", "fair-trade", "food"],
+    featured: false,
+    createdAt: "2026-02-18",
+  },
+  {
+    id: "prod-13",
+    title: "Election Observer Training Manual — PDF",
+    description:
+      "The IIIntl One Election Observer Training Manual used in our formal credentialing programs. 180-page comprehensive guide covering legal frameworks, documentation methods, incident reporting, security protocols, and post-election analysis. Available as a high-resolution PDF with interactive forms.",
+    price: 12.0,
+    vendorId: "vendor-4",
+    vendor: "EuroAction Store",
+    category: "Digital Resources",
+    region: "Europe",
+    rating: 4.6,
+    reviewCount: 38,
+    stock: 999,
+    tags: ["elections", "observer", "training", "pdf"],
+    featured: false,
+    createdAt: "2026-01-22",
+  },
+  {
+    id: "prod-14",
+    title: "Palestinian Embroidery Cushion Cover",
+    description:
+      "Hand-embroidered cushion covers in the traditional Palestinian tatreez style, created by artisan women's cooperatives in Ramallah and Bethlehem. Each cover takes 15-20 hours of skilled needlework. The geometric patterns carry regional and family identity. 45cm × 45cm, suitable for standard cushion inserts.",
+    price: 48.0,
+    vendorId: "vendor-6",
+    vendor: "Middle East Artisans",
+    category: "Art & Crafts",
+    region: "Middle East",
+    rating: 4.8,
+    reviewCount: 33,
+    stock: 24,
+    tags: ["embroidery", "palestine", "handcraft", "cushion"],
+    featured: false,
+    createdAt: "2026-02-22",
+  },
+  {
+    id: "prod-15",
+    title: "Americas Chapter Activist T-Shirt",
+    description:
+      "Lightweight unisex activist tee featuring the Americas Chapter emblem and 'Labor Rights Are Human Rights' text. 180gsm GOTS-certified organic cotton. Screen-printed with water-based inks. Available in sizes XS–3XL. Made in partnership with a worker-owned cooperative in Buenos Aires.",
+    price: 28.0,
+    vendorId: "vendor-3",
+    vendor: "Americas Solidarity Shop",
+    category: "Apparel",
+    region: "Americas",
+    rating: 4.6,
+    reviewCount: 95,
+    stock: 167,
+    tags: ["t-shirt", "americas", "labor rights", "apparel"],
+    featured: false,
+    createdAt: "2026-01-18",
+  },
+  {
+    id: "prod-16",
+    title: "Digital Security for Activists — Online Workshop",
+    description:
+      "A 3-hour live online workshop covering essential digital security practices for activists and journalists: encrypted communications, device security, operational security, and protecting your community. Led by the Digital Rights Task Force. Includes lifetime access to workshop recording and resource toolkit.",
+    price: 45.0,
+    vendorId: "vendor-5",
+    vendor: "South Asia Cooperative",
+    category: "Services",
+    region: "South Asia",
+    rating: 4.9,
+    reviewCount: 28,
+    stock: 999,
+    tags: ["digital security", "workshop", "activists", "training"],
+    featured: true,
+    createdAt: "2026-02-08",
+  },
+  {
+    id: "prod-17",
+    title: "Campaign Poster — Climate Justice Set (5 designs)",
+    description:
+      "High-quality A2-format climate justice poster set featuring 5 original designs by activist artists from Africa, Latin America, and Southeast Asia. Printed on FSC-certified recycled paper with soy-based inks. Suitable for offices, campaign tables, and public events. Each set supports the Climate Justice Summit campaign fund.",
+    price: 30.0,
+    vendorId: "vendor-3",
+    vendor: "Americas Solidarity Shop",
+    category: "Merchandise",
+    region: "Americas",
+    rating: 4.7,
+    reviewCount: 67,
+    stock: 115,
+    tags: ["poster", "climate", "art", "campaign"],
+    featured: false,
+    createdAt: "2026-02-12",
+  },
+  {
+    id: "prod-18",
+    title: "Maori Pounamu Greenstone Pendant",
+    description:
+      "Traditional New Zealand Maori pounamu (greenstone/nephrite jade) pendant hand-carved by Maori artisans of the Pacific Collective's Aotearoa chapter. Pounamu holds deep spiritual and cultural significance in Māori tradition. Each pendant comes with a woven flax cord and a card explaining the piece's cultural context.",
+    price: 120.0,
+    vendorId: "vendor-2",
+    vendor: "Pacific Collective",
+    category: "Art & Crafts",
+    region: "Asia-Pacific",
+    rating: 5.0,
+    reviewCount: 12,
+    stock: 5,
+    tags: ["maori", "greenstone", "pendant", "new zealand"],
+    featured: false,
+    createdAt: "2026-02-25",
+  },
+  {
+    id: "prod-19",
+    title: "Women's Rights Legal Toolkit — Download",
+    description:
+      "A comprehensive legal resource guide for organizations working on women's rights in the Global South. Covers international legal frameworks, model legislation templates, litigation strategy guides, and documentation standards. Compiled by the IIIntl One legal working group. Available as a formatted PDF and editable Word document bundle.",
+    price: 15.0,
+    vendorId: "vendor-1",
+    vendor: "AfroPress Books",
+    category: "Digital Resources",
+    region: "Africa",
+    rating: 4.7,
+    reviewCount: 43,
+    stock: 999,
+    tags: ["legal", "women's rights", "toolkit", "download"],
+    featured: false,
+    createdAt: "2026-01-28",
+  },
+  {
+    id: "prod-20",
+    title: "Campaign Organizer Backpack — IIIntl One",
+    description:
+      'Purpose-built 25L organizer backpack designed for field campaigners and activists. Features: padded laptop sleeve (up to 15"), external document compartments, water bottle holder, hi-vis reflective strips for evening events, and internal cable management. Made from recycled PET fabric in an ethical EU manufacturing facility.',
+    price: 95.0,
+    vendorId: "vendor-4",
+    vendor: "EuroAction Store",
+    category: "Equipment & Tools",
+    region: "Europe",
+    rating: 4.7,
+    reviewCount: 52,
+    stock: 38,
+    tags: ["backpack", "organizer", "equipment", "campaign gear"],
+    featured: true,
+    createdAt: "2026-02-28",
+  },
+];
+
+// ─── Mock Product Reviews ─────────────────────────────────────────────────────
+
+export const MOCK_PRODUCT_REVIEWS: MockProductReview[] = [
+  {
+    id: "rev-1-1",
+    productId: "prod-1",
+    authorName: "Amara Diallo",
+    rating: 5,
+    comment:
+      "Essential reading for anyone doing civic work in post-colonial contexts. The case studies are real and the frameworks are practical. I've already used the policy advocacy templates for three campaigns.",
+    date: "2026-02-14",
+  },
+  {
+    id: "rev-1-2",
+    productId: "prod-1",
+    authorName: "Elena Volkov",
+    rating: 5,
+    comment:
+      "Beautifully written and intellectually honest. It doesn't shy away from difficult questions about power and co-optation. A must for anyone building civic institutions.",
+    date: "2026-02-20",
+  },
+  {
+    id: "rev-1-3",
+    productId: "prod-1",
+    authorName: "Miguel Fernandes",
+    rating: 4,
+    comment:
+      "Very strong on African and Latin American contexts, somewhat lighter on Pacific and Caribbean. Still an excellent and thought-provoking guide worth every penny.",
+    date: "2026-03-01",
+  },
+  {
+    id: "rev-2-1",
+    productId: "prod-2",
+    authorName: "Priya Sharma",
+    rating: 5,
+    comment:
+      "Great quality bag and the five-language text gets so many questions when I carry it around. Exactly the kind of subtle activism I love.",
+    date: "2026-02-10",
+  },
+  {
+    id: "rev-2-2",
+    productId: "prod-2",
+    authorName: "Destiny Osei",
+    rating: 4,
+    comment:
+      "Solid bag, holds everything I need for campaign days. Shipped fast and packaging was minimal and recycled.",
+    date: "2026-02-18",
+  },
+  {
+    id: "rev-3-1",
+    productId: "prod-3",
+    authorName: "Sofia Andersen",
+    rating: 5,
+    comment:
+      "Absolutely stunning. The quality of the weaving is extraordinary and the card naming the artisan made it feel personal. I display it in my office and it's always a talking point.",
+    date: "2026-02-22",
+  },
+  {
+    id: "rev-4-1",
+    productId: "prod-4",
+    authorName: "Tomás García",
+    rating: 5,
+    comment:
+      "Module 4 on legislator engagement alone was worth the entire course price. The coalition building frameworks are practical and immediately applicable. Highly recommend for anyone serious about campaign strategy.",
+    date: "2026-02-08",
+  },
+  {
+    id: "rev-4-2",
+    productId: "prod-4",
+    authorName: "Zara Ahmed",
+    rating: 5,
+    comment:
+      "This course changed how I think about long-term campaign planning. The digital mobilization module is current and realistic about both the opportunities and limitations of social media.",
+    date: "2026-02-25",
+  },
+  {
+    id: "rev-16-1",
+    productId: "prod-16",
+    authorName: "Yuki Tanaka",
+    rating: 5,
+    comment:
+      "As someone who teaches digital security, I was impressed by the depth and the real-world threat modelling approach. This is not generic cybersecurity content — it's specifically built for activists and it shows.",
+    date: "2026-02-20",
+  },
+  {
+    id: "rev-20-1",
+    productId: "prod-20",
+    authorName: "James Okonkwo",
+    rating: 5,
+    comment:
+      "Finally a backpack designed for how we actually work. The document compartments are exactly right and the hi-vis strips are genuinely useful for evening events. Mine has already been through four countries.",
+    date: "2026-03-02",
+  },
+];
+
+// ─── Mock Orders ──────────────────────────────────────────────────────────────
+
+export const MOCK_ORDERS: MockOrder[] = [
+  {
+    id: "order-1",
+    orderNumber: "IIN-2026-00847",
+    date: "2026-02-28",
+    status: "delivered",
+    items: [
+      {
+        productId: "prod-1",
+        productName: "Decolonizing Democracy: A Practitioner's Guide",
+        vendor: "AfroPress Books",
+        price: 24.99,
+        quantity: 1,
+      },
+      {
+        productId: "prod-11",
+        productName: "Community Organizing Handbook — 3rd Edition",
+        vendor: "AfroPress Books",
+        price: 19.99,
+        quantity: 2,
+      },
+    ],
+    subtotal: 64.97,
+    shipping: 0,
+    tax: 5.2,
+    total: 70.17,
+  },
+  {
+    id: "order-2",
+    orderNumber: "IIN-2026-00912",
+    date: "2026-03-04",
+    status: "shipped",
+    items: [
+      {
+        productId: "prod-8",
+        productName: "Activist Hoodie — Climate Justice",
+        vendor: "EuroAction Store",
+        price: 65.0,
+        quantity: 1,
+      },
+      {
+        productId: "prod-15",
+        productName: "Americas Chapter Activist T-Shirt",
+        vendor: "Americas Solidarity Shop",
+        price: 28.0,
+        quantity: 2,
+      },
+    ],
+    subtotal: 121.0,
+    shipping: 0,
+    tax: 9.68,
+    total: 130.68,
+  },
+  {
+    id: "order-3",
+    orderNumber: "IIN-2026-00956",
+    date: "2026-03-05",
+    status: "processing",
+    items: [
+      {
+        productId: "prod-3",
+        productName: "Hand-Woven Pandanus Basket — Pacific Islands",
+        vendor: "Pacific Collective",
+        price: 42.0,
+        quantity: 1,
+      },
+    ],
+    subtotal: 42.0,
+    shipping: 4.99,
+    tax: 3.36,
+    total: 50.35,
+  },
+  {
+    id: "order-4",
+    orderNumber: "IIN-2026-00701",
+    date: "2026-02-15",
+    status: "delivered",
+    items: [
+      {
+        productId: "prod-4",
+        productName: "Campaign Strategy Masterclass — Digital Course",
+        vendor: "Americas Solidarity Shop",
+        price: 79.0,
+        quantity: 1,
+      },
+      {
+        productId: "prod-16",
+        productName: "Digital Security for Activists — Online Workshop",
+        vendor: "South Asia Cooperative",
+        price: 45.0,
+        quantity: 1,
+      },
+    ],
+    subtotal: 124.0,
+    shipping: 0,
+    tax: 9.92,
+    total: 133.92,
+  },
+  {
+    id: "order-5",
+    orderNumber: "IIN-2026-00623",
+    date: "2026-02-08",
+    status: "cancelled",
+    items: [
+      {
+        productId: "prod-18",
+        productName: "Maori Pounamu Greenstone Pendant",
+        vendor: "Pacific Collective",
+        price: 120.0,
+        quantity: 1,
+      },
+    ],
+    subtotal: 120.0,
+    shipping: 4.99,
+    tax: 9.6,
+    total: 134.59,
+  },
+];
+
+// ─── Store Helper Functions ───────────────────────────────────────────────────
+
+export function getProductById(id: string): MockProduct | undefined {
+  return MOCK_PRODUCTS.find((p) => p.id === id);
+}
+
+export function getProductsByVendorId(vendorId: string): MockProduct[] {
+  return MOCK_PRODUCTS.filter((p) => p.vendorId === vendorId);
+}
+
+export function getVendorById(id: string): MockVendor | undefined {
+  return MOCK_VENDORS.find((v) => v.id === id);
+}
+
+export function getReviewsByProductId(productId: string): MockProductReview[] {
+  return MOCK_PRODUCT_REVIEWS.filter((r) => r.productId === productId);
+}
+
+export function getProductCategoryColor(category: ProductCategory): string {
+  switch (category) {
+    case "Books & Publications":
+      return "from-amber-500 to-orange-600";
+    case "Apparel":
+      return "from-violet-500 to-purple-700";
+    case "Digital Resources":
+      return "from-sky-500 to-blue-700";
+    case "Art & Crafts":
+      return "from-rose-500 to-pink-700";
+    case "Food & Goods":
+      return "from-emerald-500 to-green-700";
+    case "Equipment & Tools":
+      return "from-slate-500 to-gray-700";
+    case "Services":
+      return "from-teal-500 to-cyan-700";
+    case "Merchandise":
+      return "from-indigo-500 to-blue-700";
+    default:
+      return "from-gray-500 to-gray-700";
+  }
+}
+
+export function getOrderStatusBadgeClasses(status: OrderStatus): string {
+  switch (status) {
+    case "delivered":
+      return "bg-green-100 text-green-700 border-green-200";
+    case "shipped":
+      return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    case "processing":
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    case "cancelled":
+      return "bg-red-100 text-red-700 border-red-200";
+    default:
+      return "bg-gray-100 text-gray-600 border-gray-200";
+  }
+}

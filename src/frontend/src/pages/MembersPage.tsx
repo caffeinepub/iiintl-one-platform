@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { UserRole } from "@/context/AuthContext";
+import { useI18n } from "@/context/I18nContext";
 import {
   MOCK_MEMBERS,
   type MockMember,
@@ -390,6 +391,7 @@ function MemberGridCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function MembersPage() {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [regionFilter, setRegionFilter] = useState("all");
@@ -432,7 +434,7 @@ export function MembersPage() {
   }
 
   return (
-    <Layout breadcrumb="Community › Members">
+    <Layout breadcrumb={`${t.sidebar.community} › ${t.members.title}`}>
       <div className="p-6 max-w-7xl mx-auto">
         {/* ── Page Header ── */}
         <motion.div
@@ -443,10 +445,10 @@ export function MembersPage() {
         >
           <h1 className="text-2xl font-display font-bold text-primary tracking-tight flex items-center gap-2.5">
             <User size={22} className="opacity-80" />
-            Member Directory
+            {t.members.title}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {MOCK_MEMBERS.length} members across the IIIntl One global network
+            {MOCK_MEMBERS.length} {t.members.title.toLowerCase()}
           </p>
           <div className="mt-3 civic-rule w-12" />
         </motion.div>
@@ -465,7 +467,7 @@ export function MembersPage() {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <Input
-              placeholder="Search by name, email, organization..."
+              placeholder={t.members.searchPlaceholder}
               className="pl-8 h-9 text-sm"
               value={search}
               onChange={(e) => {
@@ -715,7 +717,7 @@ export function MembersPage() {
             variants={gridContainerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           >
             {paginated.map((member, i) => (
               <MemberGridCard

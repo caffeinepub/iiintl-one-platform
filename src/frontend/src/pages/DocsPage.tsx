@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useI18n } from "@/context/I18nContext";
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
@@ -1295,6 +1296,7 @@ function DocsSidebar({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function DocsPage() {
+  const { t } = useI18n();
   const [activeSection, setActiveSection] = useState("platform-overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1337,7 +1339,7 @@ export function DocsPage() {
   }, [allSubsections]);
 
   return (
-    <Layout breadcrumb="Knowledge › Documentation">
+    <Layout breadcrumb={`${t.sidebar.knowledge} › ${t.sidebar.documentation}`}>
       <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
         {/* ── Desktop Sidebar ── */}
         <aside className="hidden lg:block w-[260px] flex-shrink-0 border-r border-border bg-secondary/20 overflow-hidden">

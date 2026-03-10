@@ -8,14 +8,411 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const UserRole = IDL.Variant({
+  'admin' : IDL.Null,
+  'user' : IDL.Null,
+  'guest' : IDL.Null,
+});
+export const CampaignType = IDL.Variant({
+  'action' : IDL.Null,
+  'awareness' : IDL.Null,
+  'fundraiser' : IDL.Null,
+  'petition' : IDL.Null,
+});
+export const ForumCategory = IDL.Variant({
+  'resources' : IDL.Null,
+  'general' : IDL.Null,
+  'regional' : IDL.Null,
+  'campaigns' : IDL.Null,
+  'activism' : IDL.Null,
+  'announcements' : IDL.Null,
+});
+export const UserProfile = IDL.Record({
+  'bio' : IDL.Text,
+  'displayName' : IDL.Text,
+  'email' : IDL.Text,
+  'avatarUrl' : IDL.Text,
+});
+export const CampaignStatus = IDL.Variant({
+  'active' : IDL.Null,
+  'completed' : IDL.Null,
+  'draft' : IDL.Null,
+  'archived' : IDL.Null,
+});
+export const Campaign = IDL.Record({
+  'id' : IDL.Text,
+  'status' : CampaignStatus,
+  'title' : IDL.Text,
+  'endDate' : IDL.Int,
+  'orgId' : IDL.Text,
+  'goal' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'createdBy' : IDL.Principal,
+  'tags' : IDL.Vec(IDL.Text),
+  'description' : IDL.Text,
+  'progress' : IDL.Nat,
+  'supporterCount' : IDL.Nat,
+  'campaignType' : CampaignType,
+  'startDate' : IDL.Int,
+});
+export const OrgStatus = IDL.Variant({
+  'active' : IDL.Null,
+  'archived' : IDL.Null,
+});
+export const OrgMemberRole = IDL.Variant({
+  'member' : IDL.Null,
+  'admin' : IDL.Null,
+});
+export const OrgMember = IDL.Record({
+  'userId' : IDL.Text,
+  'joinedAt' : IDL.Int,
+  'role' : OrgMemberRole,
+});
+export const Organization = IDL.Record({
+  'id' : IDL.Text,
+  'region' : IDL.Text,
+  'status' : OrgStatus,
+  'members' : IDL.Vec(OrgMember),
+  'orgType' : IDL.Text,
+  'foundedYear' : IDL.Int,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'createdBy' : IDL.Principal,
+  'description' : IDL.Text,
+  'website' : IDL.Text,
+});
+export const ForumReply = IDL.Record({
+  'id' : IDL.Nat,
+  'body' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'createdBy' : IDL.Principal,
+  'isModeratorReply' : IDL.Bool,
+  'threadId' : IDL.Nat,
+});
+export const ThreadStatus = IDL.Variant({
+  'open' : IDL.Null,
+  'locked' : IDL.Null,
+  'archived' : IDL.Null,
+});
+export const ForumThread = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : ThreadStatus,
+  'title' : IDL.Text,
+  'orgId' : IDL.Opt(IDL.Text),
+  'body' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'createdBy' : IDL.Principal,
+  'tags' : IDL.Vec(IDL.Text),
+  'viewCount' : IDL.Nat,
+  'replyCount' : IDL.Nat,
+  'category' : ForumCategory,
+  'isPinned' : IDL.Bool,
+});
+
 export const idlService = IDL.Service({
-  'ping' : IDL.Func([], [IDL.Text], ['query']),
+  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'createCampaign' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        CampaignType,
+        IDL.Text,
+        IDL.Nat,
+        IDL.Int,
+        IDL.Int,
+        IDL.Vec(IDL.Text),
+      ],
+      [IDL.Text],
+      [],
+    ),
+  'createOrg' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+      [IDL.Text],
+      [],
+    ),
+  'createThread' : IDL.Func(
+      [IDL.Text, IDL.Text, ForumCategory, IDL.Opt(IDL.Text), IDL.Vec(IDL.Text)],
+      [IDL.Nat],
+      [],
+    ),
+  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+  'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getCampaign' : IDL.Func([IDL.Text], [IDL.Opt(Campaign)], ['query']),
+  'getCampaignProgress' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(IDL.Record({ 'goal' : IDL.Nat, 'progress' : IDL.Nat }))],
+      ['query'],
+    ),
+  'getCampaignSupporterCount' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(IDL.Nat)],
+      ['query'],
+    ),
+  'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
+  'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
+  'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
+  'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
+  'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
+  'getUserProfile' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(UserProfile)],
+      ['query'],
+    ),
+  'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'leaveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
+  'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
+  'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
+  'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
+  'listThreadsByCategory' : IDL.Func(
+      [ForumCategory],
+      [IDL.Vec(ForumThread)],
+      ['query'],
+    ),
+  'listThreadsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(ForumThread)], ['query']),
+  'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+  'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateCampaign' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        CampaignType,
+        IDL.Nat,
+        IDL.Int,
+        IDL.Int,
+        IDL.Vec(IDL.Text),
+      ],
+      [IDL.Bool],
+      [],
+    ),
+  'updateOrg' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+      [IDL.Bool],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  return IDL.Service({ 'ping' : IDL.Func([], [IDL.Text], ['query']) });
+  const UserRole = IDL.Variant({
+    'admin' : IDL.Null,
+    'user' : IDL.Null,
+    'guest' : IDL.Null,
+  });
+  const CampaignType = IDL.Variant({
+    'action' : IDL.Null,
+    'awareness' : IDL.Null,
+    'fundraiser' : IDL.Null,
+    'petition' : IDL.Null,
+  });
+  const ForumCategory = IDL.Variant({
+    'resources' : IDL.Null,
+    'general' : IDL.Null,
+    'regional' : IDL.Null,
+    'campaigns' : IDL.Null,
+    'activism' : IDL.Null,
+    'announcements' : IDL.Null,
+  });
+  const UserProfile = IDL.Record({
+    'bio' : IDL.Text,
+    'displayName' : IDL.Text,
+    'email' : IDL.Text,
+    'avatarUrl' : IDL.Text,
+  });
+  const CampaignStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'completed' : IDL.Null,
+    'draft' : IDL.Null,
+    'archived' : IDL.Null,
+  });
+  const Campaign = IDL.Record({
+    'id' : IDL.Text,
+    'status' : CampaignStatus,
+    'title' : IDL.Text,
+    'endDate' : IDL.Int,
+    'orgId' : IDL.Text,
+    'goal' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'tags' : IDL.Vec(IDL.Text),
+    'description' : IDL.Text,
+    'progress' : IDL.Nat,
+    'supporterCount' : IDL.Nat,
+    'campaignType' : CampaignType,
+    'startDate' : IDL.Int,
+  });
+  const OrgStatus = IDL.Variant({ 'active' : IDL.Null, 'archived' : IDL.Null });
+  const OrgMemberRole = IDL.Variant({
+    'member' : IDL.Null,
+    'admin' : IDL.Null,
+  });
+  const OrgMember = IDL.Record({
+    'userId' : IDL.Text,
+    'joinedAt' : IDL.Int,
+    'role' : OrgMemberRole,
+  });
+  const Organization = IDL.Record({
+    'id' : IDL.Text,
+    'region' : IDL.Text,
+    'status' : OrgStatus,
+    'members' : IDL.Vec(OrgMember),
+    'orgType' : IDL.Text,
+    'foundedYear' : IDL.Int,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'description' : IDL.Text,
+    'website' : IDL.Text,
+  });
+  const ForumReply = IDL.Record({
+    'id' : IDL.Nat,
+    'body' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'isModeratorReply' : IDL.Bool,
+    'threadId' : IDL.Nat,
+  });
+  const ThreadStatus = IDL.Variant({
+    'open' : IDL.Null,
+    'locked' : IDL.Null,
+    'archived' : IDL.Null,
+  });
+  const ForumThread = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : ThreadStatus,
+    'title' : IDL.Text,
+    'orgId' : IDL.Opt(IDL.Text),
+    'body' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'createdBy' : IDL.Principal,
+    'tags' : IDL.Vec(IDL.Text),
+    'viewCount' : IDL.Nat,
+    'replyCount' : IDL.Nat,
+    'category' : ForumCategory,
+    'isPinned' : IDL.Bool,
+  });
+  
+  return IDL.Service({
+    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'createCampaign' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          CampaignType,
+          IDL.Text,
+          IDL.Nat,
+          IDL.Int,
+          IDL.Int,
+          IDL.Vec(IDL.Text),
+        ],
+        [IDL.Text],
+        [],
+      ),
+    'createOrg' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+        [IDL.Text],
+        [],
+      ),
+    'createThread' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          ForumCategory,
+          IDL.Opt(IDL.Text),
+          IDL.Vec(IDL.Text),
+        ],
+        [IDL.Nat],
+        [],
+      ),
+    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+    'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getCampaign' : IDL.Func([IDL.Text], [IDL.Opt(Campaign)], ['query']),
+    'getCampaignProgress' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Record({ 'goal' : IDL.Nat, 'progress' : IDL.Nat }))],
+        ['query'],
+      ),
+    'getCampaignSupporterCount' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Nat)],
+        ['query'],
+      ),
+    'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
+    'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
+    'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
+    'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
+    'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
+    'getUserProfile' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(UserProfile)],
+        ['query'],
+      ),
+    'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'leaveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
+    'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
+    'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
+    'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
+    'listThreadsByCategory' : IDL.Func(
+        [ForumCategory],
+        [IDL.Vec(ForumThread)],
+        ['query'],
+      ),
+    'listThreadsByOrg' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(ForumThread)],
+        ['query'],
+      ),
+    'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateCampaign' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          CampaignType,
+          IDL.Nat,
+          IDL.Int,
+          IDL.Int,
+          IDL.Vec(IDL.Text),
+        ],
+        [IDL.Bool],
+        [],
+      ),
+    'updateOrg' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+        [IDL.Bool],
+        [],
+      ),
+  });
 };
 
 export const init = ({ IDL }) => { return []; };

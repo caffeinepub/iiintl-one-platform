@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { MOCK_USERS, useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/context/I18nContext";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -21,6 +22,7 @@ import { useState } from "react";
 
 export function LoginPage() {
   const { loginWithCredentials, user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -121,16 +123,16 @@ export function LoginPage() {
           </div>
 
           <h1 className="text-2xl font-display font-bold text-primary mb-1">
-            Welcome back
+            {t.auth.loginTitle}
           </h1>
           <p className="text-muted-foreground text-sm mb-8">
-            Sign in to your account to continue
+            {t.auth.loginSubtitle}
           </p>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium">
-                Email address
+                {t.auth.email}
               </Label>
               <Input
                 id="email"
@@ -147,13 +149,13 @@ export function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">
-                  Password
+                  {t.auth.password}
                 </Label>
                 <button
                   type="button"
                   className="text-xs text-primary hover:underline"
                 >
-                  Forgot password?
+                  {t.auth.forgotPassword}
                 </button>
               </div>
               <Input
@@ -190,11 +192,11 @@ export function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  Signing in...
+                  {t.common.loading}
                 </>
               ) : (
                 <>
-                  Sign In <ArrowRight size={15} />
+                  {t.auth.signIn} <ArrowRight size={15} />
                 </>
               )}
             </Button>
@@ -211,7 +213,7 @@ export function LoginPage() {
                   data-ocid="login.demo_toggle"
                 >
                   <Terminal size={13} className="text-muted-foreground" />
-                  Demo accounts
+                  {t.auth.demoAccounts}
                   <ChevronDown
                     size={12}
                     className={`ml-auto text-muted-foreground transition-transform duration-200 ${
@@ -258,13 +260,13 @@ export function LoginPage() {
           </div>
 
           <p className="text-sm text-center text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            {t.auth.noAccount}{" "}
             <Link
               to="/register"
               className="text-primary font-semibold hover:underline"
               data-ocid="login.register_link"
             >
-              Create account
+              {t.auth.createAccount}
             </Link>
           </p>
 

@@ -1,5 +1,7 @@
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import { I18nProvider } from "@/context/I18nContext";
 import { ActivismPage } from "@/pages/ActivismPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
@@ -20,6 +22,7 @@ import { ProfilePage } from "@/pages/ProfilePage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
 import { StorePage } from "@/pages/StorePage";
+import { VendorPage } from "@/pages/VendorPage";
 import {
   Outlet,
   RouterProvider,
@@ -31,9 +34,13 @@ import {
 // ── Root route ──
 const rootRoute = createRootRoute({
   component: () => (
-    <AuthProvider>
-      <Outlet />
-    </AuthProvider>
+    <I18nProvider>
+      <AuthProvider>
+        <CartProvider>
+          <Outlet />
+        </CartProvider>
+      </AuthProvider>
+    </I18nProvider>
   ),
 });
 
@@ -78,6 +85,12 @@ const productDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/store/$id",
   component: ProductDetailPage,
+});
+
+const vendorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/store/vendor/$vendorId",
+  component: VendorPage,
 });
 
 // ── Protected routes ──
@@ -220,6 +233,7 @@ const routeTree = rootRoute.addChildren([
   docsRoute,
   storeRoute,
   productDetailRoute,
+  vendorRoute,
   cartRoute,
   adminRoute,
   activismRoute,

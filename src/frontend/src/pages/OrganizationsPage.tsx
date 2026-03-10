@@ -1,3 +1,4 @@
+import type { Organization } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { RoleGate } from "@/components/RoleGate";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,16 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/context/I18nContext";
 import {
-  MOCK_ORGANIZATIONS,
-  type MockOrganization,
   type OrgRegion,
   type OrgType,
   getOrgColorClasses,
 } from "@/data/mockData";
+import { useActor } from "@/hooks/useActor";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -51,7 +52,8 @@ import {
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -87,33 +89,52 @@ const ORG_REGIONS: OrgRegion[] = [
   "South Asia",
 ];
 
-// My org IDs for the demo user
-const MY_ORG_IDS = ["org-1", "org-2", "org-3"];
-
 function CreateOrgDialog({
   open,
   onOpenChange,
-}: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onCreated: () => void;
+}) {
+  const { actor } = useActor();
   const [name, setName] = useState("");
   const [region, setRegion] = useState<string>("");
   const [type, setType] = useState<string>("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
+  const [foundedYear, setFoundedYear] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!name.trim()) return;
     setSaving(true);
-    // Simulate async save
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      if (!actor) throw new Error("Not connected");
+      await actor.createOrg(
+        name.trim(),
+        description.trim(),
+        region || "Global",
+        type || "Coalition",
+        website.trim(),
+        BigInt(foundedYear ? Number(foundedYear) : new Date().getFullYear()),
+      );
+      toast.success("Organization created successfully");
       onOpenChange(false);
       setName("");
       setRegion("");
       setType("");
       setDescription("");
       setWebsite("");
-    }, 800);
+      setFoundedYear("");
+      onCreated();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create organization. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -190,17 +211,32 @@ function CreateOrgDialog({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="org-website" className="text-sm font-medium">
-              Website (optional)
-            </Label>
-            <Input
-              id="org-website"
-              placeholder="https://example.org"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              data-ocid="orgs.create_website_input"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="org-website" className="text-sm font-medium">
+                Website (optional)
+              </Label>
+              <Input
+                id="org-website"
+                placeholder="https://example.org"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                data-ocid="orgs.create_website_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="org-year" className="text-sm font-medium">
+                Founded Year
+              </Label>
+              <Input
+                id="org-year"
+                placeholder={String(new Date().getFullYear())}
+                type="number"
+                value={foundedYear}
+                onChange={(e) => setFoundedYear(e.target.value)}
+                data-ocid="orgs.create_year_input"
+              />
+            </div>
           </div>
         </div>
 
@@ -229,28 +265,53 @@ function OrgCard({
   org,
   index,
   isMember,
+  onJoin,
+  onLeave,
 }: {
-  org: MockOrganization;
+  org: Organization;
   index: number;
   isMember: boolean;
+  onJoin: (id: string) => Promise<void>;
+  onLeave: (id: string) => Promise<void>;
 }) {
   const { user } = useAuth();
-  const colors = getOrgColorClasses(org.color);
+  const [acting, setActing] = useState(false);
+
+  // Use a deterministic color based on org id for display
+  const colorKey = org.id.charCodeAt(org.id.length - 1) % 6;
+  const colorPalette = ["blue", "green", "purple", "orange", "red", "teal"];
+  const colors = getOrgColorClasses(colorPalette[colorKey]);
 
   const canManage =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
     (user?.role === "org_admin" && isMember);
 
+  async function handleJoin() {
+    setActing(true);
+    try {
+      await onJoin(org.id);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function handleLeave() {
+    setActing(true);
+    try {
+      await onLeave(org.id);
+    } finally {
+      setActing(false);
+    }
+  }
+
   return (
     <motion.div variants={cardVariants} data-ocid={`orgs.item.${index}`}>
       <Card className="h-full flex flex-col border-border hover:shadow-md transition-all duration-200 group overflow-hidden">
-        {/* Color accent top bar replacement — use left border instead */}
         <div className={cn("h-1 w-full", colors.bg)} />
 
         <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-start gap-3">
-            {/* Org icon */}
             <div
               className={cn(
                 "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-display font-bold text-sm text-white",
@@ -278,7 +339,7 @@ function OrgCard({
                     colors.lightBg,
                   )}
                 >
-                  {org.type}
+                  {org.orgType}
                 </Badge>
                 <Badge
                   variant="secondary"
@@ -305,25 +366,17 @@ function OrgCard({
             {org.description}
           </p>
 
-          {/* Stats row */}
           <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/60">
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <Users size={11} />
               <span className="font-semibold text-foreground">
-                {org.memberCount.toLocaleString()}
+                {org.members.length.toLocaleString()}
               </span>
               <span>members</span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Megaphone size={11} />
-              <span className="font-semibold text-foreground">
-                {org.campaignCount}
-              </span>
-              <span>campaigns</span>
-            </div>
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground ml-auto">
               <Calendar size={11} />
-              <span>Est. {org.foundedYear}</span>
+              <span>Est. {Number(org.foundedYear)}</span>
             </div>
           </div>
         </CardContent>
@@ -355,18 +408,22 @@ function OrgCard({
               variant="outline"
               size="sm"
               className="h-8 text-xs text-muted-foreground"
+              disabled={acting}
+              onClick={handleLeave}
               data-ocid={`orgs.leave_button.${index}`}
             >
-              Leave
+              {acting ? "Leaving..." : "Leave"}
             </Button>
           ) : (
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs text-primary hover:bg-primary/5"
+              disabled={acting}
+              onClick={handleJoin}
               data-ocid={`orgs.join_button.${index}`}
             >
-              Join
+              {acting ? "Joining..." : "Join"}
             </Button>
           )}
 
@@ -388,35 +445,117 @@ function OrgCard({
   );
 }
 
+function OrgCardSkeleton() {
+  return (
+    <Card className="h-full flex flex-col border-border overflow-hidden">
+      <div className="h-1 w-full bg-muted" />
+      <CardHeader className="pb-2 pt-4 px-4">
+        <div className="flex items-start gap-3">
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-3 flex-1 space-y-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+        <Skeleton className="h-3 w-2/3" />
+      </CardContent>
+      <CardFooter className="px-4 pb-4 pt-0">
+        <Skeleton className="h-8 w-full" />
+      </CardFooter>
+    </Card>
+  );
+}
+
 export function OrganizationsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
+  const { actor } = useActor();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [createOpen, setCreateOpen] = useState(false);
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [myOrgIds, setMyOrgIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const canCreate =
     user?.role === "super_admin" ||
     user?.role === "admin" ||
     user?.role === "org_admin";
 
-  const filtered = MOCK_ORGANIZATIONS.filter((org) => {
+  const fetchOrgs = useCallback(async () => {
+    if (!actor) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [allOrgs, userOrgs] = await Promise.all([
+        actor.listOrgs(),
+        user
+          ? actor.getUserOrgs(user.id)
+          : Promise.resolve([] as Organization[]),
+      ]);
+      setOrgs(allOrgs);
+      setMyOrgIds(new Set(userOrgs.map((o) => o.id)));
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load organizations. Please refresh.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, actor]);
+
+  useEffect(() => {
+    fetchOrgs();
+  }, [fetchOrgs]);
+
+  async function handleJoin(orgId: string) {
+    try {
+      if (!actor) return;
+      await actor.joinOrg(orgId);
+      toast.success("Successfully joined the organization");
+      await fetchOrgs();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to join organization.");
+    }
+  }
+
+  async function handleLeave(orgId: string) {
+    try {
+      if (!actor) return;
+      await actor.leaveOrg(orgId);
+      toast.success("Left the organization");
+      await fetchOrgs();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to leave organization.");
+    }
+  }
+
+  const filtered = orgs.filter((org) => {
     const matchesSearch =
       !search ||
       org.name.toLowerCase().includes(search.toLowerCase()) ||
       org.region.toLowerCase().includes(search.toLowerCase()) ||
-      org.type.toLowerCase().includes(search.toLowerCase());
+      org.orgType.toLowerCase().includes(search.toLowerCase());
 
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "active" && org.status === "active") ||
-      (activeTab === "mine" && MY_ORG_IDS.includes(org.id)) ||
+      (activeTab === "mine" && myOrgIds.has(org.id)) ||
       (activeTab === "archived" && org.status === "archived");
 
     return matchesSearch && matchesTab;
   });
 
+  const activeCount = orgs.filter((o) => o.status === "active").length;
+
   return (
-    <Layout breadcrumb="Organizations">
+    <Layout breadcrumb={t.orgs.title}>
       <div className="p-6 max-w-7xl mx-auto">
         {/* ── Page Header ── */}
         <motion.div
@@ -428,11 +567,12 @@ export function OrganizationsPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-primary tracking-tight flex items-center gap-2.5">
               <Building2 size={22} className="opacity-80" />
-              Organizations
+              {t.orgs.title}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {MOCK_ORGANIZATIONS.length} independent organizations across the
-              global IIIntl One network
+              {loading
+                ? "Loading organizations..."
+                : `${orgs.length} independent organizations across the global IIIntl One network`}
             </p>
             <div className="mt-3 civic-rule w-12" />
           </div>
@@ -445,7 +585,7 @@ export function OrganizationsPage() {
               data-ocid="orgs.create_button"
             >
               <Plus size={14} />
-              Create Organization
+              {t.orgs.createOrg}
             </Button>
           </RoleGate>
         </motion.div>
@@ -463,7 +603,7 @@ export function OrganizationsPage() {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <Input
-              placeholder="Search by name, region, or type..."
+              placeholder={t.orgs.searchPlaceholder}
               className="pl-8 h-9 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -482,9 +622,11 @@ export function OrganizationsPage() {
                 data-ocid="orgs.filter.tab"
               >
                 All
-                <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
-                  {MOCK_ORGANIZATIONS.length}
-                </span>
+                {!loading && (
+                  <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
+                    {orgs.length}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="active"
@@ -492,6 +634,11 @@ export function OrganizationsPage() {
                 data-ocid="orgs.filter.tab"
               >
                 Active
+                {!loading && (
+                  <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
+                    {activeCount}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="mine"
@@ -499,9 +646,11 @@ export function OrganizationsPage() {
                 data-ocid="orgs.filter.tab"
               >
                 Mine
-                <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
-                  {MY_ORG_IDS.length}
-                </span>
+                {!loading && (
+                  <span className="ml-1.5 text-[10px] bg-secondary text-secondary-foreground rounded-full px-1.5 py-0">
+                    {myOrgIds.size}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="archived"
@@ -515,69 +664,102 @@ export function OrganizationsPage() {
         </motion.div>
 
         {/* ── Results count ── */}
-        {search && (
+        {search && !loading && (
           <p className="text-xs text-muted-foreground mb-4">
-            Showing {filtered.length} of {MOCK_ORGANIZATIONS.length}{" "}
-            organizations
+            Showing {filtered.length} of {orgs.length} organizations
           </p>
         )}
 
-        {/* ── Organization Cards Grid ── */}
-        {filtered.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-24 text-center"
-            data-ocid="orgs.empty_state"
+        {/* ── Error state ── */}
+        {error && (
+          <div
+            className="flex flex-col items-center justify-center py-16 text-center"
+            data-ocid="orgs.error_state"
           >
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-              <Building2 size={24} className="text-muted-foreground/50" />
-            </div>
-            <h3 className="font-display font-semibold text-foreground mb-1">
-              No organizations found
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              {search
-                ? `No organizations match "${search}". Try a different search term.`
-                : activeTab === "archived"
-                  ? "There are no archived organizations."
-                  : activeTab === "mine"
-                    ? "You haven't joined any organizations yet."
-                    : "No organizations available."}
-            </p>
-            {canCreate && (
-              <Button
-                size="sm"
-                className="mt-4 gap-2"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus size={13} />
-                Create First Organization
-              </Button>
-            )}
-          </motion.div>
-        ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
-            {filtered.map((org, i) => (
-              <OrgCard
-                key={org.id}
-                org={org}
-                index={i + 1}
-                isMember={MY_ORG_IDS.includes(org.id)}
-              />
-            ))}
-          </motion.div>
+            <p className="text-sm text-destructive mb-3">{error}</p>
+            <Button size="sm" variant="outline" onClick={fetchOrgs}>
+              Retry
+            </Button>
+          </div>
         )}
+
+        {/* ── Loading state ── */}
+        {loading && (
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            data-ocid="orgs.loading_state"
+          >
+            {Array.from({ length: 6 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton list
+              <OrgCardSkeleton key={i} />
+            ))}
+          </div>
+        )}
+
+        {/* ── Organization Cards Grid ── */}
+        {!loading &&
+          !error &&
+          (filtered.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+              data-ocid="orgs.empty_state"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+                <Building2 size={24} className="text-muted-foreground/50" />
+              </div>
+              <h3 className="font-display font-semibold text-foreground mb-1">
+                No organizations found
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                {search
+                  ? `No organizations match "${search}". Try a different search term.`
+                  : activeTab === "archived"
+                    ? "There are no archived organizations."
+                    : activeTab === "mine"
+                      ? "You haven't joined any organizations yet."
+                      : "No organizations available."}
+              </p>
+              {canCreate && (
+                <Button
+                  size="sm"
+                  className="mt-4 gap-2"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus size={13} />
+                  Create First Organization
+                </Button>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              {filtered.map((org, i) => (
+                <OrgCard
+                  key={org.id}
+                  org={org}
+                  index={i + 1}
+                  isMember={myOrgIds.has(org.id)}
+                  onJoin={handleJoin}
+                  onLeave={handleLeave}
+                />
+              ))}
+            </motion.div>
+          ))}
       </div>
 
       {/* Create Organization Modal */}
       <RoleGate roles={["super_admin", "admin", "org_admin"]}>
-        <CreateOrgDialog open={createOpen} onOpenChange={setCreateOpen} />
+        <CreateOrgDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={fetchOrgs}
+        />
       </RoleGate>
     </Layout>
   );
