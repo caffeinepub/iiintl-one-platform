@@ -35,7 +35,6 @@ import {
   useWallet,
 } from "@/context/WalletContext";
 import { getOrderStatusBadgeClasses } from "@/data/mockData";
-import { useActor } from "@/hooks/useActor";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -199,8 +198,7 @@ function CheckoutDialog({
   onClose: () => void;
 }) {
   const { placeOrder } = useCart();
-  const { wallets, activeCurrency } = useWallet();
-  const { actor } = useActor();
+  const { wallets, activeCurrency, addTransaction } = useWallet();
   const [selectedWallet, setSelectedWallet] = useState<string>(
     wallets[0]?.address ?? "",
   );
@@ -217,9 +215,9 @@ function CheckoutDialog({
     setIsSubmitting(true);
     try {
       // Record transaction in wallet if a wallet is selected
-      if (selectedWallet && actor) {
+      if (selectedWallet) {
         try {
-          await actor.addTransaction(
+          await addTransaction(
             selectedWallet,
             totalICP,
             `Store purchase - ${items.length} item(s)`,
