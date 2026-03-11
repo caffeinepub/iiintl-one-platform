@@ -40,6 +40,7 @@ import {
   User,
   UserCog,
   Users,
+  Wallet,
   X,
   Zap,
 } from "lucide-react";
@@ -169,6 +170,12 @@ function SidebarContent({
           label: t.sidebar.orders,
           icon: <ShoppingCart size={16} />,
           ocid: "sidebar.orders_link",
+        },
+        {
+          to: "/wallet",
+          label: "Wallet",
+          icon: <Wallet size={16} />,
+          ocid: "sidebar.wallet_link",
         },
       ],
     },
@@ -530,6 +537,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                 ocid: "nav.resources_link",
               },
               { to: "/store", label: t.nav.store, ocid: "nav.store_link" },
+              { to: "/wallet", label: "Wallet", ocid: "nav.wallet_link" },
             ].map((link) => (
               <Link
                 key={link.ocid}

@@ -8,7 +8,9 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useWallet } from "@/context/WalletContext";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import {
   Building2,
   CalendarDays,
@@ -24,6 +26,7 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  Wallet,
   X,
   Zap,
 } from "lucide-react";
@@ -71,6 +74,7 @@ const MEMBER_ORGS = [
 
 export function ProfilePage() {
   const { user, logout } = useAuth();
+  const { wallets, totalBalanceICP } = useWallet();
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -625,6 +629,48 @@ export function ProfilePage() {
                         )}
                       </div>
                     ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Linked Wallets Summary */}
+              <motion.div variants={itemVariants}>
+                <Card
+                  className="border-border"
+                  data-ocid="profile.wallets_card"
+                >
+                  <CardHeader className="pb-3 pt-4 px-5">
+                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Wallet size={15} className="text-primary" />
+                      Linked Wallets
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-5 pb-5">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">
+                          Wallets Linked
+                        </span>
+                        <span className="text-sm font-bold font-display text-foreground">
+                          {wallets.length}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">
+                          Total Balance
+                        </span>
+                        <span className="text-sm font-bold font-display text-foreground">
+                          {totalBalanceICP.toFixed(4)} ICP
+                        </span>
+                      </div>
+                      <Link
+                        to="/wallet"
+                        className="flex items-center justify-end gap-1 text-xs font-semibold text-primary hover:underline mt-1"
+                        data-ocid="profile.wallets.link"
+                      >
+                        Manage Wallets →
+                      </Link>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>

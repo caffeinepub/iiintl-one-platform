@@ -5,16 +5,20 @@ import Map "mo:core/Map";
 import Iter "mo:core/Iter";
 import Array "mo:core/Array";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
-import AccessControl "authorization/access-control";
+import Nat "mo:core/Nat";
+import Float "mo:core/Float";
 import MixinAuthorization "authorization/MixinAuthorization";
+import AccessControl "authorization/access-control";
+
+
 
 actor {
   // Initialize the access control system
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Type definitions
+  // === Existing Types ===
+
   public type Role = {
     #admin;
     #moderator;
@@ -141,6 +145,36 @@ actor {
     isModeratorReply : Bool;
   };
 
+  // === Wallet Module Types ===
+
+  public type WalletType = {
+    #internetIdentity;
+    #plug;
+    #stoic;
+  };
+
+  public type Wallet = {
+    address : Text;
+    walletType : WalletType;
+    walletLabel : Text; // Renamed from label to walletLabel
+    balanceICP : Float;
+    linkedAt : Int;
+  };
+
+  public type Transaction = {
+    id : Nat;
+    walletAddress : Text;
+    amountICP : Float;
+    description : Text;
+    txType : TransactionType;
+    timestamp : Int;
+  };
+
+  public type TransactionType = {
+    #sent;
+    #received;
+  };
+
   // Storage variables
   let users = Map.empty<Text, User>();
   let principalToUserId = Map.empty<Principal, Text>();
@@ -155,7 +189,13 @@ actor {
   var nextThreadId = 1;
   var nextReplyId = 1;
 
-  // User Functions
+  // === Wallet Storage ===
+  let userWallets = Map.empty<Principal, Map.Map<Text, Wallet>>();
+  let userTransactions = Map.empty<Principal, Map.Map<Nat, Transaction>>();
+  var nextTransactionId = 1;
+
+  // === User Functions ===
+
   public shared ({ caller }) func registerUser(displayName : Text, email : Text) : async Text {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only authenticated users can register");
@@ -184,7 +224,8 @@ actor {
     };
   };
 
-  // Organization Functions
+  // === Organization Functions ===
+
   public shared ({ caller }) func createOrg(
     name : Text,
     description : Text,
@@ -349,6 +390,8 @@ actor {
     userOrgs.toArray();
   };
 
+  // === User Profile Functions ===
+
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only authenticated users can access profiles");
@@ -418,7 +461,8 @@ actor {
     };
   };
 
-  // Campaign Functions
+  // === Campaign Functions ===
+
   public shared ({ caller }) func createCampaign(
     title : Text,
     description : Text,
@@ -639,7 +683,8 @@ actor {
     };
   };
 
-  // Forums Functions
+  // === Forums Functions ===
+
   public shared ({ caller }) func createThread(
     title : Text,
     body : Text,
@@ -827,6 +872,157 @@ actor {
         let updatedThread = { thread with viewCount = thread.viewCount + 1 };
         forumThreads.add(threadId, updatedThread);
         true;
+      };
+    };
+  };
+
+  // === WALLET MODULE FUNCTIONS ===
+
+  // Link a new wallet to the caller
+  public shared ({ caller }) func linkWallet(walletType : WalletType, address : Text, walletLabel : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can link wallets");
+    };
+
+    // Check if caller already has this wallet linked
+    let userWalletMap = switch (userWallets.get(caller)) {
+      case (null) { Map.empty<Text, Wallet>() };
+      case (?walletMap) { walletMap };
+    };
+
+    if (userWalletMap.containsKey(address)) {
+      Runtime.trap("Wallet already linked");
+    };
+
+    let wallet : Wallet = {
+      address;
+      walletType;
+      walletLabel;
+      balanceICP = 0.0; // Start with zero balance
+      linkedAt = Time.now();
+    };
+
+    userWalletMap.add(address, wallet);
+    userWallets.add(caller, userWalletMap);
+  };
+
+  // Unlink a wallet from the caller
+  public shared ({ caller }) func unlinkWallet(address : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can unlink wallets");
+    };
+
+    switch (userWallets.get(caller)) {
+      case (null) { Runtime.trap("No wallets found for caller") };
+      case (?walletMap) {
+        if (not walletMap.containsKey(address)) {
+          Runtime.trap("Wallet not linked");
+        };
+        walletMap.remove(address);
+        userWallets.add(caller, walletMap);
+      };
+    };
+  };
+
+  // Get all wallets linked to the caller
+  public query ({ caller }) func getLinkedWallets() : async [Wallet] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can view wallets");
+    };
+
+    switch (userWallets.get(caller)) {
+      case (null) { [] };
+      case (?walletMap) { walletMap.values().toArray() };
+    };
+  };
+
+  // Get balance for a specific wallet
+  public query ({ caller }) func getWalletBalance(address : Text) : async Float {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can view balances");
+    };
+
+    switch (userWallets.get(caller)) {
+      case (null) { Runtime.trap("No wallets found for caller") };
+      case (?walletMap) {
+        switch (walletMap.get(address)) {
+          case (null) { Runtime.trap("Wallet not found") };
+          case (?wallet) { wallet.balanceICP };
+        };
+      };
+    };
+  };
+
+  // Add a transaction to the caller's transaction history
+  public shared ({ caller }) func addTransaction(walletAddress : Text, amount : Float, description : Text, txType : TransactionType) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can add transactions");
+    };
+
+    // Update wallet balance
+    switch (userWallets.get(caller)) {
+      case (null) { Runtime.trap("No wallets found for caller") };
+      case (?walletMap) {
+        switch (walletMap.get(walletAddress)) {
+          case (null) { Runtime.trap("Wallet not found") };
+          case (?wallet) {
+            let updatedBalance = switch (txType) {
+              case (#sent) { wallet.balanceICP - amount };
+              case (#received) { wallet.balanceICP + amount };
+            };
+
+            if (txType == #sent and amount > wallet.balanceICP) {
+              Runtime.trap("Insufficient balance");
+            };
+
+            let updatedWallet = { wallet with balanceICP = updatedBalance };
+            walletMap.add(walletAddress, updatedWallet);
+            userWallets.add(caller, walletMap);
+          };
+        };
+      };
+    };
+
+    // Add transaction to user's transaction history
+    let transactionId = nextTransactionId;
+    nextTransactionId += 1;
+
+    let transaction : Transaction = {
+      id = transactionId;
+      walletAddress;
+      amountICP = amount;
+      description;
+      txType;
+      timestamp = Time.now();
+    };
+
+    let userTransactionMap = switch (userTransactions.get(caller)) {
+      case (null) { Map.empty<Nat, Transaction>() };
+      case (?txMap) { txMap };
+    };
+
+    userTransactionMap.add(transactionId, transaction);
+    userTransactions.add(caller, userTransactionMap);
+  };
+
+  // Get the transaction history for the caller, optionally filtered by wallet address
+  public query ({ caller }) func getTransactionHistory(walletAddress : ?Text) : async [Transaction] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can view transactions");
+    };
+
+    switch (userTransactions.get(caller)) {
+      case (null) { [] };
+      case (?txMap) {
+        let transactions = txMap.values().toArray();
+        switch (walletAddress) {
+          case (null) { transactions };
+          case (?address) {
+            transactions.filter(
+              func(tx) { tx.walletAddress == address }
+            );
+          };
+        };
       };
     };
   };

@@ -87,6 +87,16 @@ export interface Organization {
 export type ThreadStatus = { 'open' : null } |
   { 'locked' : null } |
   { 'archived' : null };
+export interface Transaction {
+  'id' : bigint,
+  'description' : string,
+  'walletAddress' : string,
+  'timestamp' : bigint,
+  'txType' : TransactionType,
+  'amountICP' : number,
+}
+export type TransactionType = { 'sent' : null } |
+  { 'received' : null };
 export interface UserProfile {
   'bio' : string,
   'displayName' : string,
@@ -96,8 +106,22 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface Wallet {
+  'linkedAt' : bigint,
+  'walletType' : WalletType,
+  'address' : string,
+  'balanceICP' : number,
+  'walletLabel' : string,
+}
+export type WalletType = { 'internetIdentity' : null } |
+  { 'plug' : null } |
+  { 'stoic' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addTransaction' : ActorMethod<
+    [string, number, string, TransactionType],
+    undefined
+  >,
   'archiveCampaign' : ActorMethod<[string], boolean>,
   'archiveOrg' : ActorMethod<[string], boolean>,
   'archiveThread' : ActorMethod<[bigint], boolean>,
@@ -131,18 +155,22 @@ export interface _SERVICE {
     [] | [{ 'goal' : bigint, 'progress' : bigint }]
   >,
   'getCampaignSupporterCount' : ActorMethod<[string], [] | [bigint]>,
+  'getLinkedWallets' : ActorMethod<[], Array<Wallet>>,
   'getOrg' : ActorMethod<[string], [] | [Organization]>,
   'getOrgMembers' : ActorMethod<[string], Array<OrgMember>>,
   'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
   'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
+  'getTransactionHistory' : ActorMethod<[[] | [string]], Array<Transaction>>,
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getWalletBalance' : ActorMethod<[string], number>,
   'incrementThreadView' : ActorMethod<[bigint], boolean>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'joinCampaign' : ActorMethod<[string], boolean>,
   'joinOrg' : ActorMethod<[string], boolean>,
   'leaveCampaign' : ActorMethod<[string], boolean>,
   'leaveOrg' : ActorMethod<[string], boolean>,
+  'linkWallet' : ActorMethod<[WalletType, string, string], undefined>,
   'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
   'listCampaigns' : ActorMethod<[], Array<Campaign>>,
@@ -156,6 +184,7 @@ export interface _SERVICE {
   'registerUser' : ActorMethod<[string, string], string>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
     [
       string,

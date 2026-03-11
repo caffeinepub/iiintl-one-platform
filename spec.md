@@ -1,25 +1,38 @@
 # IIIntl One Platform
 
 ## Current State
-The platform has Users, Organizations, and Campaigns backend modules live and integrated. The frontend Forums pages (ForumsPage.tsx and ForumDetailPage.tsx) exist with mock data. The backend.d.ts has Campaign, Organization, and UserProfile types with corresponding CRUD methods.
+- Store, ProductDetail, Vendor, Cart pages are fully built with mock data and UI
+- CartContext manages in-memory cart (lost on refresh)
+- Cart has a demo checkout dialog with no real payment flow
+- Orders shown in CartPage are static mock data
+- WalletContext + WalletPage are live and wired to the Wallet backend module (linkWallet, unlinkWallet, getLinkedWallets, addTransaction, getTransactionHistory)
+- Multi-currency display (ICP, USD, EUR, GBP) is live in WalletPage via WalletContext
 
 ## Requested Changes (Diff)
 
 ### Add
-- Forums Motoko backend module: threads, replies, categories, pinning, locking, archiving
-- Backend API methods: createThread, replyToThread, listThreads, getThread, listReplies, pinThread, lockThread, archiveThread
-- Forum data types: ForumThread, ForumReply, ForumCategory, ThreadStatus
-- Wire ForumsPage and ForumDetailPage to real backend APIs
+- Cart persistence via localStorage (survives page refreshes)
+- Order history persistence via localStorage (keyed by user, simulating per-user order records)
+- Real checkout flow: shows ICP price equivalent, deducts from wallet balance (mock), records a transaction via `addTransaction` backend call so it appears in Wallet transaction history
+- Multi-currency price display in cart summary and checkout using WalletContext's active currency
+- Wallet balance check in checkout: warn if balance may be insufficient
+- ICP payment option in checkout dialog alongside existing flow
 
 ### Modify
-- backend.d.ts -- add Forum types and interface methods
-- ForumsPage.tsx -- replace mock data with live backend calls
-- ForumDetailPage.tsx -- replace mock data with live backend calls
+- CartContext: add localStorage persistence for cart items
+- CartPage: replace static mock orders with localStorage-persisted orders; wire checkout to wallet payment flow; show prices in active currency
+- Checkout dialog: add currency display, ICP price, wallet selector (dropdown of linked wallets), and record transaction on confirm
 
 ### Remove
-- Mock forum data from frontend pages
+- Static hardcoded mock orders in CartPage (replaced by localStorage orders)
 
 ## Implementation Plan
-1. Generate Motoko Forums backend module
-2. Update frontend Forums pages to use real backend APIs
-3. Validate and deploy
+1. Update CartContext to persist items to localStorage and restore on mount
+2. Add an OrdersContext (or extend CartContext) to persist placed orders in localStorage
+3. Update CartPage checkout dialog to:
+   a. Import and use WalletContext for currency display and linked wallets
+   b. Show ICP equivalent of subtotal
+   c. Provide wallet selector dropdown if wallets are linked
+   d. On checkout confirm: call `addTransaction` backend, save order to localStorage, clear cart
+4. Replace static mock orders in CartPage My Orders tab with localStorage orders
+5. Show currency-converted prices in cart summary using WalletContext active currency

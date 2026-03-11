@@ -1,6 +1,12 @@
-import { type ReactNode, createContext, useContext, useState } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
-// ─── Cart Types ───────────────────────────────────────────────────────────────
+// ─── Cart & Order Types ────────────────────────────────────────────────────────
 
 export interface CartItem {
   productId: string;
@@ -8,6 +14,46 @@ export interface CartItem {
   vendor: string;
   price: number;
   quantity: number;
+}
+
+export interface Order {
+  id: string;
+  placedAt: number;
+  items: CartItem[];
+  subtotal: number;
+  currency: string;
+  icpAmount: number;
+  walletAddress?: string;
+  status: "processing" | "shipped" | "delivered";
+}
+
+const CART_KEY = "icp_cart";
+const ORDERS_KEY = "icp_orders";
+
+function loadCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function loadOrders(): Order[] {
+  try {
+    const raw = localStorage.getItem(ORDERS_KEY);
+    return raw ? (JSON.parse(raw) as Order[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOrders(orders: Order[]) {
+  try {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+  } catch {
+    // ignore
+  }
 }
 
 interface CartContextValue {
@@ -18,12 +64,22 @@ interface CartContextValue {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  placeOrder: (order: Order) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(loadCart);
+
+  // Persist cart to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(items));
+    } catch {
+      // ignore
+    }
+  }, [items]);
 
   const addItem = (item: Omit<CartItem, "quantity">, quantity = 1) => {
     setItems((prev) => {
@@ -59,6 +115,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => setItems([]);
 
+  const placeOrder = (order: Order) => {
+    const existing = loadOrders();
+    saveOrders([order, ...existing]);
+    clearCart();
+  };
+
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
@@ -72,6 +134,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        placeOrder,
       }}
     >
       {children}

@@ -1,3 +1,4 @@
+import { TransactionType } from "@/backend";
 import { Layout } from "@/components/Layout";
 import {
   Accordion,
@@ -17,21 +18,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { useCart } from "@/context/CartContext";
+import type { CartItem, Order } from "@/context/CartContext";
+import { loadOrders, useCart } from "@/context/CartContext";
 import {
-  MOCK_ORDERS,
-  getOrderStatusBadgeClasses,
-  getProductCategoryColor,
-} from "@/data/mockData";
+  convertFromICP,
+  formatAmount,
+  useWallet,
+} from "@/context/WalletContext";
+import { getOrderStatusBadgeClasses } from "@/data/mockData";
+import { useActor } from "@/hooks/useActor";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
-  AlertCircle,
   CheckCircle,
   CreditCard,
   Minus,
@@ -42,27 +49,30 @@ import {
   Store,
   Trash2,
   Truck,
+  Wallet,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+// ICP mock rate: 1 ICP = $8.50 USD (checkout display)
+const ICP_RATE_USD = 8.5;
+
+function usdToICP(usd: number): number {
+  return usd / ICP_RATE_USD;
+}
 
 // ── Cart Item Row ──────────────────────────────────────────────────────────────
 function CartItemRow({
   item,
   index,
 }: {
-  item: {
-    productId: string;
-    name: string;
-    vendor: string;
-    price: number;
-    quantity: number;
-  };
+  item: CartItem;
   index: number;
 }) {
   const { updateQuantity, removeItem } = useCart();
-  const gradient = "from-slate-400 to-slate-600";
+  const { activeCurrency } = useWallet();
+  const icpPrice = usdToICP(item.price);
 
   return (
     <motion.div
@@ -74,12 +84,7 @@ function CartItemRow({
       data-ocid={`cart.item.${index + 1}`}
     >
       {/* Image placeholder */}
-      <div
-        className={cn(
-          "w-16 h-16 rounded-lg bg-gradient-to-br flex items-center justify-center flex-shrink-0",
-          gradient,
-        )}
-      >
+      <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center flex-shrink-0">
         <ShoppingBag size={18} className="text-white/60" />
       </div>
 
@@ -92,9 +97,20 @@ function CartItemRow({
           <Store size={10} className="text-primary/60" />
           <span className="text-xs text-muted-foreground">{item.vendor}</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          ${item.price.toFixed(2)} each
-        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-xs text-muted-foreground">
+            {formatAmount(
+              convertFromICP(icpPrice, activeCurrency),
+              activeCurrency,
+            )}{" "}
+            each
+          </p>
+          {activeCurrency !== "ICP" && (
+            <span className="text-[10px] text-muted-foreground/60">
+              ({icpPrice.toFixed(4)} ICP)
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Quantity */}
@@ -124,9 +140,22 @@ function CartItemRow({
       </div>
 
       {/* Line total */}
-      <p className="text-sm font-bold text-primary w-16 text-right flex-shrink-0">
-        ${(item.price * item.quantity).toFixed(2)}
-      </p>
+      <div className="w-20 text-right flex-shrink-0">
+        <p className="text-sm font-bold text-primary">
+          {formatAmount(
+            convertFromICP(
+              usdToICP(item.price * item.quantity),
+              activeCurrency,
+            ),
+            activeCurrency,
+          )}
+        </p>
+        {activeCurrency !== "ICP" && (
+          <p className="text-[10px] text-muted-foreground/60">
+            {usdToICP(item.price * item.quantity).toFixed(4)} ICP
+          </p>
+        )}
+      </div>
 
       {/* Remove */}
       <button
@@ -136,7 +165,7 @@ function CartItemRow({
           toast("Item removed from cart");
         }}
         className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded hover:bg-destructive/10"
-        data-ocid={`cart.remove_button.${index + 1}`}
+        data-ocid={`cart.delete_button.${index + 1}`}
       >
         <Trash2 size={14} />
       </button>
@@ -160,20 +189,71 @@ function OrderStatusBadge({ status }: { status: string }) {
 }
 
 // ── Checkout Dialog ────────────────────────────────────────────────────────────
-function CheckoutDialog({ total }: { subtotal?: number; total: number }) {
-  const { clearCart } = useCart();
+function CheckoutDialog({
+  subtotal,
+  items,
+  onClose,
+}: {
+  subtotal: number;
+  items: CartItem[];
+  onClose: () => void;
+}) {
+  const { placeOrder } = useCart();
+  const { wallets, activeCurrency } = useWallet();
+  const { actor } = useActor();
+  const [selectedWallet, setSelectedWallet] = useState<string>(
+    wallets[0]?.address ?? "",
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<"form" | "success">("form");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setStep("success");
-    setTimeout(() => {
-      clearCart();
-    }, 1500);
+  const shipping = subtotal >= 50 ? 0 : 4.99;
+  const tax = subtotal * 0.08;
+  const total = subtotal + shipping + tax;
+  const totalICP = usdToICP(total);
+  const totalConverted = convertFromICP(totalICP, activeCurrency);
+
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    try {
+      // Record transaction in wallet if a wallet is selected
+      if (selectedWallet && actor) {
+        try {
+          await actor.addTransaction(
+            selectedWallet,
+            totalICP,
+            `Store purchase - ${items.length} item(s)`,
+            TransactionType.sent,
+          );
+        } catch {
+          // non-fatal — still place the order
+        }
+      }
+
+      const order: Order = {
+        id: `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+        placedAt: Date.now(),
+        items,
+        subtotal: total,
+        currency: activeCurrency,
+        icpAmount: totalICP,
+        walletAddress: selectedWallet || undefined,
+        status: "processing",
+      };
+
+      placeOrder(order);
+      setStep("success");
+      toast.success("Order placed successfully!");
+      setTimeout(onClose, 2000);
+    } catch {
+      toast.error("Failed to place order. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <DialogContent className="max-w-md" data-ocid="cart.checkout_dialog">
+    <DialogContent className="max-w-md" data-ocid="cart.dialog">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <CreditCard size={18} className="text-primary" />
@@ -181,13 +261,13 @@ function CheckoutDialog({ total }: { subtotal?: number; total: number }) {
         </DialogTitle>
         <DialogDescription>
           {step === "form"
-            ? "Demo checkout — no real payment will be processed."
-            : "Your demo order has been submitted."}
+            ? "Review your order and confirm payment."
+            : "Your order has been submitted successfully."}
         </DialogDescription>
       </DialogHeader>
 
       {step === "success" ? (
-        <div className="py-6 text-center">
+        <div className="py-6 text-center" data-ocid="cart.success_state">
           <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-600" />
           </div>
@@ -195,113 +275,100 @@ function CheckoutDialog({ total }: { subtotal?: number; total: number }) {
             Order Confirmed!
           </h3>
           <p className="text-sm text-muted-foreground mb-1">
-            Total charged (demo): <strong>${total.toFixed(2)}</strong>
+            Total:{" "}
+            <strong>{formatAmount(totalConverted, activeCurrency)}</strong>{" "}
+            <span className="text-muted-foreground/60">
+              ({totalICP.toFixed(4)} ICP)
+            </span>
           </p>
-          <p className="text-xs text-muted-foreground">
-            This is a demo. No actual payment was processed.
-          </p>
+          {selectedWallet && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Charged to wallet ending in {selectedWallet.slice(-6)}
+            </p>
+          )}
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
-            <AlertCircle
-              size={14}
-              className="text-amber-600 mt-0.5 flex-shrink-0"
-            />
-            <p className="text-xs text-amber-700">
-              <strong>Demo only</strong> — this is a prototype checkout. No real
-              payment or order will be created.
+        <div className="space-y-4">
+          {/* Order summary */}
+          <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Order Total
+            </p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-primary font-display">
+                {formatAmount(totalConverted, activeCurrency)}
+              </span>
+              {activeCurrency !== "ICP" && (
+                <span className="text-sm text-muted-foreground">
+                  {totalICP.toFixed(4)} ICP
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {items.length} item{items.length !== 1 ? "s" : ""} ·{" "}
+              {shipping === 0
+                ? "Free shipping"
+                : `$${shipping.toFixed(2)} shipping`}{" "}
+              · {tax.toFixed(2)} tax
             </p>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs font-semibold" htmlFor="checkout_name">
-                Full Name
-              </Label>
-              <Input
-                id="checkout_name"
-                placeholder="Your full name"
-                className="mt-1 h-9 text-sm"
-                required
-                data-ocid="cart.checkout_name_input"
-              />
-            </div>
-            <div>
-              <Label
-                className="text-xs font-semibold"
-                htmlFor="checkout_address"
-              >
-                Shipping Address
-              </Label>
-              <Textarea
-                id="checkout_address"
-                placeholder="Street address, city, country"
-                className="mt-1 text-sm resize-none"
-                rows={2}
-                required
-                data-ocid="cart.checkout_address_textarea"
-              />
-            </div>
-            <div>
-              <Label className="text-xs font-semibold" htmlFor="checkout_card">
-                Card Number
-              </Label>
-              <Input
-                id="checkout_card"
-                placeholder="4242 4242 4242 4242 (demo)"
-                className="mt-1 h-9 text-sm"
-                required
-                data-ocid="cart.checkout_card_input"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label
-                  className="text-xs font-semibold"
-                  htmlFor="checkout_expiry"
+          {/* Wallet selector */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-foreground">
+              Pay with wallet
+            </p>
+            {wallets.length > 0 ? (
+              <Select value={selectedWallet} onValueChange={setSelectedWallet}>
+                <SelectTrigger
+                  className="h-9 text-sm"
+                  data-ocid="cart.wallet_select"
                 >
-                  Expiry
-                </Label>
-                <Input
-                  id="checkout_expiry"
-                  placeholder="MM/YY"
-                  className="mt-1 h-9 text-sm"
-                  required
-                />
+                  <SelectValue placeholder="Choose a wallet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {wallets.map((w) => (
+                    <SelectItem key={w.address} value={w.address}>
+                      <span className="flex items-center gap-2">
+                        <Wallet size={12} />
+                        {w.walletLabel} · {w.address.slice(0, 12)}…
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                No wallets linked.{" "}
+                <Link
+                  to="/wallet"
+                  className="underline text-amber-700 font-medium"
+                >
+                  Link one in Wallet page
+                </Link>{" "}
+                to enable ICP payments.
               </div>
-              <div>
-                <Label className="text-xs font-semibold" htmlFor="checkout_cvv">
-                  CVV
-                </Label>
-                <Input
-                  id="checkout_cvv"
-                  placeholder="123"
-                  className="mt-1 h-9 text-sm"
-                  required
-                />
-              </div>
-            </div>
+            )}
           </div>
 
-          <Separator />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total</span>
-            <span className="font-bold text-primary text-base">
-              ${total.toFixed(2)}
-            </span>
-          </div>
-
-          <DialogFooter className="flex gap-2 sm:gap-2">
+          <DialogFooter>
             <Button
-              type="submit"
-              className="flex-1"
-              data-ocid="cart.checkout_submit_button"
+              variant="outline"
+              onClick={onClose}
+              data-ocid="cart.cancel_button"
             >
-              Place Demo Order
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+              className="flex-1"
+              data-ocid="cart.confirm_button"
+            >
+              {isSubmitting ? "Placing order…" : "Confirm Order"}
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       )}
     </DialogContent>
   );
@@ -310,9 +377,23 @@ function CheckoutDialog({ total }: { subtotal?: number; total: number }) {
 // ── Main CartPage ──────────────────────────────────────────────────────────────
 export function CartPage() {
   const { items, totalItems, subtotal, clearCart } = useCart();
+  const { activeCurrency } = useWallet();
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [orders, setOrders] = useState<Order[]>(() => loadOrders());
+
   const shipping = subtotal >= 50 ? 0 : 4.99;
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
+  const totalICP = usdToICP(total);
+
+  const subtotalConverted = convertFromICP(usdToICP(subtotal), activeCurrency);
+  const totalConverted = convertFromICP(totalICP, activeCurrency);
+
+  // Reload orders from localStorage when checkout closes
+  const handleCheckoutClose = () => {
+    setCheckoutOpen(false);
+    setOrders(loadOrders());
+  };
 
   return (
     <Layout breadcrumb="Commerce › Cart & Orders">
@@ -340,11 +421,15 @@ export function CartPage() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="orders" data-ocid="cart.my_orders_tab">
+            <TabsTrigger
+              value="orders"
+              data-ocid="cart.my_orders_tab"
+              onClick={() => setOrders(loadOrders())}
+            >
               <Package size={13} className="mr-1.5" />
               My Orders
               <Badge className="ml-1.5 h-4 px-1.5 text-[9px] bg-secondary text-muted-foreground border-border border">
-                {MOCK_ORDERS.length}
+                {orders.length}
               </Badge>
             </TabsTrigger>
           </TabsList>
@@ -427,9 +512,16 @@ export function CartPage() {
                         <span className="text-muted-foreground">
                           Subtotal ({totalItems} items)
                         </span>
-                        <span className="font-medium">
-                          ${subtotal.toFixed(2)}
-                        </span>
+                        <div className="text-right">
+                          <span className="font-medium">
+                            {formatAmount(subtotalConverted, activeCurrency)}
+                          </span>
+                          {activeCurrency !== "ICP" && (
+                            <p className="text-[10px] text-muted-foreground/60">
+                              {usdToICP(subtotal).toFixed(4)} ICP
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground flex items-center gap-1.5">
@@ -459,12 +551,22 @@ export function CartPage() {
                       <Separator />
                       <div className="flex justify-between">
                         <span className="font-bold text-foreground">Total</span>
-                        <span className="font-bold text-primary text-lg">
-                          ${total.toFixed(2)}
-                        </span>
+                        <div className="text-right">
+                          <span className="font-bold text-primary text-lg">
+                            {formatAmount(totalConverted, activeCurrency)}
+                          </span>
+                          {activeCurrency !== "ICP" && (
+                            <p className="text-[10px] text-muted-foreground/60">
+                              {totalICP.toFixed(4)} ICP
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <Dialog>
+                      <Dialog
+                        open={checkoutOpen}
+                        onOpenChange={setCheckoutOpen}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             className="w-full mt-2 font-semibold"
@@ -475,7 +577,11 @@ export function CartPage() {
                             Proceed to Checkout
                           </Button>
                         </DialogTrigger>
-                        <CheckoutDialog subtotal={subtotal} total={total} />
+                        <CheckoutDialog
+                          subtotal={subtotal}
+                          items={items}
+                          onClose={handleCheckoutClose}
+                        />
                       </Dialog>
 
                       <Link to="/store" className="block">
@@ -496,7 +602,7 @@ export function CartPage() {
 
           {/* ── My Orders Tab ── */}
           <TabsContent value="orders">
-            {MOCK_ORDERS.length === 0 ? (
+            {orders.length === 0 ? (
               <div className="text-center py-20" data-ocid="orders.empty_state">
                 <Package
                   size={36}
@@ -511,7 +617,7 @@ export function CartPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {MOCK_ORDERS.map((order, i) => (
+                {orders.map((order, i) => (
                   <motion.div
                     key={order.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -532,12 +638,12 @@ export function CartPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-0.5">
                                   <p className="text-sm font-bold text-foreground font-display">
-                                    {order.orderNumber}
+                                    {order.id}
                                   </p>
                                   <OrderStatusBadge status={order.status} />
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                  {new Date(order.date).toLocaleDateString(
+                                  {new Date(order.placedAt).toLocaleDateString(
                                     "en-US",
                                     {
                                       year: "numeric",
@@ -551,10 +657,25 @@ export function CartPage() {
                               </div>
                               <div className="text-right flex-shrink-0">
                                 <p className="text-base font-bold text-primary">
-                                  ${order.total.toFixed(2)}
+                                  {formatAmount(
+                                    convertFromICP(
+                                      usdToICP(order.subtotal),
+                                      (order.currency as
+                                        | "ICP"
+                                        | "USD"
+                                        | "EUR"
+                                        | "GBP") ?? activeCurrency,
+                                    ),
+                                    (order.currency as
+                                      | "ICP"
+                                      | "USD"
+                                      | "EUR"
+                                      | "GBP") ?? activeCurrency,
+                                  )}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                                  View details ↓
+                                  {order.icpAmount.toFixed(4)} ICP · View
+                                  details ↓
                                 </p>
                               </div>
                             </div>
@@ -576,7 +697,7 @@ export function CartPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="text-xs font-semibold text-foreground line-clamp-1">
-                                        {item.productName}
+                                        {item.name}
                                       </p>
                                       <p className="text-[10px] text-muted-foreground">
                                         {item.vendor} · Qty {item.quantity}
@@ -588,6 +709,12 @@ export function CartPage() {
                                   </div>
                                 ))}
                               </div>
+                              {order.walletAddress && (
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+                                  <Wallet size={10} />
+                                  <span>Paid from: {order.walletAddress}</span>
+                                </div>
+                              )}
                               <div className="bg-secondary/50 rounded-lg p-3 space-y-1.5">
                                 <div className="flex justify-between text-xs">
                                   <span className="text-muted-foreground">
@@ -597,29 +724,15 @@ export function CartPage() {
                                 </div>
                                 <div className="flex justify-between text-xs">
                                   <span className="text-muted-foreground">
-                                    Shipping
+                                    ICP equivalent
                                   </span>
-                                  <span>
-                                    {order.shipping === 0 ? (
-                                      <span className="text-green-600 font-semibold">
-                                        Free
-                                      </span>
-                                    ) : (
-                                      `$${order.shipping.toFixed(2)}`
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">
-                                    Tax
-                                  </span>
-                                  <span>${order.tax.toFixed(2)}</span>
+                                  <span>{order.icpAmount.toFixed(4)} ICP</span>
                                 </div>
                                 <Separator className="my-1" />
                                 <div className="flex justify-between text-sm font-bold">
                                   <span>Total</span>
                                   <span className="text-primary">
-                                    ${order.total.toFixed(2)}
+                                    ${order.subtotal.toFixed(2)}
                                   </span>
                                 </div>
                               </div>

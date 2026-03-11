@@ -8,6 +8,10 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const TransactionType = IDL.Variant({
+  'sent' : IDL.Null,
+  'received' : IDL.Null,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -54,6 +58,18 @@ export const Campaign = IDL.Record({
   'supporterCount' : IDL.Nat,
   'campaignType' : CampaignType,
   'startDate' : IDL.Int,
+});
+export const WalletType = IDL.Variant({
+  'internetIdentity' : IDL.Null,
+  'plug' : IDL.Null,
+  'stoic' : IDL.Null,
+});
+export const Wallet = IDL.Record({
+  'linkedAt' : IDL.Int,
+  'walletType' : WalletType,
+  'address' : IDL.Text,
+  'balanceICP' : IDL.Float64,
+  'walletLabel' : IDL.Text,
 });
 export const OrgStatus = IDL.Variant({
   'active' : IDL.Null,
@@ -108,9 +124,22 @@ export const ForumThread = IDL.Record({
   'category' : ForumCategory,
   'isPinned' : IDL.Bool,
 });
+export const Transaction = IDL.Record({
+  'id' : IDL.Nat,
+  'description' : IDL.Text,
+  'walletAddress' : IDL.Text,
+  'timestamp' : IDL.Int,
+  'txType' : TransactionType,
+  'amountICP' : IDL.Float64,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addTransaction' : IDL.Func(
+      [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
+      [],
+      [],
+    ),
   'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -152,22 +181,30 @@ export const idlService = IDL.Service({
       [IDL.Opt(IDL.Nat)],
       ['query'],
     ),
+  'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
   'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
   'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
   'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
   'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
+  'getTransactionHistory' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [IDL.Vec(Transaction)],
+      ['query'],
+    ),
   'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'leaveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
   'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
   'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
@@ -185,6 +222,7 @@ export const idlService = IDL.Service({
   'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
       [
         IDL.Text,
@@ -209,6 +247,10 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const TransactionType = IDL.Variant({
+    'sent' : IDL.Null,
+    'received' : IDL.Null,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
@@ -255,6 +297,18 @@ export const idlFactory = ({ IDL }) => {
     'supporterCount' : IDL.Nat,
     'campaignType' : CampaignType,
     'startDate' : IDL.Int,
+  });
+  const WalletType = IDL.Variant({
+    'internetIdentity' : IDL.Null,
+    'plug' : IDL.Null,
+    'stoic' : IDL.Null,
+  });
+  const Wallet = IDL.Record({
+    'linkedAt' : IDL.Int,
+    'walletType' : WalletType,
+    'address' : IDL.Text,
+    'balanceICP' : IDL.Float64,
+    'walletLabel' : IDL.Text,
   });
   const OrgStatus = IDL.Variant({ 'active' : IDL.Null, 'archived' : IDL.Null });
   const OrgMemberRole = IDL.Variant({
@@ -306,9 +360,22 @@ export const idlFactory = ({ IDL }) => {
     'category' : ForumCategory,
     'isPinned' : IDL.Bool,
   });
+  const Transaction = IDL.Record({
+    'id' : IDL.Nat,
+    'description' : IDL.Text,
+    'walletAddress' : IDL.Text,
+    'timestamp' : IDL.Int,
+    'txType' : TransactionType,
+    'amountICP' : IDL.Float64,
+  });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addTransaction' : IDL.Func(
+        [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
+        [],
+        [],
+      ),
     'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -356,22 +423,30 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Nat)],
         ['query'],
       ),
+    'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
     'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
     'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
     'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
     'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
+    'getTransactionHistory' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(Transaction)],
+        ['query'],
+      ),
     'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'leaveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
     'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
     'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
@@ -393,6 +468,7 @@ export const idlFactory = ({ IDL }) => {
     'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
         [
           IDL.Text,

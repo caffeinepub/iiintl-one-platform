@@ -2,6 +2,8 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { I18nProvider } from "@/context/I18nContext";
+import { WalletProvider, useWallet } from "@/context/WalletContext";
+import { useBackend } from "@/hooks/useBackend";
 import { ActivismPage } from "@/pages/ActivismPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
@@ -23,6 +25,7 @@ import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
 import { StorePage } from "@/pages/StorePage";
 import { VendorPage } from "@/pages/VendorPage";
+import { WalletPage } from "@/pages/WalletPage";
 import {
   Outlet,
   RouterProvider,
@@ -30,15 +33,30 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
+
+// Syncs backend actor into WalletContext
+function WalletSync() {
+  const actor = useBackend();
+  const { _setActor, refreshWallets } = useWallet();
+  useEffect(() => {
+    _setActor(actor);
+    if (actor) refreshWallets();
+  }, [actor, _setActor, refreshWallets]);
+  return null;
+}
 
 // ── Root route ──
 const rootRoute = createRootRoute({
   component: () => (
     <I18nProvider>
       <AuthProvider>
-        <CartProvider>
-          <Outlet />
-        </CartProvider>
+        <WalletProvider>
+          <WalletSync />
+          <CartProvider>
+            <Outlet />
+          </CartProvider>
+        </WalletProvider>
       </AuthProvider>
     </I18nProvider>
   ),
@@ -214,6 +232,15 @@ const activismRoute = createRoute({
   ),
 });
 
+const walletRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wallet",
+  component: () => (
+    <ProtectedRoute>
+      <WalletPage />
+    </ProtectedRoute>
+  ),
+});
 // ── Route tree ──
 const routeTree = rootRoute.addChildren([
   homeRoute,
@@ -237,6 +264,7 @@ const routeTree = rootRoute.addChildren([
   cartRoute,
   adminRoute,
   activismRoute,
+  walletRoute,
 ]);
 
 // ── Router ──
