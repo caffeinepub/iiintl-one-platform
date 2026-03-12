@@ -257,9 +257,11 @@ export interface backendInterface {
     listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;
     lockThread(threadId: bigint): Promise<boolean>;
     pinThread(threadId: bigint): Promise<boolean>;
+    getPreferredLanguage(): Promise<string>;
     registerUser(displayName: string, email: string): Promise<string>;
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setPreferredLanguage(lang: string): Promise<void>;
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
@@ -869,6 +871,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveCallerUserProfile(arg0);
+            return result;
+        }
+    }
+    async getPreferredLanguage(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPreferredLanguage();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPreferredLanguage();
+            return result;
+        }
+    }
+    async setPreferredLanguage(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setPreferredLanguage(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setPreferredLanguage(arg0);
             return result;
         }
     }

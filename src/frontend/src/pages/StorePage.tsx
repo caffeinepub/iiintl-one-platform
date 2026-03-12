@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
@@ -26,10 +27,10 @@ import { useI18n } from "@/context/I18nContext";
 import {
   MOCK_PRODUCTS,
   MOCK_VENDORS,
-  type MockProduct,
   type ProductCategory,
   getProductCategoryColor,
 } from "@/data/mockData";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -49,9 +50,55 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+// Store type augmentation -- extends backendInterface with Store methods added to main.mo
+interface Vendor {
+  id: bigint;
+  ownerId: unknown;
+  name: string;
+  description: string;
+  logoUrl: string;
+  status: string;
+  createdAt: bigint;
+}
+interface Product {
+  id: bigint;
+  vendorId: bigint;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  category: string;
+  stock: bigint;
+  imageUrl: string;
+  isActive: boolean;
+  createdAt: bigint;
+}
+interface Order {
+  id: bigint;
+  buyerId: unknown;
+  items: Array<{ productId: bigint; quantity: bigint; unitPrice: number }>;
+  total: number;
+  currency: string;
+  status: string;
+  walletAddress: string;
+  createdAt: bigint;
+}
+interface StoreBackend {
+  listProducts(
+    vendorId: bigint | null,
+    category: string | null,
+  ): Promise<Array<Product>>;
+  listVendors(): Promise<Array<Vendor>>;
+  placeOrder(
+    items: Array<{ productId: bigint; quantity: bigint; unitPrice: number }>,
+    currency: string,
+    walletAddress: string,
+  ): Promise<bigint>;
+  getMyOrders(): Promise<Array<Order>>;
+}
 const CATEGORIES: ProductCategory[] = [
   "Books & Publications",
   "Apparel",
@@ -81,6 +128,36 @@ const REGIONS = [
   "South Asia",
   "Caribbean",
 ];
+
+// Normalized product type used in display
+interface DisplayProduct {
+  id: string;
+  title: string;
+  vendor: string;
+  vendorId: string;
+  price: number;
+  category: string;
+  stock: number;
+  rating: number;
+  reviewCount: number;
+  featured: boolean;
+  region: string;
+  tags: string[];
+  createdAt: string;
+  fromBackend?: boolean;
+}
+
+// Normalized vendor type used in display
+interface DisplayVendor {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  productCount: number;
+  rating: number;
+  reviewCount: number;
+  fromBackend?: boolean;
+}
 
 // ── Star Rating Component ──────────────────────────────────────────────────────
 function StarRating({
@@ -120,11 +197,13 @@ function ProductCard({
   product,
   index,
 }: {
-  product: MockProduct;
+  product: DisplayProduct;
   index: number;
 }) {
   const { addItem } = useCart();
-  const gradientClass = getProductCategoryColor(product.category);
+  const gradientClass = getProductCategoryColor(
+    product.category as ProductCategory,
+  );
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -136,7 +215,8 @@ function ProductCard({
     });
     toast.success("Added to cart", {
       description:
-        product.title.slice(0, 45) + (product.title.length > 45 ? "…" : ""),
+        product.title.slice(0, 45) +
+        (product.title.length > 45 ? "\u2026" : ""),
     });
   };
 
@@ -231,11 +311,13 @@ function ProductRow({
   product,
   index,
 }: {
-  product: MockProduct;
+  product: DisplayProduct;
   index: number;
 }) {
   const { addItem } = useCart();
-  const gradientClass = getProductCategoryColor(product.category);
+  const gradientClass = getProductCategoryColor(
+    product.category as ProductCategory,
+  );
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -247,7 +329,8 @@ function ProductRow({
     });
     toast.success("Added to cart", {
       description:
-        product.title.slice(0, 45) + (product.title.length > 45 ? "…" : ""),
+        product.title.slice(0, 45) +
+        (product.title.length > 45 ? "\u2026" : ""),
     });
   };
 
@@ -321,17 +404,36 @@ function ProductRow({
   );
 }
 
+// ── Loading Skeleton ───────────────────────────────────────────────────────────
+function ProductSkeleton() {
+  return (
+    <Card className="overflow-hidden">
+      <Skeleton className="h-44 w-full rounded-none" />
+      <CardContent className="p-4 space-y-2">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-8 w-full mt-2" />
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main StorePage ─────────────────────────────────────────────────────────────
 export function StorePage() {
   const { user } = useAuth();
   const { totalItems } = useCart();
   const { t } = useI18n();
+  const backend = useBackend();
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<"all" | ProductCategory>("all");
+  const [category, setCategory] = useState<"all" | string>("all");
   const [region, setRegion] = useState("All Regions");
   const [sort, setSort] = useState("featured");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [visibleCount, setVisibleCount] = useState(12);
+  const [products, setProducts] = useState<DisplayProduct[]>([]);
+  const [vendors, setVendors] = useState<DisplayVendor[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const isAdmin =
     user?.role === "admin" ||
@@ -339,13 +441,131 @@ export function StorePage() {
     user?.role === "org_admin";
   const isSuperAdmin = user?.role === "admin" || user?.role === "super_admin";
 
+  // Fetch live data on mount
+  useEffect(() => {
+    async function fetchStoreData() {
+      setLoading(true);
+      try {
+        if (!backend) throw new Error("not ready");
+        const store = backend as unknown as StoreBackend;
+        const [backendProducts, backendVendors] = await Promise.all([
+          store.listProducts(null, null),
+          store.listVendors(),
+        ]);
+
+        if (backendProducts.length > 0) {
+          // Map backend products to display format
+          const mapped: DisplayProduct[] = backendProducts.map((p) => {
+            const vendor = backendVendors.find((v) => v.id === p.vendorId);
+            return {
+              id: p.id.toString(),
+              title: p.name,
+              vendor: vendor?.name ?? "IIIntl Vendor",
+              vendorId: p.vendorId.toString(),
+              price: p.price,
+              category: p.category || "Merchandise",
+              stock: Number(p.stock),
+              rating: 4.5,
+              reviewCount: 0,
+              featured: false,
+              region: "Global",
+              tags: [p.category],
+              createdAt: new Date(
+                Number(p.createdAt) / 1_000_000,
+              ).toISOString(),
+              fromBackend: true,
+            };
+          });
+          setProducts(mapped);
+        } else {
+          // Fallback to mock data when no backend products exist yet
+          const mockMapped: DisplayProduct[] = MOCK_PRODUCTS.map((p) => ({
+            id: p.id,
+            title: p.title,
+            vendor: p.vendor,
+            vendorId: p.vendorId,
+            price: p.price,
+            category: p.category,
+            stock: p.stock,
+            rating: p.rating,
+            reviewCount: p.reviewCount,
+            featured: p.featured,
+            region: p.region,
+            tags: p.tags,
+            createdAt: p.createdAt,
+          }));
+          setProducts(mockMapped);
+        }
+
+        if (backendVendors.length > 0) {
+          // Map backend vendors to display format
+          const mappedVendors: DisplayVendor[] = backendVendors.map((v) => ({
+            id: v.id.toString(),
+            name: v.name,
+            description: v.description,
+            region: "Global",
+            productCount: backendProducts.filter((p) => p.vendorId === v.id)
+              .length,
+            rating: 4.5,
+            reviewCount: 0,
+            fromBackend: true,
+          }));
+          setVendors(mappedVendors);
+        } else {
+          // Fallback to mock vendors
+          const mockVendors: DisplayVendor[] = MOCK_VENDORS.map((v) => ({
+            id: v.id,
+            name: v.name,
+            description: v.description,
+            region: v.region,
+            productCount: v.productCount,
+            rating: v.rating,
+            reviewCount: v.reviewCount,
+          }));
+          setVendors(mockVendors);
+        }
+      } catch {
+        // On error, fall back to mock data silently
+        const mockMapped: DisplayProduct[] = MOCK_PRODUCTS.map((p) => ({
+          id: p.id,
+          title: p.title,
+          vendor: p.vendor,
+          vendorId: p.vendorId,
+          price: p.price,
+          category: p.category,
+          stock: p.stock,
+          rating: p.rating,
+          reviewCount: p.reviewCount,
+          featured: p.featured,
+          region: p.region,
+          tags: p.tags,
+          createdAt: p.createdAt,
+        }));
+        setProducts(mockMapped);
+        const mockVendors: DisplayVendor[] = MOCK_VENDORS.map((v) => ({
+          id: v.id,
+          name: v.name,
+          description: v.description,
+          region: v.region,
+          productCount: v.productCount,
+          rating: v.rating,
+          reviewCount: v.reviewCount,
+        }));
+        setVendors(mockVendors);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStoreData();
+  }, [backend]);
+
   // Filter
-  let filtered = MOCK_PRODUCTS.filter((p) => {
+  let filtered = products.filter((p) => {
     const matchSearch =
       !search ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.vendor.toLowerCase().includes(search.toLowerCase()) ||
-      p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+      p.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
     const matchCat = category === "all" || p.category === category;
     const matchRegion = region === "All Regions" || p.region === region;
     return matchSearch && matchCat && matchRegion;
@@ -371,8 +591,13 @@ export function StorePage() {
 
   const visible = filtered.slice(0, visibleCount);
 
+  // Derive unique categories from loaded products
+  const activeCategories = CATEGORIES.filter((cat) =>
+    products.some((p) => p.category === cat),
+  );
+
   return (
-    <Layout breadcrumb={`${t.sidebar.commerce} › ${t.store.title}`}>
+    <Layout breadcrumb={`${t.sidebar.commerce} \u203a ${t.store.title}`}>
       {/* ── Hero Banner ── */}
       <div className="civic-gradient text-white px-6 py-8 relative overflow-hidden">
         <div
@@ -573,7 +798,7 @@ export function StorePage() {
         <Tabs
           value={category}
           onValueChange={(v) => {
-            setCategory(v as "all" | ProductCategory);
+            setCategory(v);
             setVisibleCount(12);
           }}
           className="mb-6"
@@ -586,10 +811,10 @@ export function StorePage() {
             >
               All Products
               <span className="ml-1.5 text-[9px] opacity-60">
-                {MOCK_PRODUCTS.length}
+                {products.length}
               </span>
             </TabsTrigger>
-            {CATEGORIES.map((cat) => (
+            {activeCategories.map((cat) => (
               <TabsTrigger
                 key={cat}
                 value={cat}
@@ -598,7 +823,7 @@ export function StorePage() {
               >
                 {cat}
                 <span className="ml-1.5 text-[9px] opacity-60">
-                  {MOCK_PRODUCTS.filter((p) => p.category === cat).length}
+                  {products.filter((p) => p.category === cat).length}
                 </span>
               </TabsTrigger>
             ))}
@@ -608,76 +833,95 @@ export function StorePage() {
         {/* ── Results Count ── */}
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">
-              {filtered.length}
-            </span>{" "}
-            product{filtered.length !== 1 ? "s" : ""} found
-            {search && (
-              <span>
-                {" "}
-                for <span className="font-medium text-primary">"{search}"</span>
-              </span>
+            {loading ? (
+              <span data-ocid="store.loading_state">Loading products...</span>
+            ) : (
+              <>
+                <span className="font-semibold text-foreground">
+                  {filtered.length}
+                </span>{" "}
+                product{filtered.length !== 1 ? "s" : ""} found
+                {search && (
+                  <span>
+                    {" "}
+                    for{" "}
+                    <span className="font-medium text-primary">"{search}"</span>
+                  </span>
+                )}
+              </>
             )}
           </p>
         </div>
 
         {/* ── Product Grid / List ── */}
-        <AnimatePresence mode="wait">
-          {filtered.length === 0 ? (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-20 text-muted-foreground"
-              data-ocid="store.empty_state"
-            >
-              <ShoppingBag size={40} className="mx-auto mb-3 opacity-30" />
-              <p className="font-semibold text-foreground/60">
-                No products found
-              </p>
-              <p className="text-sm mt-1">
-                Try adjusting your search or filters
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-xs"
-                onClick={() => {
-                  setSearch("");
-                  setCategory("all");
-                  setRegion("All Regions");
-                }}
+        {loading ? (
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+            data-ocid="store.loading_state"
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
+              <ProductSkeleton key={i} />
+            ))}
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {filtered.length === 0 ? (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-20 text-muted-foreground"
+                data-ocid="store.empty_state"
               >
-                Clear Filters
-              </Button>
-            </motion.div>
-          ) : viewMode === "grid" ? (
-            <motion.div
-              key="grid"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-            >
-              {visible.map((product, i) => (
-                <ProductCard key={product.id} product={product} index={i} />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="list"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-2"
-            >
-              {visible.map((product, i) => (
-                <ProductRow key={product.id} product={product} index={i} />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <ShoppingBag size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="font-semibold text-foreground/60">
+                  No products found
+                </p>
+                <p className="text-sm mt-1">
+                  Try adjusting your search or filters
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 text-xs"
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("all");
+                    setRegion("All Regions");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </motion.div>
+            ) : viewMode === "grid" ? (
+              <motion.div
+                key="grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+              >
+                {visible.map((product, i) => (
+                  <ProductCard key={product.id} product={product} index={i} />
+                ))}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="list"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="space-y-2"
+              >
+                {visible.map((product, i) => (
+                  <ProductRow key={product.id} product={product} index={i} />
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* ── Load More ── */}
-        {visible.length < filtered.length && (
+        {!loading && visible.length < filtered.length && (
           <div className="flex justify-center mt-8">
             <Button
               variant="outline"
@@ -709,7 +953,7 @@ export function StorePage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {MOCK_VENDORS.map((vendor, i) => (
+          {vendors.map((vendor, i) => (
             <motion.div
               key={vendor.id}
               initial={{ opacity: 0, y: 12 }}

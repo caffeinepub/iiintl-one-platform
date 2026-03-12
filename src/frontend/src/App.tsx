@@ -1,7 +1,12 @@
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
-import { I18nProvider } from "@/context/I18nContext";
+import {
+  I18nProvider,
+  LANGUAGES,
+  type Language,
+  useI18n,
+} from "@/context/I18nContext";
 import { WalletProvider, useWallet } from "@/context/WalletContext";
 import { useBackend } from "@/hooks/useBackend";
 import { ActivismPage } from "@/pages/ActivismPage";
@@ -33,7 +38,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // Syncs backend actor into WalletContext
 function WalletSync() {
@@ -46,6 +51,41 @@ function WalletSync() {
   return null;
 }
 
+// Syncs language preference with backend
+function LanguageSync() {
+  const actor = useBackend();
+  const { language, setLanguage } = useI18n();
+  const hasLoaded = useRef(false);
+
+  // On login: load preferred language from backend
+  useEffect(() => {
+    if (actor && !hasLoaded.current) {
+      hasLoaded.current = true;
+      actor
+        .getPreferredLanguage()
+        .then((lang: string) => {
+          const code = lang.toUpperCase() as Language;
+          if (LANGUAGES.find((l) => l.code === code)) {
+            setLanguage(code);
+          }
+        })
+        .catch(() => {});
+    }
+    if (!actor) {
+      hasLoaded.current = false;
+    }
+  }, [actor, setLanguage]);
+
+  // On language change: persist to backend
+  useEffect(() => {
+    if (actor && hasLoaded.current) {
+      actor.setPreferredLanguage(language.toLowerCase()).catch(() => {});
+    }
+  }, [language, actor]);
+
+  return null;
+}
+
 // ── Root route ──
 const rootRoute = createRootRoute({
   component: () => (
@@ -53,6 +93,7 @@ const rootRoute = createRootRoute({
       <AuthProvider>
         <WalletProvider>
           <WalletSync />
+          <LanguageSync />
           <CartProvider>
             <Outlet />
           </CartProvider>

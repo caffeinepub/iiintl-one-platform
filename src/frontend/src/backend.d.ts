@@ -174,9 +174,11 @@ export interface backendInterface {
     listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;
     lockThread(threadId: bigint): Promise<boolean>;
     pinThread(threadId: bigint): Promise<boolean>;
-    registerUser(displayName: string, email: string): Promise<string>;
+    getPreferredLanguage(): Promise<string>;
+    registerUser(displayName: string, email: string): Promise<string>
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setPreferredLanguage(lang: string): Promise<void>;
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
