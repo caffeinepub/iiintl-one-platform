@@ -1,11 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { type AuthUser, useAuth } from "@/context/AuthContext";
+import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Globe, Loader2 } from "lucide-react";
+import { ArrowRight, Fingerprint, Globe, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface FormErrors {
   firstName?: string;
@@ -16,8 +19,9 @@ interface FormErrors {
 }
 
 export function RegisterPage() {
-  const { login, user } = useAuth();
+  const { login, loginWithII, user } = useAuth();
   const navigate = useNavigate();
+  const ii = useInternetIdentity();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,6 +29,24 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Auto-login when II identity becomes available
+  useEffect(() => {
+    if (ii.identity && !user) {
+      loginWithII(ii.identity);
+      navigate({ to: "/dashboard" });
+    }
+  }, [ii.identity, user, loginWithII, navigate]);
+
+  // Show error toast on II login failure
+  useEffect(() => {
+    if (ii.isLoginError) {
+      toast.error(
+        ii.loginError?.message ??
+          "Internet Identity login failed. Please try again.",
+      );
+    }
+  }, [ii.isLoginError, ii.loginError]);
 
   if (user) {
     navigate({ to: "/dashboard" });
@@ -136,6 +158,46 @@ export function RegisterPage() {
           <p className="text-muted-foreground text-sm mb-8">
             Join the IIIntl One global platform
           </p>
+
+          {/* Internet Identity — Primary Option */}
+          <div className="mb-6">
+            <Button
+              type="button"
+              className="w-full h-12 font-semibold gap-3 text-base bg-primary hover:bg-primary/90 shadow-md"
+              data-ocid="register.ii_button"
+              onClick={() => ii.login()}
+              disabled={ii.isLoggingIn || ii.isInitializing}
+            >
+              {ii.isLoggingIn ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Connecting to Internet Identity…
+                </>
+              ) : (
+                <>
+                  <Fingerprint size={20} />
+                  Create account with Internet Identity
+                </>
+              )}
+            </Button>
+            <div className="flex items-center justify-center mt-2 gap-1.5">
+              <span className="text-[11px] text-muted-foreground/70">
+                Powered by
+              </span>
+              <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-wide">
+                Internet Computer · ICP
+              </span>
+            </div>
+          </div>
+
+          {/* Separator */}
+          <div className="flex items-center gap-3 mb-6">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">
+              or register with email
+            </span>
+            <Separator className="flex-1" />
+          </div>
 
           <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             <div className="grid grid-cols-2 gap-3">

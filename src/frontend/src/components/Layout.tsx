@@ -9,19 +9,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { type UserRole, useAuth } from "@/context/AuthContext";
 import { LANGUAGES, useI18n } from "@/context/I18nContext";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   BarChart3,
   Bell,
+  BellOff,
   BookMarked,
   BookOpen,
   Building2,
+  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +41,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  Server,
   Settings,
   ShoppingBag,
   ShoppingCart,
@@ -177,6 +186,12 @@ function SidebarContent({
           icon: <Wallet size={16} />,
           ocid: "sidebar.wallet_link",
         },
+        {
+          to: "/tenant",
+          label: "My Plan",
+          icon: <Server size={16} />,
+          ocid: "sidebar.myplan_link",
+        },
       ],
     },
   ];
@@ -279,11 +294,31 @@ interface LayoutProps {
   hideFooter?: boolean;
 }
 
+interface NotifItem {
+  id: bigint;
+  title: string;
+  message: string;
+  isRead: boolean;
+  notifType: string;
+  createdAt: bigint;
+  entityId: string | null;
+}
+interface NotifBackend {
+  getMyNotifications(): Promise<NotifItem[]>;
+  getUnreadCount(): Promise<bigint>;
+  markNotificationRead(id: bigint): Promise<void>;
+  markAllNotificationsRead(): Promise<void>;
+}
+
 export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [notifications, setNotifications] = useState<NotifItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
   const { user, logout, switchRole, isAuthenticated } = useAuth();
+  const actor = useBackend();
   const { language, setLanguage, t } = useI18n();
 
   useEffect(() => {
@@ -299,6 +334,48 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !actor) return;
+    const nb = actor as unknown as NotifBackend;
+    const fetchNotifs = async () => {
+      try {
+        const notifs = await nb.getMyNotifications();
+        setNotifications(notifs);
+        const count = await nb.getUnreadCount();
+        setUnreadCount(Number(count));
+      } catch {
+        // silently fail
+      }
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, actor]);
+
+  const markRead = async (id: bigint) => {
+    try {
+      const nb = actor as unknown as NotifBackend;
+      await nb.markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      const nb = actor as unknown as NotifBackend;
+      await nb.markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const initials = user?.name
     ? user.name
@@ -537,6 +614,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                 ocid: "nav.resources_link",
               },
               { to: "/store", label: t.nav.store, ocid: "nav.store_link" },
+              { to: "/pricing", label: "Pricing", ocid: "nav.pricing_link" },
               { to: "/wallet", label: "Wallet", ocid: "nav.wallet_link" },
             ].map((link) => (
               <Link
@@ -570,16 +648,87 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
           <div className="flex items-center gap-2 ml-auto">
             {/* Notification Bell (authenticated users only) */}
             {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 relative"
-                data-ocid="nav.notifications_button"
-                aria-label="Notifications"
-              >
-                <Bell size={16} className="text-muted-foreground" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full ring-2 ring-white" />
-              </Button>
+              <Popover open={notifOpen} onOpenChange={setNotifOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 relative"
+                    data-ocid="nav.notifications_button"
+                    aria-label="Notifications"
+                  >
+                    <Bell size={16} className="text-muted-foreground" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 ring-2 ring-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-80 p-0"
+                  data-ocid="nav.notifications_panel"
+                >
+                  <div className="flex items-center justify-between px-4 py-3 border-b">
+                    <span className="font-semibold text-sm">Notifications</span>
+                    {unreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={markAllRead}
+                        data-ocid="nav.notifications_mark_all_button"
+                      >
+                        <CheckCheck size={11} /> Mark all read
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-80">
+                    {notifications.length === 0 ? (
+                      <div
+                        className="flex flex-col items-center py-8 text-muted-foreground gap-2"
+                        data-ocid="nav.notifications_empty_state"
+                      >
+                        <BellOff size={20} />
+                        <p className="text-xs">No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map((n, i) => (
+                        <button
+                          key={String(n.id)}
+                          type="button"
+                          className={cn(
+                            "w-full text-left px-4 py-3 hover:bg-secondary/50 border-b last:border-0 transition-colors",
+                            !n.isRead && "bg-blue-50/40",
+                          )}
+                          onClick={() => markRead(n.id)}
+                          data-ocid={`nav.notification.item.${i + 1}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!n.isRead && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium leading-snug">
+                                {n.title}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                                {n.message}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                {new Date(
+                                  Number(n.createdAt) / 1_000_000,
+                                ).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             )}
 
             {/* Language Switcher */}
@@ -718,6 +867,15 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/tenant"
+                      className="flex items-center gap-2 cursor-pointer"
+                      data-ocid="nav.myplan_link"
+                    >
+                      <Server size={14} /> My Plan
+                    </Link>
+                  </DropdownMenuItem>
 
                   {/* Role Switcher (Demo) */}
                   <DropdownMenuSeparator />
@@ -825,6 +983,11 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                       to: "/forums",
                       label: "Forums",
                       ocid: "footer.forums_link",
+                    },
+                    {
+                      to: "/pricing",
+                      label: "Pricing",
+                      ocid: "footer.pricing_link",
                     },
                   ].map((link) => (
                     <Link

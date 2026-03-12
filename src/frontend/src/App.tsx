@@ -24,11 +24,13 @@ import { LoginPage } from "@/pages/LoginPage";
 import { MembersPage } from "@/pages/MembersPage";
 import { OrganizationDetailPage } from "@/pages/OrganizationDetailPage";
 import { OrganizationsPage } from "@/pages/OrganizationsPage";
+import { PricingPage } from "@/pages/PricingPage";
 import { ProductDetailPage } from "@/pages/ProductDetailPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
 import { StorePage } from "@/pages/StorePage";
+import { TenantAdminPage } from "@/pages/TenantAdminPage";
 import { VendorPage } from "@/pages/VendorPage";
 import { WalletPage } from "@/pages/WalletPage";
 import {
@@ -273,6 +275,22 @@ const activismRoute = createRoute({
   ),
 });
 
+const pricingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pricing",
+  component: () => <PricingPage />,
+});
+
+const tenantRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tenant",
+  component: () => (
+    <ProtectedRoute>
+      <TenantAdminPage />
+    </ProtectedRoute>
+  ),
+});
+
 const walletRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/wallet",
@@ -306,6 +324,8 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   activismRoute,
   walletRoute,
+  pricingRoute,
+  tenantRoute,
 ]);
 
 // ── Router ──

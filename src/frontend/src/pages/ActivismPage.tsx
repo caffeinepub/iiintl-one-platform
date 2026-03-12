@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/context/I18nContext";
 import {
   MOCK_CAMPAIGNS,
@@ -13,6 +14,7 @@ import {
   getCampaignById,
   getCampaignCategoryColor,
 } from "@/data/mockData";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 import {
@@ -25,6 +27,7 @@ import {
   ExternalLink,
   FileText,
   Globe,
+  Loader2,
   Megaphone,
   MessageSquare,
   PenSquare,
@@ -37,7 +40,7 @@ import {
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -160,14 +163,97 @@ const ACTIVISM_TYPES = [
   },
 ];
 
+interface ActivismBackend {
+  signPetition(petitionId: string): Promise<boolean>;
+  hasSigned(petitionId: string): Promise<boolean>;
+  getPetitionSignatureCount(petitionId: string): Promise<bigint>;
+  recordAction(actionType: string, description: string): Promise<void>;
+  getMyActions(): Promise<
+    Array<{
+      actionType: string;
+      description: string;
+      id: bigint;
+      completedAt: bigint;
+    }>
+  >;
+}
+
 export function ActivismPage() {
   const { t } = useI18n();
+  const { isAuthenticated } = useAuth();
+  const actor = useBackend();
   const [signedPetitions, setSignedPetitions] = useState<Set<string>>(
     new Set(),
   );
+  const [loadingPetitions, setLoadingPetitions] = useState<Set<string>>(
+    new Set(),
+  );
+  const [completedCTAs, setCompletedCTAs] = useState<Set<string>>(new Set());
+  const [loadingCTAs, setLoadingCTAs] = useState<Set<string>>(new Set());
 
-  function handleSign(petitionId: string) {
-    setSignedPetitions((prev) => new Set([...prev, petitionId]));
+  useEffect(() => {
+    if (!isAuthenticated || !actor) return;
+    const ab = actor as unknown as ActivismBackend;
+    const init = async () => {
+      try {
+        const actions = await ab.getMyActions();
+        setCompletedCTAs(new Set(actions.map((a) => a.actionType)));
+      } catch {
+        /* ignore */
+      }
+      try {
+        await Promise.all(
+          MOCK_PETITIONS.map(async (p) => {
+            const signed = await ab.hasSigned(p.id);
+            if (signed) setSignedPetitions((prev) => new Set([...prev, p.id]));
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+    init();
+  }, [isAuthenticated, actor]);
+
+  async function handleSign(petitionId: string) {
+    setLoadingPetitions((prev) => new Set([...prev, petitionId]));
+    try {
+      if (actor && isAuthenticated) {
+        await (actor as unknown as ActivismBackend).signPetition(petitionId);
+      }
+      setSignedPetitions((prev) => new Set([...prev, petitionId]));
+    } catch {
+      /* ignore */
+    }
+    setLoadingPetitions((prev) => {
+      const s = new Set(prev);
+      s.delete(petitionId);
+      return s;
+    });
+  }
+
+  async function handleTakeAction(
+    ctaId: string,
+    ctaType: string,
+    ctaTitle: string,
+  ) {
+    setLoadingCTAs((prev) => new Set([...prev, ctaId]));
+    try {
+      if (actor && isAuthenticated) {
+        await (actor as unknown as ActivismBackend).recordAction(
+          ctaType,
+          ctaTitle,
+        );
+      }
+      setCompletedCTAs((prev) => new Set([...prev, ctaType]));
+    } catch {
+      /* ignore */
+    }
+    setLoadingCTAs((prev) => {
+      const s = new Set(prev);
+      s.delete(ctaId);
+      return s;
+    });
   }
 
   const urgentCTAs = MOCK_CTAS.filter((c) => c.isUrgent);
@@ -369,10 +455,31 @@ export function ActivismPage() {
                             </span>
                             <Button
                               size="sm"
-                              className="h-7 text-xs bg-red-600 hover:bg-red-700"
+                              className={cn(
+                                "h-7 text-xs",
+                                completedCTAs.has(cta.type)
+                                  ? "bg-green-600 hover:bg-green-700"
+                                  : "bg-red-600 hover:bg-red-700",
+                              )}
+                              onClick={() =>
+                                handleTakeAction(cta.id, cta.type, cta.title)
+                              }
+                              disabled={
+                                completedCTAs.has(cta.type) ||
+                                loadingCTAs.has(cta.id)
+                              }
                               data-ocid={`activism.take_action_button.${i + 1}`}
                             >
-                              Take Action
+                              {loadingCTAs.has(cta.id) ? (
+                                <Loader2 size={11} className="animate-spin" />
+                              ) : completedCTAs.has(cta.type) ? (
+                                <>
+                                  <CheckCircle2 size={11} className="mr-1" />
+                                  Done
+                                </>
+                              ) : (
+                                "Take Action"
+                              )}
                             </Button>
                           </div>
                         </CardContent>
@@ -498,10 +605,14 @@ export function ActivismPage() {
                             isSigned && "bg-emerald-600 hover:bg-emerald-700",
                           )}
                           onClick={() => handleSign(petition.id)}
-                          disabled={isSigned}
+                          disabled={
+                            isSigned || loadingPetitions.has(petition.id)
+                          }
                           data-ocid={`activism.sign_petition_button.${i + 1}`}
                         >
-                          {isSigned ? (
+                          {loadingPetitions.has(petition.id) ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : isSigned ? (
                             <>
                               <CheckCircle2 size={12} className="mr-1.5" />
                               Signed!

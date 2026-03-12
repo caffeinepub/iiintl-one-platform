@@ -275,6 +275,16 @@ export interface backendInterface {
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
+    createTenant(orgName: string, contactEmail: string, tier: string, paymentMethod: string): Promise<string>;
+    getTenant(tenantId: string): Promise<any | null>;
+    getMyTenant(): Promise<any | null>;
+    getMySubscription(): Promise<any | null>;
+    listAllTenants(): Promise<Array<any>>;
+    updateTenant(orgName: string, contactEmail: string, customDomain: string | null): Promise<boolean>;
+    suspendTenant(tenantId: string): Promise<boolean>;
+    reactivateTenant(tenantId: string): Promise<boolean>;
+    upgradeTenant(newTier: string): Promise<boolean>;
+    cancelTenant(): Promise<boolean>;
 }
 import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, ThreadStatus as _ThreadStatus, Transaction as _Transaction, TransactionType as _TransactionType, UserProfile as _UserProfile, UserRole as _UserRole, Wallet as _Wallet, WalletType as _WalletType } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -967,6 +977,46 @@ export class Backend implements backendInterface {
             const result = await this.actor.updateOrg(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
             return result;
         }
+    }
+    async createTenant(arg0: string, arg1: string, arg2: import("@\/backend.d").TenantTier, arg3: import("@\/backend.d").PaymentMethod): Promise<string> {
+        const result = await (this.actor as any).createTenant(arg0, arg1, { [arg2]: null }, { [arg3]: null });
+        return result as string;
+    }
+    async getTenant(arg0: string): Promise<import("@\/backend.d").Tenant | null> {
+        const result = await (this.actor as any).getTenant(arg0);
+        return result.length > 0 ? result[0] as import("@\/backend.d").Tenant : null;
+    }
+    async getMyTenant(): Promise<import("@\/backend.d").Tenant | null> {
+        const result = await (this.actor as any).getMyTenant();
+        return result.length > 0 ? result[0] as import("@\/backend.d").Tenant : null;
+    }
+    async getMySubscription(): Promise<import("@\/backend.d").TenantSubscription | null> {
+        const result = await (this.actor as any).getMySubscription();
+        return result.length > 0 ? result[0] as import("@\/backend.d").TenantSubscription : null;
+    }
+    async listAllTenants(): Promise<Array<import("@\/backend.d").Tenant>> {
+        const result = await (this.actor as any).listAllTenants();
+        return result as Array<import("@\/backend.d").Tenant>;
+    }
+    async updateTenant(arg0: string, arg1: string, arg2: string | null): Promise<boolean> {
+        const result = await (this.actor as any).updateTenant(arg0, arg1, arg2 ? [arg2] : []);
+        return result as boolean;
+    }
+    async suspendTenant(arg0: string): Promise<boolean> {
+        const result = await (this.actor as any).suspendTenant(arg0);
+        return result as boolean;
+    }
+    async reactivateTenant(arg0: string): Promise<boolean> {
+        const result = await (this.actor as any).reactivateTenant(arg0);
+        return result as boolean;
+    }
+    async upgradeTenant(arg0: import("@\/backend.d").TenantTier): Promise<boolean> {
+        const result = await (this.actor as any).upgradeTenant({ [arg0]: null });
+        return result as boolean;
+    }
+    async cancelTenant(): Promise<boolean> {
+        const result = await (this.actor as any).cancelTenant();
+        return result as boolean;
     }
 }
 function from_candid_CampaignStatus_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignStatus): CampaignStatus {

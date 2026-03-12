@@ -1,3 +1,4 @@
+import type { Identity } from "@icp-sdk/core/agent";
 import { type ReactNode, createContext, useContext, useState } from "react";
 
 export type UserRole =
@@ -24,6 +25,7 @@ interface AuthContextValue {
   login: (user: AuthUser) => void;
   logout: () => void;
   loginWithCredentials: (email: string, password: string) => boolean;
+  loginWithII: (identity: Identity) => void;
   switchRole: (role: UserRole) => void;
 }
 
@@ -106,6 +108,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
+  const loginWithII = (identity: Identity) => {
+    const principal = identity.getPrincipal();
+    setUser({
+      id: principal.toString(),
+      name: "Internet Identity User",
+      role: "member",
+      avatar: null,
+      email: "",
+    });
+  };
+
   const switchRole = (role: UserRole) => {
     const target = MOCK_USERS[role];
     if (target) {
@@ -121,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         loginWithCredentials,
+        loginWithII,
         switchRole,
       }}
     >

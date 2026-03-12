@@ -192,4 +192,52 @@ export interface backendInterface {
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
+    createTenant(orgName: string, contactEmail: string, tier: TenantTier, paymentMethod: PaymentMethod): Promise<string>;
+    getTenant(tenantId: string): Promise<Tenant | null>;
+    getMyTenant(): Promise<Tenant | null>;
+    getMySubscription(): Promise<TenantSubscription | null>;
+    listAllTenants(): Promise<Array<Tenant>>;
+    updateTenant(orgName: string, contactEmail: string, customDomain: string | null): Promise<boolean>;
+    suspendTenant(tenantId: string): Promise<boolean>;
+    reactivateTenant(tenantId: string): Promise<boolean>;
+    upgradeTenant(newTier: TenantTier): Promise<boolean>;
+    cancelTenant(): Promise<boolean>;
+}
+export enum TenantTier {
+    starter = "starter",
+    organization = "organization",
+    enterprise = "enterprise"
+}
+export enum TenantStatus {
+    trial = "trial",
+    active = "active",
+    suspended = "suspended",
+    cancelled = "cancelled"
+}
+export enum PaymentMethod {
+    icp = "icp",
+    stripe = "stripe",
+    invoice = "invoice"
+}
+export interface Tenant {
+    id: string;
+    ownerPrincipal: Principal;
+    orgName: string;
+    contactEmail: string;
+    tier: TenantTier;
+    status: TenantStatus;
+    memberLimit: bigint;
+    storageLimit: bigint;
+    billingCycleStart: bigint;
+    createdAt: bigint;
+    customDomain: string | null;
+}
+export interface TenantSubscription {
+    tenantId: string;
+    tier: TenantTier;
+    monthlyFee: number;
+    currency: string;
+    paymentMethod: PaymentMethod;
+    lastPaidAt: bigint | null;
+    nextDueAt: bigint;
 }

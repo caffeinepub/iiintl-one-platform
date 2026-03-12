@@ -1,3 +1,5 @@
+import type { Tenant } from "@/backend.d";
+import { TenantStatus, TenantTier } from "@/backend.d";
 import type { Campaign, ForumThread, Organization } from "@/backend.d";
 import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend.d";
 import { Layout } from "@/components/Layout";
@@ -19,6 +21,7 @@ import { useBackend } from "@/hooks/useBackend";
 import {
   Activity,
   BookOpen,
+  Building,
   Building2,
   CheckCircle,
   FileText,
@@ -1187,6 +1190,175 @@ function ContentTab() {
   );
 }
 
+function TenantsTab() {
+  const backend = useBackend();
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  useEffect(() => {
+    if (!backend) return;
+    setLoading(true);
+    backend
+      .listAllTenants()
+      .then((data) => setTenants(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [backend]);
+
+  async function handleSuspend(id: string) {
+    if (!backend) return;
+    setActionLoading((p) => ({ ...p, [id]: true }));
+    try {
+      await backend.suspendTenant(id);
+      toast.success("Tenant suspended");
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, status: TenantStatus.suspended } : t,
+        ),
+      );
+    } catch {
+      toast.error("Failed to suspend tenant");
+    } finally {
+      setActionLoading((p) => ({ ...p, [id]: false }));
+    }
+  }
+
+  async function handleReactivate(id: string) {
+    if (!backend) return;
+    setActionLoading((p) => ({ ...p, [id]: true }));
+    try {
+      await backend.reactivateTenant(id);
+      toast.success("Tenant reactivated");
+      setTenants((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, status: TenantStatus.active } : t,
+        ),
+      );
+    } catch {
+      toast.error("Failed to reactivate tenant");
+    } finally {
+      setActionLoading((p) => ({ ...p, [id]: false }));
+    }
+  }
+
+  const tierBadge = (tier: TenantTier) => {
+    const map: Record<TenantTier, string> = {
+      [TenantTier.starter]: "bg-emerald-500/20 text-emerald-400 border-0",
+      [TenantTier.organization]: "bg-blue-500/20 text-blue-400 border-0",
+      [TenantTier.enterprise]: "bg-purple-500/20 text-purple-400 border-0",
+    };
+    return <Badge className={map[tier] ?? ""}>{tier}</Badge>;
+  };
+
+  const statusBadge = (status: TenantStatus) => {
+    const map: Record<TenantStatus, string> = {
+      [TenantStatus.trial]: "bg-yellow-500/20 text-yellow-400 border-0",
+      [TenantStatus.active]: "bg-emerald-500/20 text-emerald-400 border-0",
+      [TenantStatus.suspended]: "bg-red-500/20 text-red-400 border-0",
+      [TenantStatus.cancelled]: "bg-muted text-muted-foreground border-0",
+    };
+    return <Badge className={map[status] ?? ""}>{status}</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <div data-ocid="admin.tenants.loading_state" className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (tenants.length === 0) {
+    return (
+      <div
+        data-ocid="admin.tenants.empty_state"
+        className="text-center py-16 text-muted-foreground"
+      >
+        <Building size={32} className="mx-auto mb-3 opacity-30" />
+        <p className="text-sm">No tenants registered yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div data-ocid="admin.tenants.table">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Org Name</TableHead>
+            <TableHead>Owner</TableHead>
+            <TableHead>Tier</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tenants.map((tenant, idx) => (
+            <TableRow
+              key={tenant.id}
+              data-ocid={`admin.tenants.row.${idx + 1}`}
+            >
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {tenant.id.slice(0, 8)}...
+              </TableCell>
+              <TableCell className="font-medium">{tenant.orgName}</TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {tenant.ownerPrincipal.toString().slice(0, 12)}...
+              </TableCell>
+              <TableCell>{tierBadge(tenant.tier)}</TableCell>
+              <TableCell>{statusBadge(tenant.status)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {new Date(
+                  Number(tenant.createdAt) / 1_000_000,
+                ).toLocaleDateString()}
+              </TableCell>
+              <TableCell>
+                {tenant.status === TenantStatus.suspended ||
+                tenant.status === TenantStatus.cancelled ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    disabled={actionLoading[tenant.id]}
+                    onClick={() => handleReactivate(tenant.id)}
+                    data-ocid={`admin.tenants.reactivate.button.${idx + 1}`}
+                  >
+                    {actionLoading[tenant.id] ? (
+                      <Loader2 size={11} className="mr-1 animate-spin" />
+                    ) : null}
+                    Reactivate
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="text-xs"
+                    disabled={actionLoading[tenant.id]}
+                    onClick={() => handleSuspend(tenant.id)}
+                    data-ocid={`admin.tenants.suspend.button.${idx + 1}`}
+                  >
+                    {actionLoading[tenant.id] ? (
+                      <Loader2 size={11} className="mr-1 animate-spin" />
+                    ) : null}
+                    Suspend
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 // ── Main AdminPage ────────────────────────────────────────────────────────────
 export function AdminPage() {
   const { user } = useAuth();
@@ -1299,6 +1471,14 @@ export function AdminPage() {
               <BookOpen size={13} />
               Content
             </TabsTrigger>
+            <TabsTrigger
+              value="tenants"
+              className="text-xs gap-1.5"
+              data-ocid="admin.tenants.tab"
+            >
+              <Building size={13} />
+              Tenants
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -1336,6 +1516,9 @@ export function AdminPage() {
 
           <TabsContent value="content">
             <ContentTab />
+          </TabsContent>
+          <TabsContent value="tenants">
+            <TenantsTab />
           </TabsContent>
         </Tabs>
       </div>
