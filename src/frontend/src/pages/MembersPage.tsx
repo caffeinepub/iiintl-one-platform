@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -27,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { UserRole } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/context/I18nContext";
 import {
   MOCK_MEMBERS,
@@ -36,6 +38,7 @@ import {
   getRoleBadgeClasses,
   getStatusBadgeClasses,
 } from "@/data/mockData";
+import { useActor } from "@/hooks/useActor";
 import { cn } from "@/lib/utils";
 import {
   Activity,
@@ -53,7 +56,7 @@ import {
 } from "lucide-react";
 import type { Variants } from "motion/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ─── Variants ─────────────────────────────────────────────────────────────────
 
@@ -399,10 +402,55 @@ export function MembersPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MockMember | null>(null);
+  const { user } = useAuth();
+  const { actor } = useActor();
+  const [members, setMembers] = useState<MockMember[]>(MOCK_MEMBERS);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [page, setPage] = useState(1);
 
   // Filter logic
-  const filtered = MOCK_MEMBERS.filter((m) => {
+  useEffect(() => {
+    if (!user || !actor) return;
+    setIsLoading(true);
+    actor
+      .listUsers()
+      .then((users) => {
+        if (users.length === 0) {
+          setMembers(MOCK_MEMBERS);
+          return;
+        }
+        const mapped: MockMember[] = users.map((u, idx) => ({
+          id: u.id || String(idx + 1),
+          name: u.displayName || "Unknown",
+          email: "",
+          role:
+            u.role === "admin"
+              ? "admin"
+              : u.role === "guest"
+                ? "guest"
+                : "member",
+          organization: "",
+          organizationId: "",
+          region: "Global",
+          bio: u.bio || "",
+          joinedDate: new Date(Number(u.joinedAt) / 1_000_000).toISOString(),
+          status: u.isActive ? "active" : "inactive",
+          campaignCount: 0,
+          postCount: 0,
+          avatar: null,
+          title: u.role === "admin" ? "Administrator" : undefined,
+        }));
+        setMembers(mapped);
+      })
+      .catch(() => {
+        setMembers(MOCK_MEMBERS);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [user, actor]);
+  const filtered = members.filter((m) => {
     const matchesSearch =
       !search ||
       m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -448,7 +496,7 @@ export function MembersPage() {
             {t.members.title}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {MOCK_MEMBERS.length} {t.members.title.toLowerCase()}
+            {members.length} {t.members.title.toLowerCase()}
           </p>
           <div className="mt-3 civic-rule w-12" />
         </motion.div>
@@ -712,6 +760,27 @@ export function MembersPage() {
         )}
 
         {/* ── Grid View ── */}
+        {/* ── Loading Skeleton ── */}
+        {isLoading && (
+          <div
+            data-ocid="members.loading_state"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6"
+          >
+            {Array.from({ length: 8 }, (_, i) => `skeleton-${i}`).map((key) => (
+              <Card key={key} className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-full mb-2" />
+                <Skeleton className="h-3 w-2/3" />
+              </Card>
+            ))}
+          </div>
+        )}
         {filtered.length > 0 && viewMode === "grid" && (
           <motion.div
             variants={gridContainerVariants}

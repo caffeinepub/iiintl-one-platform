@@ -166,6 +166,15 @@ export interface UserProfile {
     email: string;
     avatarUrl: string;
 }
+export interface UserSummary {
+    id: string;
+    displayName: string;
+    role: UserRole;
+    bio: string;
+    avatarUrl: string;
+    joinedAt: bigint;
+    isActive: boolean;
+}
 export enum CampaignStatus {
     active = "active",
     completed = "completed",
@@ -252,6 +261,7 @@ export interface backendInterface {
     listCampaigns(): Promise<Array<Campaign>>;
     listCampaignsByOrg(orgId: string): Promise<Array<Campaign>>;
     listOrgs(): Promise<Array<Organization>>;
+    listUsers(): Promise<Array<UserSummary>>;
     listThreads(): Promise<Array<ForumThread>>;
     listThreadsByCategory(category: ForumCategory): Promise<Array<ForumThread>>;
     listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;
@@ -760,6 +770,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.listOrgs();
             return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listUsers(): Promise<Array<UserSummary>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listUsers();
+                return result as Array<UserSummary>;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listUsers();
+            return result as Array<UserSummary>;
         }
     }
     async listThreads(): Promise<Array<ForumThread>> {

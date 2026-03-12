@@ -131,6 +131,15 @@ export enum WalletType {
     plug = "plug",
     stoic = "stoic"
 }
+export interface UserSummary {
+  id: string;
+  displayName: string;
+  role: UserRole;
+  bio: string;
+  avatarUrl: string;
+  joinedAt: bigint;
+  isActive: boolean;
+}
 export interface backendInterface {
     addTransaction(walletAddress: string, amount: number, description: string, txType: TransactionType): Promise<void>;
     archiveCampaign(id: string): Promise<boolean>;
@@ -169,6 +178,7 @@ export interface backendInterface {
     listCampaigns(): Promise<Array<Campaign>>;
     listCampaignsByOrg(orgId: string): Promise<Array<Campaign>>;
     listOrgs(): Promise<Array<Organization>>;
+    listUsers(): Promise<Array<UserSummary>>;
     listThreads(): Promise<Array<ForumThread>>;
     listThreadsByCategory(category: ForumCategory): Promise<Array<ForumThread>>;
     listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;

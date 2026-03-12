@@ -175,6 +175,17 @@ actor {
     #received;
   };
 
+
+  public type UserSummary = {
+    id : Text;
+    displayName : Text;
+    role : Role;
+    bio : Text;
+    avatarUrl : Text;
+    joinedAt : Int;
+    isActive : Bool;
+  };
+
   // Storage variables
   let users = Map.empty<Text, User>();
   let principalToUserId = Map.empty<Principal, Text>();
@@ -193,6 +204,7 @@ actor {
   let userWallets = Map.empty<Principal, Map.Map<Text, Wallet>>();
   let userTransactions = Map.empty<Principal, Map.Map<Nat, Transaction>>();
   var nextTransactionId = 1;
+  let userLanguages = Map.empty<Principal, Text>();
 
   // === User Functions ===
 
@@ -458,6 +470,35 @@ actor {
           avatarUrl = u.avatarUrl;
         };
       };
+    };
+  };
+
+
+  // List all registered users (public summaries)
+  public query func listUsers() : async [UserSummary] {
+    users.values().map(func(u : User) : UserSummary {
+      {
+        id = u.id;
+        displayName = u.displayName;
+        role = u.role;
+        bio = u.bio;
+        avatarUrl = u.avatarUrl;
+        joinedAt = u.joinedAt;
+        isActive = u.isActive;
+      }
+    }).toArray();
+  };
+
+  // === Language Preference Functions ===
+
+  public shared ({ caller }) func setPreferredLanguage(lang : Text) : async () {
+    userLanguages.add(caller, lang);
+  };
+
+  public query ({ caller }) func getPreferredLanguage() : async Text {
+    switch (userLanguages.get(caller)) {
+      case (null) { "en" };
+      case (?lang) { lang };
     };
   };
 
