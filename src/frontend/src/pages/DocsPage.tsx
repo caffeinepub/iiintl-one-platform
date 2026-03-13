@@ -1165,6 +1165,445 @@ const DOC_SECTIONS: DocSection[] = [
       },
     ],
   },
+  {
+    id: "platform-as-a-service",
+    title: "Platform as a Service",
+    icon: <Building2 size={15} />,
+    badge: "PaaS",
+    subsections: [
+      {
+        id: "paas-architecture",
+        title: "Architecture Overview",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              IIIntl One Platform supports multi-tenancy, where each renting
+              organization receives an isolated namespace scoped by a unique
+              tenant ID. All data — members, campaigns, forums, store orders,
+              resources — is tagged with that tenant ID and is never visible to
+              other tenants.
+            </p>
+            <div className="bg-secondary/40 rounded-lg p-4 border border-border">
+              <h4 className="font-display font-semibold text-sm text-foreground mb-2">
+                Deployment Tiers
+              </h4>
+              <ul className="space-y-2">
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Shared Instance</strong> —
+                  Starter and Organization plans share a single canister; data
+                  is strictly isolated by tenant ID. Lower cost, fastest setup.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Dedicated Clone</strong> —
+                  Enterprise plans receive their own canister on the Internet
+                  Computer. Maximum data sovereignty and isolation, ideal for
+                  large or regulated organizations.
+                </li>
+              </ul>
+            </div>
+            <div className="bg-secondary/40 rounded-lg p-4 border border-border">
+              <h4 className="font-display font-semibold text-sm text-foreground mb-2">
+                Tenant Status Lifecycle
+              </h4>
+              <ul className="space-y-1.5">
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Trial</strong> — 14-day
+                  free access, full features. Converts to Active on first
+                  payment.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Active</strong> —
+                  Subscription current. Full platform access.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Suspended</strong> —
+                  Payment overdue or admin action. Read-only access until
+                  reactivated.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Cancelled</strong> —
+                  Access ends at billing period close.
+                </li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "tenant-onboarding",
+        title: "Tenant Onboarding Guide",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Follow these steps to bring your organization onto the IIIntl PaaS
+              platform:
+            </p>
+            <ol className="space-y-3 list-none">
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">1. Choose a plan</strong> —
+                Visit /pricing and compare Starter, Organization, and Enterprise
+                tiers. Click &quot;Get Started&quot; on your chosen plan.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">2. Sign in</strong> — Log in
+                with Internet Identity (ICP). This becomes your tenant owner
+                identity.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  3. Create your tenant
+                </strong>{" "}
+                — Complete the tenant creation form at /tenant: enter your
+                organization name, contact email, tier, and preferred payment
+                method (Stripe card or ICP token).
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  4. Access the Admin Portal
+                </strong>{" "}
+                — Your 6-tab Tenant Admin Portal is immediately available at
+                /tenant: Overview, Usage, Members, Branding, Billing, and
+                Settings.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  5. Configure branding
+                </strong>{" "}
+                — Open the Branding tab to set your brand name, logo URL, accent
+                color, and a custom welcome message for your members.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">6. Invite your team</strong>{" "}
+                — Open the Members tab and add team members by their Internet
+                Identity principal. Assign roles: owner, admin, member, or
+                viewer.
+              </li>
+            </ol>
+          </div>
+        ),
+      },
+      {
+        id: "pricing-billing",
+        title: "Pricing & Billing Policy",
+        content: (
+          <div className="space-y-4">
+            <div className="bg-secondary/40 rounded-lg p-4 border border-border">
+              <h4 className="font-display font-semibold text-sm text-foreground mb-3">
+                Subscription Tiers
+              </h4>
+              <ul className="space-y-2">
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Starter — $49/mo</strong>:
+                  Up to 50 members, 1 GB storage. All core modules included.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">
+                    Organization — $299/mo
+                  </strong>
+                  : Up to 500 members, 10 GB storage. Priority support, custom
+                  branding.
+                </li>
+                <li className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">
+                    Enterprise — $999/mo
+                  </strong>
+                  : Up to 10,000 members, 100 GB storage. Dedicated canister,
+                  SLA, white-label.
+                </li>
+              </ul>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              All tiers include a{" "}
+              <strong className="text-foreground">14-day free trial</strong>{" "}
+              with full feature access — no payment required to start. Annual
+              billing is available at a discounted rate (equivalent to 2 months
+              free).
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">Payment methods:</strong>{" "}
+              Credit and debit cards via Stripe, or ICP tokens for crypto-native
+              organizations. Enterprise clients may arrange invoice-based
+              billing.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">Cancellation:</strong> You may
+              cancel at any time from the Settings tab. Access continues until
+              the end of the current billing period. No refunds are issued for
+              partial periods.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "tenant-admin-manual",
+        title: "Tenant Admin Manual",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The Tenant Admin Portal at{" "}
+              <strong className="text-foreground">/tenant</strong> has six tabs:
+            </p>
+            <ul className="space-y-3">
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Overview</strong> — Plan
+                summary card showing your current tier, subscription status,
+                monthly fee, and next billing date. Contains the &quot;Pay with
+                Card&quot; button for Stripe payments.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Usage</strong> — Live
+                progress bars for members used vs. tier limit and storage
+                consumed vs. allocation. Amber warning at 80% capacity. Red
+                warning at 100%. Trial countdown banner shows days remaining.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Members</strong> — Add
+                members by pasting their Internet Identity principal. Assign a
+                role (owner, admin, member, or viewer). Remove members at any
+                time. The owner role cannot be removed.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Branding</strong> — Set your
+                organization&apos;s brand name, logo URL (with live preview),
+                accent color, and welcome message. Saved to the Internet
+                Computer and applied across your tenant space.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Billing</strong> — Full
+                payment history table: date, description, amount, currency,
+                status (paid/pending/failed), and payment method. Refreshable on
+                demand.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Settings</strong> — Edit
+                organization name, contact email, and custom domain. Upgrade to
+                a higher tier. Cancel your subscription.
+              </li>
+            </ul>
+          </div>
+        ),
+      },
+      {
+        id: "super-admin-management",
+        title: "Super-Admin Management",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Platform owners with the{" "}
+              <strong className="text-foreground">super_admin</strong> role
+              access the Admin Dashboard at{" "}
+              <strong className="text-foreground">/admin</strong>. The following
+              tabs are relevant to PaaS management:
+            </p>
+            <ul className="space-y-3">
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Tenants tab</strong> — View
+                all registered tenants with tier and status badges. Suspend
+                active tenants or reactivate suspended ones. Each row shows org
+                name, owner principal, creation date, and current status.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Analytics tab</strong> —
+                Platform-wide revenue and growth metrics: total tenants, monthly
+                recurring revenue (MRR), active vs. trial breakdown, tier
+                distribution (Starter / Organization / Enterprise counts), total
+                members across all tenants, and branding adoption rate.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Stripe tab</strong> — Enter
+                your Stripe secret key and allowed countries to enable
+                credit/debit card payments for tenants. Status badge confirms
+                whether Stripe is active.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Content tab</strong> —
+                Publish or unpublish Resources, FAQ items, and Docs pages
+                platform-wide. Controls visibility for all tenants on the shared
+                instance.
+              </li>
+            </ul>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Super-admin actions are permanent and immediate. Suspending a
+              tenant blocks all write operations for their members. Always
+              communicate with the tenant owner before taking administrative
+              action.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "dedicated-clone-roadmap",
+        title: "Dedicated Clone Roadmap",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">Dedicated Clone</strong> is
+              the next major infrastructure milestone for IIIntl One Platform.
+              It upgrades Enterprise tenants from the current shared-instance
+              model to a fully isolated deployment — each organization runs on
+              their own canister with independent storage, compute, and upgrade
+              control.
+            </p>
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                Roadmap Status — Planned (Phase E)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Not yet implemented. The shared-instance model (Phases A–D) is
+                fully live and production-ready. Dedicated Clone is the planned
+                Phase E expansion, to be built when Enterprise demand justifies
+                it.
+              </p>
+            </div>
+            <p className="text-sm font-semibold text-foreground">
+              What Dedicated Clone Delivers
+            </p>
+            <ul className="space-y-3">
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  Full data sovereignty
+                </strong>{" "}
+                — No other tenant's data ever touches the organization's
+                canister. Ideal for compliance-sensitive or regulated
+                environments.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  Independent upgrade control
+                </strong>{" "}
+                — The platform owner can push updates to each clone on its own
+                schedule. Enterprise clients can negotiate upgrade windows.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  Custom domain / subdomain
+                </strong>{" "}
+                — Each clone operates at its own URL (e.g.{" "}
+                <code className="bg-muted px-1 rounded">
+                  orgname.iiintl.one
+                </code>{" "}
+                or the client's own domain), reinforcing white-label branding.
+              </li>
+              <li className="text-xs text-muted-foreground">
+                <strong className="text-foreground">
+                  Dedicated compute and storage
+                </strong>{" "}
+                — No resource contention with other tenants. Storage and
+                throughput limits are governed solely by the organization's
+                canister.
+              </li>
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Phase E Build Plan
+            </p>
+            <ul className="space-y-2">
+              {[
+                {
+                  phase: "E1",
+                  label: "Canister Factory",
+                  desc: "New Motoko factory canister using the IC management API to programmatically spin up and fund new tenant canisters on demand.",
+                },
+                {
+                  phase: "E2",
+                  label: "Wasm Build Pipeline",
+                  desc: "Reproducible build process that compiles the platform backend to a Wasm binary, embeds it in the factory, and supports versioned updates.",
+                },
+                {
+                  phase: "E3",
+                  label: "Tenant Registry",
+                  desc: "Maps Tenant ID → Canister ID → frontend URL; tracks canister health and platform code version per clone.",
+                },
+                {
+                  phase: "E4",
+                  label: "Frontend Routing Layer",
+                  desc: "Subdomain routing (wildcard DNS) or path-based routing so each clone resolves to its own URL.",
+                },
+                {
+                  phase: "E5",
+                  label: "Super-Admin Provisioning UI",
+                  desc: "One-click 'Create Dedicated Clone' action in the Admin Dashboard for qualifying Enterprise tenants.",
+                },
+                {
+                  phase: "E6",
+                  label: "Cycles Monitoring Dashboard",
+                  desc: "Alerts and top-up tooling so no tenant canister is ever frozen due to cycle depletion.",
+                },
+              ].map(({ phase, label, desc }) => (
+                <li
+                  key={phase}
+                  className="flex gap-3 text-xs text-muted-foreground"
+                >
+                  <span className="shrink-0 font-mono font-semibold text-foreground bg-muted rounded px-1.5 py-0.5">
+                    {phase}
+                  </span>
+                  <span>
+                    <strong className="text-foreground">{label}</strong> —{" "}
+                    {desc}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Platform Owner Obligations
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "Cycle funding",
+                  "Pre-fund each new canister at creation; automate or monitor ongoing top-ups to prevent freezing.",
+                ],
+                [
+                  "Wasm versioning",
+                  "Maintain a versioned build pipeline; coordinate update rollouts with Enterprise clients.",
+                ],
+                [
+                  "Uptime monitoring",
+                  "Track cycle levels across all clone canisters; set alerts at threshold levels.",
+                ],
+                [
+                  "SLA documentation",
+                  "Define and publish uptime commitments, cycle-depletion recovery procedures, and support response times.",
+                ],
+                [
+                  "Onboarding process",
+                  "Client signs contract → pays → canister provisioned → client receives URL and admin credentials within agreed SLA window.",
+                ],
+                [
+                  "Support boundary",
+                  "Platform owner is responsible for infrastructure (canister health, cycles). Tenant owner is responsible for content, members, and data.",
+                ],
+              ].map(([title, desc]) => (
+                <li key={title} className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">{title}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Pricing Recommendation
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Dedicated Clone is best positioned as a custom-quoted add-on above
+              the standard Enterprise tier ($999/month), priced to cover cycle
+              costs (~$10–$20/month per canister), provisioning labour, and a
+              margin for ongoing monitoring. A one-time setup fee ($500–$2,000)
+              is also recommended to cover onboarding and DNS configuration.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              When to Build It
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The current shared-instance model (Phases A–D) is sufficient for
+              most organizations including large ones. Proceed to Phase E when
+              at least one Enterprise client requires data residency, compliance
+              isolation, or independent upgrade control — or when three or more
+              Enterprise clients express interest. Until then, Dedicated Clone
+              can be offered as a roadmap commitment at contract signing.
+            </p>
+          </div>
+        ),
+      },
+    ],
+  },
 ];
 
 // ─── Motion Variants ──────────────────────────────────────────────────────────

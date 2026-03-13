@@ -989,6 +989,16 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                       label: "Pricing",
                       ocid: "footer.pricing_link",
                     },
+                    {
+                      to: "/legal/privacy",
+                      label: "Privacy",
+                      ocid: "footer.privacy_link",
+                    },
+                    {
+                      to: "/legal/terms",
+                      label: "Terms",
+                      ocid: "footer.terms_link",
+                    },
                   ].map((link) => (
                     <Link
                       key={link.ocid}

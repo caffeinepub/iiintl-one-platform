@@ -25,12 +25,14 @@ import { MembersPage } from "@/pages/MembersPage";
 import { OrganizationDetailPage } from "@/pages/OrganizationDetailPage";
 import { OrganizationsPage } from "@/pages/OrganizationsPage";
 import { PricingPage } from "@/pages/PricingPage";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 import { ProductDetailPage } from "@/pages/ProductDetailPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
 import { StorePage } from "@/pages/StorePage";
 import { TenantAdminPage } from "@/pages/TenantAdminPage";
+import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
 import { VendorPage } from "@/pages/VendorPage";
 import { WalletPage } from "@/pages/WalletPage";
 import {
@@ -300,6 +302,16 @@ const walletRoute = createRoute({
     </ProtectedRoute>
   ),
 });
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/legal/privacy",
+  component: PrivacyPolicyPage,
+});
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/legal/terms",
+  component: TermsOfServicePage,
+});
 // ── Route tree ──
 const routeTree = rootRoute.addChildren([
   homeRoute,
@@ -326,6 +338,8 @@ const routeTree = rootRoute.addChildren([
   walletRoute,
   pricingRoute,
   tenantRoute,
+  privacyRoute,
+  termsRoute,
 ]);
 
 // ── Router ──
