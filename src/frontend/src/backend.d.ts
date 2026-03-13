@@ -140,6 +140,117 @@ export interface UserSummary {
   joinedAt: bigint;
   isActive: boolean;
 }
+export enum TenantTier {
+    starter = "starter",
+    organization = "organization",
+    enterprise = "enterprise"
+}
+export enum TenantStatus {
+    trial = "trial",
+    active = "active",
+    suspended = "suspended",
+    cancelled = "cancelled"
+}
+export enum PaymentMethod {
+    icp = "icp",
+    stripe = "stripe",
+    invoice = "invoice"
+}
+export enum BillingStatus {
+    paid = "paid",
+    pending = "pending",
+    failed = "failed",
+    refunded = "refunded"
+}
+export interface TenantBranding {
+    brandName: string;
+    logoUrl: string;
+    primaryColor: string;
+    welcomeMessage: string;
+}
+export interface TenantMember {
+    tenantId: bigint;
+    memberPrincipal: Principal;
+    role: string;
+    addedAt: bigint;
+    addedBy: Principal;
+}
+export interface BillingRecord {
+    id: bigint;
+    tenantId: bigint;
+    amountCents: bigint;
+    currency: string;
+    status: BillingStatus;
+    paymentMethod: PaymentMethod;
+    description: string;
+    paidAt: bigint;
+    periodStart: bigint;
+    periodEnd: bigint;
+}
+export interface TenantUsage {
+    memberCount: bigint;
+    memberLimit: bigint;
+    storageUsedGB: number;
+    storageLimit: bigint;
+    tier: TenantTier;
+    status: TenantStatus;
+    daysLeftInTrial: bigint;
+    createdAt: bigint;
+}
+export interface TenantAccessResult {
+    allowed: boolean;
+    reason: string;
+}
+export interface TierCount {
+    starter: bigint;
+    organization: bigint;
+    enterprise: bigint;
+}
+export interface TenantStats {
+    id: bigint;
+    orgName: string;
+    tier: TenantTier;
+    status: TenantStatus;
+    memberCount: bigint;
+    memberLimit: bigint;
+    daysActive: bigint;
+    monthlyFee: number;
+    hasBranding: boolean;
+}
+export interface PlatformAnalytics {
+    totalTenants: bigint;
+    activeTenants: bigint;
+    trialTenants: bigint;
+    suspendedTenants: bigint;
+    cancelledTenants: bigint;
+    tierBreakdown: TierCount;
+    totalMonthlyRevenue: number;
+    totalMembers: bigint;
+    tenantsWithBranding: bigint;
+}
+export interface Tenant {
+    id: string;
+    ownerPrincipal: Principal;
+    orgName: string;
+    contactEmail: string;
+    tier: TenantTier;
+    status: TenantStatus;
+    memberLimit: bigint;
+    storageLimit: bigint;
+    billingCycleStart: bigint;
+    createdAt: bigint;
+    customDomain: string | null;
+    branding: TenantBranding | null;
+}
+export interface TenantSubscription {
+    tenantId: string;
+    tier: TenantTier;
+    monthlyFee: number;
+    currency: string;
+    paymentMethod: PaymentMethod;
+    lastPaidAt: bigint | null;
+    nextDueAt: bigint;
+}
 export interface backendInterface {
     addTransaction(walletAddress: string, amount: number, description: string, txType: TransactionType): Promise<void>;
     archiveCampaign(id: string): Promise<boolean>;
@@ -185,7 +296,7 @@ export interface backendInterface {
     lockThread(threadId: bigint): Promise<boolean>;
     pinThread(threadId: bigint): Promise<boolean>;
     getPreferredLanguage(): Promise<string>;
-    registerUser(displayName: string, email: string): Promise<string>
+    registerUser(displayName: string, email: string): Promise<string>;
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setPreferredLanguage(lang: string): Promise<void>;
@@ -202,42 +313,19 @@ export interface backendInterface {
     reactivateTenant(tenantId: string): Promise<boolean>;
     upgradeTenant(newTier: TenantTier): Promise<boolean>;
     cancelTenant(): Promise<boolean>;
-}
-export enum TenantTier {
-    starter = "starter",
-    organization = "organization",
-    enterprise = "enterprise"
-}
-export enum TenantStatus {
-    trial = "trial",
-    active = "active",
-    suspended = "suspended",
-    cancelled = "cancelled"
-}
-export enum PaymentMethod {
-    icp = "icp",
-    stripe = "stripe",
-    invoice = "invoice"
-}
-export interface Tenant {
-    id: string;
-    ownerPrincipal: Principal;
-    orgName: string;
-    contactEmail: string;
-    tier: TenantTier;
-    status: TenantStatus;
-    memberLimit: bigint;
-    storageLimit: bigint;
-    billingCycleStart: bigint;
-    createdAt: bigint;
-    customDomain: string | null;
-}
-export interface TenantSubscription {
-    tenantId: string;
-    tier: TenantTier;
-    monthlyFee: number;
-    currency: string;
-    paymentMethod: PaymentMethod;
-    lastPaidAt: bigint | null;
-    nextDueAt: bigint;
+    addTenantMember(memberPrincipal: string, role: string): Promise<boolean>;
+    removeTenantMember(memberPrincipal: string): Promise<boolean>;
+    listTenantMembers(): Promise<Array<TenantMember>>;
+    getTenantMemberCount(): Promise<bigint>;
+    updateTenantBranding(brandName: string, logoUrl: string, primaryColor: string, welcomeMessage: string): Promise<boolean>;
+    getTenantBranding(tenantId: bigint): Promise<TenantBranding | null>;
+    getMyTenantBranding(): Promise<TenantBranding | null>;
+    checkTenantAccess(): Promise<TenantAccessResult>;
+    getTenantUsage(): Promise<TenantUsage | null>;
+    recordPayment(amountCents: bigint, currency: string, description: string, periodStart: bigint, periodEnd: bigint): Promise<bigint>;
+    listBillingHistory(): Promise<Array<BillingRecord>>;
+    getLatestBillingRecord(): Promise<BillingRecord | null>;
+    listTenantBillingHistory(tenantId: bigint): Promise<Array<BillingRecord>>;
+    getTenantStats(): Promise<TenantStats | null>;
+    getPlatformAnalytics(): Promise<PlatformAnalytics | null>;
 }

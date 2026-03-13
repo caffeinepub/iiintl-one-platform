@@ -1,4 +1,4 @@
-import type { Tenant } from "@/backend.d";
+import type { PlatformAnalytics, Tenant } from "@/backend.d";
 import { TenantStatus, TenantTier } from "@/backend.d";
 import type { Campaign, ForumThread, Organization } from "@/backend.d";
 import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend.d";
@@ -6,6 +6,7 @@ import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -20,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
 import {
   Activity,
+  BarChart2,
   BookOpen,
   Building,
   Building2,
@@ -35,6 +37,7 @@ import {
   ShoppingBag,
   Target,
   Trash2,
+  TrendingUp,
   Users,
   XCircle,
 } from "lucide-react";
@@ -1190,6 +1193,240 @@ function ContentTab() {
   );
 }
 
+function AnalyticsTab() {
+  const backend = useBackend();
+  const [analytics, setAnalytics] = useState<PlatformAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!backend) return;
+    setLoading(true);
+    setError(false);
+    backend
+      .getPlatformAnalytics()
+      .then((data) => {
+        setAnalytics(data);
+        if (!data) setError(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [backend]);
+
+  if (loading) {
+    return (
+      <div data-ocid="admin.analytics.loading_state" className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (error || !analytics) {
+    return (
+      <div
+        data-ocid="admin.analytics.error_state"
+        className="text-center py-16 text-muted-foreground"
+      >
+        <BarChart2 size={40} className="mx-auto mb-3 opacity-40" />
+        <p className="font-medium">Analytics unavailable</p>
+        <p className="text-sm mt-1">Could not load platform analytics data.</p>
+      </div>
+    );
+  }
+
+  const totalTenants = Number(analytics.totalTenants);
+  const activeTenants = Number(analytics.activeTenants);
+  const trialTenants = Number(analytics.trialTenants);
+  const suspendedTenants = Number(analytics.suspendedTenants);
+  const cancelledTenants = Number(analytics.cancelledTenants);
+  const totalMembers = Number(analytics.totalMembers);
+  const tenantsWithBranding = Number(analytics.tenantsWithBranding);
+  const revenue = analytics.totalMonthlyRevenue;
+  const starterCount = Number(analytics.tierBreakdown.starter);
+  const orgCount = Number(analytics.tierBreakdown.organization);
+  const enterpriseCount = Number(analytics.tierBreakdown.enterprise);
+
+  const statCards = [
+    {
+      label: "Total Tenants",
+      value: totalTenants,
+      icon: <Building size={16} />,
+      color: "text-primary",
+    },
+    {
+      label: "Active Tenants",
+      value: activeTenants,
+      icon: <CheckCircle size={16} />,
+      color: "text-emerald-500",
+    },
+    {
+      label: "Trial Tenants",
+      value: trialTenants,
+      icon: <Radio size={16} />,
+      color: "text-yellow-500",
+    },
+    {
+      label: "Monthly Revenue",
+      value: `$${revenue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      icon: <TrendingUp size={16} />,
+      color: "text-blue-500",
+    },
+    {
+      label: "Total Members",
+      value: totalMembers,
+      icon: <Users size={16} />,
+      color: "text-violet-500",
+    },
+    {
+      label: "With Branding",
+      value: tenantsWithBranding,
+      icon: <Shield size={16} />,
+      color: "text-pink-500",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Key metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {statCards.map((card, idx) => (
+          <Card
+            key={card.label}
+            data-ocid={
+              idx === 0
+                ? "admin.analytics.total_tenants.card"
+                : idx === 3
+                  ? "admin.analytics.revenue.card"
+                  : idx === 4
+                    ? "admin.analytics.members.card"
+                    : undefined
+            }
+          >
+            <CardContent className="pt-4 pb-4">
+              <div className={`flex items-center gap-2 mb-1 ${card.color}`}>
+                {card.icon}
+                <span className="text-xs font-medium text-muted-foreground">
+                  {card.label}
+                </span>
+              </div>
+              <p className="text-2xl font-bold">{card.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Status breakdown */}
+      <Card data-ocid="admin.analytics.status.panel">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Activity size={14} />
+            Tenant Status Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[
+            {
+              label: "Active",
+              count: activeTenants,
+              total: totalTenants,
+              cls: "bg-emerald-500",
+            },
+            {
+              label: "Trial",
+              count: trialTenants,
+              total: totalTenants,
+              cls: "bg-yellow-500",
+            },
+            {
+              label: "Suspended",
+              count: suspendedTenants,
+              total: totalTenants,
+              cls: "bg-red-500",
+            },
+            {
+              label: "Cancelled",
+              count: cancelledTenants,
+              total: totalTenants,
+              cls: "bg-muted-foreground",
+            },
+          ].map(({ label, count, total }) => (
+            <div key={label} className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{label}</span>
+                <span>
+                  {count} / {total}
+                </span>
+              </div>
+              <Progress
+                value={total > 0 ? (count / total) * 100 : 0}
+                className="h-2"
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Tier breakdown */}
+      <Card data-ocid="admin.analytics.tier.panel">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Building size={14} />
+            Tier Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-0">
+              Starter
+            </Badge>
+            <span className="text-sm font-bold">{starterCount}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-blue-500/20 text-blue-400 border-0">
+              Organization
+            </Badge>
+            <span className="text-sm font-bold">{orgCount}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-purple-500/20 text-purple-400 border-0">
+              Enterprise
+            </Badge>
+            <span className="text-sm font-bold">{enterpriseCount}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MRR card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <TrendingUp size={14} />
+            Monthly Recurring Revenue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold text-primary">
+            $
+            {revenue.toLocaleString("en-US", {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Based on active subscriptions
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function TenantsTab() {
   const backend = useBackend();
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -1479,6 +1716,14 @@ export function AdminPage() {
               <Building size={13} />
               Tenants
             </TabsTrigger>
+            <TabsTrigger
+              value="analytics"
+              className="text-xs gap-1.5"
+              data-ocid="admin.analytics.tab"
+            >
+              <BarChart2 size={13} />
+              Analytics
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -1519,6 +1764,9 @@ export function AdminPage() {
           </TabsContent>
           <TabsContent value="tenants">
             <TenantsTab />
+          </TabsContent>
+          <TabsContent value="analytics">
+            <AnalyticsTab />
           </TabsContent>
         </Tabs>
       </div>

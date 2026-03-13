@@ -285,6 +285,21 @@ export interface backendInterface {
     reactivateTenant(tenantId: string): Promise<boolean>;
     upgradeTenant(newTier: string): Promise<boolean>;
     cancelTenant(): Promise<boolean>;
+    addTenantMember(memberPrincipal: string, role: string): Promise<boolean>;
+    removeTenantMember(memberPrincipal: string): Promise<boolean>;
+    listTenantMembers(): Promise<Array<any>>;
+    getTenantMemberCount(): Promise<bigint>;
+    updateTenantBranding(brandName: string, logoUrl: string, primaryColor: string, welcomeMessage: string): Promise<boolean>;
+    getTenantBranding(tenantId: bigint): Promise<any | null>;
+    getMyTenantBranding(): Promise<any | null>;
+    checkTenantAccess(): Promise<any>;
+    getTenantUsage(): Promise<any | null>;
+    recordPayment(amountCents: bigint, currency: string, description: string, periodStart: bigint, periodEnd: bigint): Promise<bigint>;
+    listBillingHistory(): Promise<Array<any>>;
+    getLatestBillingRecord(): Promise<any | null>;
+    listTenantBillingHistory(tenantId: bigint): Promise<Array<any>>;
+    getTenantStats(): Promise<any | null>;
+    getPlatformAnalytics(): Promise<any | null>;
 }
 import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, ThreadStatus as _ThreadStatus, Transaction as _Transaction, TransactionType as _TransactionType, UserProfile as _UserProfile, UserRole as _UserRole, Wallet as _Wallet, WalletType as _WalletType } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -1017,6 +1032,67 @@ export class Backend implements backendInterface {
     async cancelTenant(): Promise<boolean> {
         const result = await (this.actor as any).cancelTenant();
         return result as boolean;
+    }
+
+    async addTenantMember(arg0: string, arg1: string): Promise<boolean> {
+        const result = await (this.actor as any).addTenantMember(arg0, arg1);
+        return result as boolean;
+    }
+    async removeTenantMember(arg0: string): Promise<boolean> {
+        const result = await (this.actor as any).removeTenantMember(arg0);
+        return result as boolean;
+    }
+    async listTenantMembers(): Promise<Array<any>> {
+        const result = await (this.actor as any).listTenantMembers();
+        return result as Array<any>;
+    }
+    async getTenantMemberCount(): Promise<bigint> {
+        const result = await (this.actor as any).getTenantMemberCount();
+        return result as bigint;
+    }
+    async updateTenantBranding(arg0: string, arg1: string, arg2: string, arg3: string): Promise<boolean> {
+        const result = await (this.actor as any).updateTenantBranding(arg0, arg1, arg2, arg3);
+        return result as boolean;
+    }
+    async getTenantBranding(arg0: bigint): Promise<any | null> {
+        const result = await (this.actor as any).getTenantBranding(arg0);
+        return result.length > 0 ? result[0] : null;
+    }
+    async getMyTenantBranding(): Promise<any | null> {
+        const result = await (this.actor as any).getMyTenantBranding();
+        return result.length > 0 ? result[0] : null;
+    }
+    async checkTenantAccess(): Promise<any> {
+        const result = await (this.actor as any).checkTenantAccess();
+        return result;
+    }
+    async getTenantUsage(): Promise<any | null> {
+        const result = await (this.actor as any).getTenantUsage();
+        return result.length > 0 ? result[0] : null;
+    }
+    async recordPayment(arg0: bigint, arg1: string, arg2: string, arg3: bigint, arg4: bigint): Promise<bigint> {
+        const result = await (this.actor as any).recordPayment(arg0, arg1, arg2, arg3, arg4);
+        return result as bigint;
+    }
+    async listBillingHistory(): Promise<Array<any>> {
+        const result = await (this.actor as any).listBillingHistory();
+        return result as Array<any>;
+    }
+    async getLatestBillingRecord(): Promise<any | null> {
+        const result = await (this.actor as any).getLatestBillingRecord();
+        return result.length > 0 ? result[0] : null;
+    }
+    async listTenantBillingHistory(arg0: bigint): Promise<Array<any>> {
+        const result = await (this.actor as any).listTenantBillingHistory(arg0);
+        return result as Array<any>;
+    }
+    async getTenantStats(): Promise<any | null> {
+        const result = await (this.actor as any).getTenantStats();
+        return result.length > 0 ? result[0] : null;
+    }
+    async getPlatformAnalytics(): Promise<any | null> {
+        const result = await (this.actor as any).getPlatformAnalytics();
+        return result.length > 0 ? result[0] : null;
     }
 }
 function from_candid_CampaignStatus_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignStatus): CampaignStatus {
