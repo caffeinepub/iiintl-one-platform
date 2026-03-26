@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Code2,
   FileText,
+  Gift,
   Globe,
   HelpCircle,
   LayoutDashboard,
@@ -21,6 +22,8 @@ import {
   MessageSquare,
   Settings,
   Shield,
+  Star,
+  TrendingUp,
   Users,
   Zap,
 } from "lucide-react";
@@ -1598,6 +1601,743 @@ const DOC_SECTIONS: DocSection[] = [
               isolation, or independent upgrade control — or when three or more
               Enterprise clients express interest. Until then, Dedicated Clone
               can be offered as a roadmap commitment at contract signing.
+            </p>
+          </div>
+        ),
+      },
+    ],
+  },
+  {
+    id: "mlm-rewards",
+    title: "MLM & Rewards System",
+    icon: <TrendingUp size={15} />,
+    badge: "MLM",
+    subsections: [
+      {
+        id: "mlm-overview",
+        title: "System Overview",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The{" "}
+              <strong className="text-foreground">
+                IIIntl MLM & Rewards System
+              </strong>{" "}
+              is a multi-level membership, referral, royalty, and{" "}
+              <strong className="text-foreground">FinFracFran™</strong> fractal
+              franchise economics engine built directly into the platform. It
+              enables members — individuals and organizations — to earn
+              commissions, royalty pool distributions, and Franchise Share Units
+              (FSUs) through participation, recruitment, and purchasing activity
+              across the network.
+            </p>
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
+                Live &amp; Active
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The full MLM system — backend, frontend, admin panel, referral
+                links, leaderboard, and bonus challenges — is implemented and
+                live. Access it via the <strong>/mlm</strong> route (Rewards
+                &amp; MLM Hub) in the sidebar under Commerce.
+              </p>
+            </div>
+            <p className="text-sm font-semibold text-foreground">
+              Key Components
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "Membership Tiers",
+                  "7 levels (Free → Founder) with increasing earning depth and royalty access.",
+                ],
+                [
+                  "Commission Rate Table",
+                  "Admin-configurable matrix: tier × depth level × earning type → percentage + flat amount.",
+                ],
+                [
+                  "Referral Chain",
+                  "Unique referral codes per member; upline/downline genealogy stored on-chain.",
+                ],
+                [
+                  "Royalty Pools",
+                  "Global, Leadership, Event, and FinFracFran™ pools distributed each pay cycle.",
+                ],
+                [
+                  "FinFracFran™ FSU Engine",
+                  "Fractal Franchise Share Units accumulate with every platform transaction and are distributed proportionally by tier weight.",
+                ],
+                [
+                  "Event Ticketing",
+                  "Members earn commissions on ticket sales they refer; admins create events with tiered ticket types.",
+                ],
+                [
+                  "Bonus Challenges",
+                  "Time-limited recruitment and activity challenges with extra reward payouts.",
+                ],
+              ].map(([title, desc]) => (
+                <li
+                  key={title as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{title}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-user-access",
+        title: "User Access & Getting Started",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Any registered member can access the Rewards &amp; MLM Hub. Here
+              is how to get started as a user.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Step 1 — Join the MLM System
+            </p>
+            <ol className="space-y-2 list-decimal list-inside">
+              {[
+                "Log in with your Internet Identity or registered account.",
+                "Navigate to Rewards & MLM in the sidebar (Commerce section) or go directly to /mlm.",
+                "If you have a referral code from your sponsor, it will already be applied if you registered via a /join?ref=CODE link. Otherwise you can enter a sponsor's code manually.",
+                "Click Join the MLM System to initialize your membership record. This registers you at the Free tier and generates your personal referral code.",
+              ].map((step) => (
+                <li key={step} className="text-xs text-muted-foreground">
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <p className="text-sm font-semibold text-foreground">
+              Step 2 — Navigate the Rewards Hub
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The Rewards Hub at <strong>/mlm</strong> has 7 tabs:
+            </p>
+            <div className="space-y-2">
+              {[
+                [
+                  "Overview",
+                  "Your current tier badge, referral code with copy button, 4 stat cards (Total Earned, Pending, Paid Out, FSU Balance), and an earnings breakdown by type.",
+                ],
+                [
+                  "Earnings History",
+                  "Full table of every commission, bonus, and royalty distribution — date, description, type badge, level depth, dollar amount, and payout status.",
+                ],
+                [
+                  "My Network",
+                  "Your personal referral URL, direct downline member cards showing each member's tier and referral count, and your upline chain with level indicators.",
+                ],
+                [
+                  "FinFracFran™",
+                  "Live FSU pool status (pool size, value per unit, next distribution), your personal FSU balance, redemption form, and full FSU transaction history.",
+                ],
+                [
+                  "Royalty Pools",
+                  "Active and past royalty pool listings (Global, Leadership, Event, FinFracFran™) with your personal distribution history per pool.",
+                ],
+                [
+                  "Leaderboard",
+                  "Top 10 recruiters for the current period with trophy medals, tier badges, and referral counts. Refreshes each pay cycle.",
+                ],
+                [
+                  "Challenges",
+                  "Active bonus challenge cards with progress bars, deadlines, and reward amounts. Complete challenges to earn extra flat bonuses.",
+                ],
+              ].map(([tab, desc]) => (
+                <li
+                  key={tab as string}
+                  className="flex gap-3 text-xs text-muted-foreground list-none"
+                >
+                  <span className="shrink-0 font-semibold text-foreground w-32">
+                    {tab}
+                  </span>
+                  <span>{desc}</span>
+                </li>
+              ))}
+            </div>
+            <p className="text-sm font-semibold text-foreground">
+              Step 3 — Share Your Referral Link
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Go to <strong>My Network</strong> tab and copy your unique
+              referral URL (format:{" "}
+              <code className="bg-muted px-1 rounded">/join?ref=YOURCODE</code>
+              ). Share it via social media, email, or direct message. When
+              someone registers using your link, they are permanently linked to
+              you as your Level 1 downline, and you begin earning commissions on
+              their dues payments and purchases immediately — up to 6 levels
+              deep depending on your tier.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Step 4 — Upgrade Your Tier
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your tier controls how many levels deep you earn commissions. On
+              the Overview tab, click <strong>Upgrade Tier</strong> to request a
+              tier upgrade. Tier upgrades above Free require admin approval or
+              automatic qualification based on the criteria set in the rate
+              table (dues paid, recruitment count, downline volume). Once
+              upgraded, new earnings depth takes effect immediately on the next
+              qualifying transaction.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-earning-types",
+        title: "Earning Types & Commissions",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The system supports 6 distinct earning types, each generated by
+              different on-platform activities.
+            </p>
+            <div className="space-y-3">
+              {[
+                {
+                  type: "Direct Referral Bonus",
+                  badge: "Level 1",
+                  desc: "Triggered when someone you directly referred makes a qualifying payment (membership dues, store purchase, ticket). You earn a percentage of their payment amount or a flat bonus — whichever the admin has configured in the rate table.",
+                },
+                {
+                  type: "Level Override Commission",
+                  badge: "Levels 2–6",
+                  desc: "Passive income from the activity of your downline's downline. Each level deeper earns a smaller percentage (e.g. 10% → 6% → 4% → 2% → 1% → 0.5%). You must be at the appropriate tier to unlock each level.",
+                },
+                {
+                  type: "Royalty Pool Distribution",
+                  badge: "Pools",
+                  desc: "Periodic distributions from the Global Pool (% of all platform revenue), Leadership Pool (Executive+ members), and Event Pool (ticket sale revenue). Distributed each pay cycle by the admin.",
+                },
+                {
+                  type: "Event Commission",
+                  badge: "Tickets",
+                  desc: "When someone you referred purchases a ticket to a platform event, you earn the commission rate set on that ticket tier (e.g. 5% of the ticket price). Issued instantly on purchase.",
+                },
+                {
+                  type: "FinFracFran™ FSU",
+                  badge: "Fractal",
+                  desc: "Franchise Share Units accumulate from a micro-contribution on every platform transaction. Distributed proportionally by tier weight each pay cycle. Redeem FSUs for ICP/cash equivalent in your wallet, convert to membership credit, or hold for accumulation.",
+                },
+                {
+                  type: "Activity Bonus",
+                  badge: "Challenges",
+                  desc: "Flat bonuses for completing time-limited challenges (e.g. recruit 3 members in 7 days = $50 bonus) or hitting activity milestones (forum posts, campaign joins, events attended).",
+                },
+              ].map(({ type, badge, desc }) => (
+                <div
+                  key={type}
+                  className="rounded-md border border-border p-3 space-y-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-foreground">
+                      {type}
+                    </span>
+                    <span className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5">
+                      {badge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm font-semibold text-foreground">Payout Flow</p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {[
+                "Qualifying event occurs (dues payment, purchase, ticket sale, referral).",
+                "System creates an EarningRecord with status Pending.",
+                "Admin runs a Pay Cycle (or it is triggered automatically for eligible members).",
+                "EarningRecord status moves to Processing, then Paid.",
+                "Paid amount appears in your Earnings History and can be withdrawn to your ICP wallet or requested as a fiat payout.",
+              ].map((step) => (
+                <li key={step} className="text-xs text-muted-foreground">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-finfracfran",
+        title: "FinFracFran™ System",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">FinFracFran™</strong> —
+              Financial Fractal Franchise — is a proprietary economic model
+              where every transaction on the platform contributes a micro-share
+              to a communal pool, then distributes that pool fractally across
+              the entire active membership network. Everyone participates in the
+              economic output of the whole.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              How FSUs Work
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "Accumulation",
+                  "A small percentage of every dues payment, store purchase, and ticket sale flows into the FinFracFran™ pool.",
+                ],
+                [
+                  "Distribution",
+                  "Each pay cycle, the admin distributes the pool across all active members. Each member's share = their tier weight × network depth contribution. Higher tiers and larger networks receive proportionally more.",
+                ],
+                [
+                  "FSU Value",
+                  "The value of one FSU is recalculated each distribution cycle as pool total ÷ total outstanding FSUs.",
+                ],
+                [
+                  "Redemption",
+                  "On the FinFracFran™ tab of the Rewards Hub, enter the number of FSUs to redeem. The equivalent USD-cent value is transferred to your earnings balance for withdrawal.",
+                ],
+                [
+                  "Membership Credit",
+                  "Instead of cash redemption, apply FSUs as a credit toward your next membership dues payment.",
+                ],
+                [
+                  "Accumulation Strategy",
+                  "Members who stay active and recruit larger networks accumulate FSUs faster. Long-term holders benefit as the pool grows with platform revenue.",
+                ],
+              ].map(([title, desc]) => (
+                <li
+                  key={title as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{title}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                FinFracFran™ Dashboard
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Find your live FSU balance, the current pool size, FSU value per
+                unit, next distribution date, and full transaction history on
+                the <strong>FinFracFran™</strong> tab of the Rewards Hub at{" "}
+                <code className="bg-muted px-1 rounded">/mlm</code>.
+              </p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-events-tickets",
+        title: "Events & Ticket Commissions",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The platform supports ticketed events with multiple ticket tiers.
+              Members earn commissions when people they referred purchase
+              tickets.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Browsing & Buying Tickets (Users)
+            </p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {[
+                "Navigate to Events in the sidebar (Commerce section) or go to /events.",
+                "Filter by Upcoming, Live, or Past. Click any event card to view full details.",
+                "On the event detail page, select a ticket tier (General, VIP, Early Bird, VIP+). Each tier shows its capacity, price, and the commission rate paid to the referring member.",
+                "Click Purchase Ticket. If you have a referral code from the event promoter, enter it in the referral code field — this ensures your ticket purchase earns them their commission.",
+                "After purchase, your ticket appears at /my-tickets with a QR code and unique verification code for check-in.",
+              ].map((step) => (
+                <li key={step} className="text-xs text-muted-foreground">
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <p className="text-sm font-semibold text-foreground">
+              Promoting Events (Members)
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Share your referral link with the event URL as context. When
+              someone registers via your referral code and then purchases a
+              ticket, your event commission is issued automatically as an
+              EarningRecord of type
+              <code className="bg-muted px-1 rounded mx-1">
+                eventCommission
+              </code>
+              . The commission rate is set per ticket tier by the event
+              organizer.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Hosting an Event (Organizers)
+            </p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {[
+                "On the Events page (/events), expand the Host an Event panel.",
+                "Fill in the event name, description, date/time, location, and cover image URL.",
+                "Submit the form — the event is created with Upcoming status.",
+                "Add ticket tiers via the Ticket Tiers section on the event detail page: set type, price, capacity, and the commission basis points (100 = 1%) paid to referring members.",
+                "Share the event URL and your referral link to start earning event commissions.",
+              ].map((step) => (
+                <li key={step} className="text-xs text-muted-foreground">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-admin-config",
+        title: "Admin Configuration Guide",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Super-admins manage the entire MLM system from the{" "}
+              <strong className="text-foreground">Admin Dashboard</strong> at{" "}
+              <code className="bg-muted px-1 rounded">/admin</code> → MLM tab.
+              The MLM tab has 4 sub-tabs: Rate Table, Member Tiers, Pay Cycles,
+              and Reports &amp; Pools.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Rate Table Sub-tab
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+              The commission rate matrix controls exactly how much each member
+              earns on each type of qualifying event, at each downline depth,
+              for each membership tier.
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "Add a Rate",
+                  "Click Add Rate. Select the member's Tier (Free → Founder), the downline Level (1–6), the Earning Type (directReferral, levelOverride, royaltyPool, eventCommission, finFracFran, activityBonus), enter the Basis Points (100 = 1%) and optional Flat Amount in cents. Save.",
+                ],
+                [
+                  "Edit a Rate",
+                  "Rates are immutable once saved (for audit integrity). Deactivate the old rate and add a corrected new one.",
+                ],
+                [
+                  "Deactivate a Rate",
+                  "Click the × button on any active rate row. Deactivated rates no longer apply to new transactions but are retained in the audit log.",
+                ],
+                [
+                  "Viewing the Matrix",
+                  "All active rates are displayed in the table sorted by tier, level, and type. Use this to verify the full incentive structure at a glance.",
+                ],
+              ].map(([action, desc]) => (
+                <li
+                  key={action as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{action}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Member Tiers Sub-tab
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "View All Members",
+                  "The full table shows every member's principal, current tier level, referral code, sponsor, join date, and last upgrade date.",
+                ],
+                [
+                  "Set Tier Manually",
+                  "Enter a member's principal ID and select the target tier. Use this to onboard founding members, correct errors, or grant promotional upgrades. All manual changes are logged.",
+                ],
+              ].map(([action, desc]) => (
+                <li
+                  key={action as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{action}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Pay Cycles Sub-tab
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "Run Pay Cycle",
+                  "Enter a member's principal and click Run Pay Cycle. This marks all Pending earnings for that member as Paid. Run this for each qualifying member each billing period, or use it to process a specific member on demand.",
+                ],
+                [
+                  "View Earnings",
+                  "Enter a principal and click Load Earnings to see the full EarningRecord table for that member — useful for auditing or resolving disputes.",
+                ],
+              ].map(([action, desc]) => (
+                <li
+                  key={action as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{action}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold text-foreground">
+              Reports &amp; Pools Sub-tab
+            </p>
+            <ul className="space-y-2">
+              {[
+                [
+                  "FSU Pool Status",
+                  "Displays the current FinFracFran™ pool size, FSU value per unit, and total outstanding FSUs.",
+                ],
+                [
+                  "Fund FSU Pool",
+                  "Enter an amount in USD cents and a description, then click Fund to add to the FinFracFran™ pool.",
+                ],
+                [
+                  "Distribute FSU",
+                  "Enter the total number of FSU to distribute and a description. The system calculates each active member's weighted share and creates EarningRecords automatically.",
+                ],
+                [
+                  "Royalty Pools Table",
+                  "Lists all royalty pools (Global, Leadership, Event, FinFracFran™) with their period, total amount, and distribution status.",
+                ],
+                [
+                  "Create Royalty Pool",
+                  "Select the pool type, enter a period label, amount in cents, and currency. Click Create Pool.",
+                ],
+                [
+                  "Fund Royalty Pool",
+                  "Select an existing pool and add more funds before distribution.",
+                ],
+                [
+                  "Distribute Royalty Pool",
+                  "Select a pool, set the minimum member tier level required to qualify, and click Distribute. The system splits the pool equally among all qualifying members.",
+                ],
+              ].map(([action, desc]) => (
+                <li
+                  key={action as string}
+                  className="text-xs text-muted-foreground"
+                >
+                  <strong className="text-foreground">{action}</strong> — {desc}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-admin-events",
+        title: "Admin Event Management",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Admins have full control over events and ticket tiers from both
+              the Events page and the Admin Dashboard.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Managing Event Status
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              On the Events page (
+              <code className="bg-muted px-1 rounded">/events</code>), admins
+              can change any event's status via the Admin controls panel:
+            </p>
+            <div className="space-y-1">
+              {[
+                [
+                  "Upcoming → Active",
+                  "Opens ticket sales and marks the event as live.",
+                ],
+                [
+                  "Active → Past",
+                  "Closes ticket sales after the event concludes.",
+                ],
+                [
+                  "Any → Cancelled",
+                  "Cancels the event. Existing ticket holders should be notified and refunded manually.",
+                ],
+              ].map(([transition, desc]) => (
+                <div
+                  key={transition as string}
+                  className="flex gap-3 text-xs text-muted-foreground"
+                >
+                  <code className="shrink-0 bg-muted rounded px-1.5 py-0.5 text-foreground">
+                    {transition}
+                  </code>
+                  <span>{desc}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm font-semibold text-foreground">
+              Ticket Check-in
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              At the event, use the admin panel to mark tickets as used. Enter
+              the ticket's unique QR verification code and click Mark Used. The
+              ticket stub at{" "}
+              <code className="bg-muted px-1 rounded">/my-tickets</code> will
+              display a USED stamp overlay for the attendee.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Viewing All Tickets
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Use{" "}
+              <code className="bg-muted px-1 rounded">
+                adminListAllTickets()
+              </code>{" "}
+              via the backend or the Admin panel to see every ticket across all
+              events — useful for capacity planning, revenue reporting, and
+              commission audits.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-referral-system",
+        title: "Referral Links & Challenges",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The referral system is the growth engine of the MLM network. Every
+              member gets a unique code that tracks their entire downline
+              on-chain.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Using Your Referral Link
+            </p>
+            <ol className="space-y-1 list-decimal list-inside">
+              {[
+                "Go to /mlm → My Network tab.",
+                "Copy your referral URL (format: /join?ref=YOURCODE).",
+                "Share the link. When someone visits it, they land on a public marketing page showcasing the platform features and membership tier benefits.",
+                "When they click Get Started and register, your referral code is automatically captured and linked to their account.",
+                "You begin earning Level 1 direct referral commissions on their first qualifying payment.",
+              ].map((step) => (
+                <li key={step} className="text-xs text-muted-foreground">
+                  {step}
+                </li>
+              ))}
+            </ol>
+            <p className="text-sm font-semibold text-foreground">
+              Referral Landing Page
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The <code className="bg-muted px-1 rounded">/join?ref=CODE</code>{" "}
+              page is a public-facing marketing page that displays: the platform
+              mission, all 7 membership tiers with earning depth, the
+              FinFracFran™ spotlight, and a prominent Get Started CTA that
+              pre-fills the referral code on the registration form.
+            </p>
+            <p className="text-sm font-semibold text-foreground">
+              Bonus Challenges
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Active bonus challenges appear on the <strong>Challenges</strong>{" "}
+              tab of the Rewards Hub. Each challenge card shows:
+            </p>
+            <ul className="space-y-1">
+              {[
+                "Challenge name and objective (e.g. Recruit 3 new members in 7 days)",
+                "Current progress bar (tracked against your downline activity)",
+                "Deadline date",
+                "Reward amount (flat bonus in USD cents, paid as an activityBonus EarningRecord on completion)",
+              ].map((item) => (
+                <li
+                  key={item}
+                  className="text-xs text-muted-foreground list-disc list-inside"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Admins create and manage bonus challenges from the Admin
+              Dashboard. Challenges can be set to double commission periods,
+              enrollment bonuses during promo windows, or flat recruitment
+              bonuses.
+            </p>
+            <p className="text-sm font-semibold text-foreground">Leaderboard</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The <strong>Leaderboard</strong> tab shows the top 10 recruiters
+              for the current pay cycle with trophy medals (🥇🥈🥉), member
+              name, tier badge, and referral count. Use this for social proof,
+              recognition programs, and motivating network growth.
+            </p>
+          </div>
+        ),
+      },
+      {
+        id: "mlm-tiers-table",
+        title: "Membership Tiers Reference",
+        content: (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              There are 7 membership tiers. Each tier unlocks deeper commission
+              earning levels, royalty pool access, and FinFracFran™ weight.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 pr-4 font-semibold text-foreground">
+                      Tier
+                    </th>
+                    <th className="text-left py-2 pr-4 font-semibold text-foreground">
+                      Level
+                    </th>
+                    <th className="text-left py-2 pr-4 font-semibold text-foreground">
+                      Commission Depth
+                    </th>
+                    <th className="text-left py-2 font-semibold text-foreground">
+                      Royalty Access
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["Free Member", "0", "None", "None"],
+                    ["Associate", "1", "1 level", "None"],
+                    ["Affiliate", "2", "2 levels", "None"],
+                    ["Partner", "3", "3 levels", "None"],
+                    ["Executive", "4", "4 levels", "Leadership Pool"],
+                    [
+                      "Ambassador",
+                      "5",
+                      "5 levels",
+                      "+ Global Pool + Event Pool",
+                    ],
+                    [
+                      "Founder",
+                      "6",
+                      "6 levels (max)",
+                      "+ FinFracFran™ Founder Pool",
+                    ],
+                  ].map(([tier, level, depth, royalty]) => (
+                    <tr
+                      key={tier as string}
+                      className="border-b border-border/50"
+                    >
+                      <td className="py-1.5 pr-4 font-medium text-foreground">
+                        {tier}
+                      </td>
+                      <td className="py-1.5 pr-4 text-muted-foreground">
+                        {level}
+                      </td>
+                      <td className="py-1.5 pr-4 text-muted-foreground">
+                        {depth}
+                      </td>
+                      <td className="py-1.5 text-muted-foreground">
+                        {royalty}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Tier qualification criteria (dues amount, recruitment count,
+              downline volume, activity score) are configured by the admin in
+              the Rate Table. Members can request upgrades from the Overview
+              tab; admins can set tiers manually from the Admin Dashboard → MLM
+              → Member Tiers.
             </p>
           </div>
         ),
