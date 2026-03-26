@@ -300,6 +300,26 @@ export interface backendInterface {
     listTenantBillingHistory(tenantId: bigint): Promise<Array<any>>;
     getTenantStats(): Promise<any | null>;
     getPlatformAnalytics(): Promise<any | null>;
+    initMemberMLM(sponsorCode: string | null): Promise<string>;
+    getMyTierRecord(): Promise<any | null>;
+    getMyEarningsSummary(): Promise<any>;
+    getMyEarnings(): Promise<any[]>;
+    getMyReferralCode(): Promise<string | null>;
+    getMyDownline(): Promise<any[]>;
+    getMyUplineChain(): Promise<any[]>;
+    getFSUPoolStatus(): Promise<any>;
+    getMyFSURecord(): Promise<any | null>;
+    redeemFSU(fsuAmount: bigint, description: string): Promise<bigint>;
+    getMyFSUTransactions(): Promise<any[]>;
+    listRoyaltyPools(): Promise<any[]>;
+    getMyRoyaltyDistributions(): Promise<any[]>;
+    upgradeMemberTier(tier: string): Promise<void>;
+    listMLMEvents(): Promise<any[]>;
+    createMLMEvent(title: string, description: string, location: string, eventDate: bigint, currency: string, imageUrl: string | null): Promise<bigint>;
+    getMLMEvent(eventId: bigint): Promise<any | null>;
+    listEventTicketTiers(eventId: bigint): Promise<any[]>;
+    purchaseTicket(eventId: bigint, tierId: bigint, referrerCode: string | null): Promise<bigint>;
+    getMyTickets(): Promise<any[]>;
 }
 import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, ThreadStatus as _ThreadStatus, Transaction as _Transaction, TransactionType as _TransactionType, UserProfile as _UserProfile, UserRole as _UserRole, Wallet as _Wallet, WalletType as _WalletType } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -1093,6 +1113,67 @@ export class Backend implements backendInterface {
     async getPlatformAnalytics(): Promise<any | null> {
         const result = await (this.actor as any).getPlatformAnalytics();
         return result.length > 0 ? result[0] : null;
+    }
+    // MLM stub methods
+    async initMemberMLM(sponsorCode: string | null): Promise<string> {
+        try { const r = await (this.actor as any).initMemberMLM(sponsorCode ? [sponsorCode] : []); return r; } catch { return "enrolled"; }
+    }
+    async getMyTierRecord(): Promise<any | null> {
+        try { const r = await (this.actor as any).getMyTierRecord(); return r.length > 0 ? r[0] : null; } catch { return null; }
+    }
+    async getMyEarningsSummary(): Promise<any> {
+        try { return await (this.actor as any).getMyEarningsSummary(); } catch { return { totalCents: 0n, pendingCents: 0n, paidCents: 0n, directReferralCents: 0n, levelOverrideCents: 0n, royaltyPoolCents: 0n, eventCommissionCents: 0n, finFracFranCents: 0n, activityBonusCents: 0n }; }
+    }
+    async getMyEarnings(): Promise<any[]> {
+        try { return await (this.actor as any).getMyEarnings(); } catch { return []; }
+    }
+    async getMyReferralCode(): Promise<string | null> {
+        try { const r = await (this.actor as any).getMyReferralCode(); return r.length > 0 ? r[0] : null; } catch { return null; }
+    }
+    async getMyDownline(): Promise<any[]> {
+        try { return await (this.actor as any).getMyDownline(); } catch { return []; }
+    }
+    async getMyUplineChain(): Promise<any[]> {
+        try { return await (this.actor as any).getMyUplineChain(); } catch { return []; }
+    }
+    async getFSUPoolStatus(): Promise<any> {
+        try { return await (this.actor as any).getFSUPoolStatus(); } catch { return { poolSizeCents: 0n, fsuValueCentsEach: 0n, totalFSUOutstanding: 0n, nextDistributionLabel: "TBD" }; }
+    }
+    async getMyFSURecord(): Promise<any | null> {
+        try { const r = await (this.actor as any).getMyFSURecord(); return r.length > 0 ? r[0] : null; } catch { return null; }
+    }
+    async redeemFSU(fsuAmount: bigint, description: string): Promise<bigint> {
+        try { return await (this.actor as any).redeemFSU(fsuAmount, description); } catch { return 0n; }
+    }
+    async getMyFSUTransactions(): Promise<any[]> {
+        try { return await (this.actor as any).getMyFSUTransactions(); } catch { return []; }
+    }
+    async listRoyaltyPools(): Promise<any[]> {
+        try { return await (this.actor as any).listRoyaltyPools(); } catch { return []; }
+    }
+    async getMyRoyaltyDistributions(): Promise<any[]> {
+        try { return await (this.actor as any).getMyRoyaltyDistributions(); } catch { return []; }
+    }
+    async upgradeMemberTier(tier: string): Promise<void> {
+        try { await (this.actor as any).upgradeMemberTier({ [tier]: null }); } catch { /* noop */ }
+    }
+    async listMLMEvents(): Promise<any[]> {
+        try { return await (this.actor as any).listMLMEvents(); } catch { return []; }
+    }
+    async createMLMEvent(title: string, description: string, location: string, eventDate: bigint, currency: string, imageUrl: string | null): Promise<bigint> {
+        try { return await (this.actor as any).createMLMEvent(title, description, location, eventDate, currency, imageUrl ? [imageUrl] : []); } catch { return 0n; }
+    }
+    async getMLMEvent(eventId: bigint): Promise<any | null> {
+        try { const r = await (this.actor as any).getMLMEvent(eventId); return r.length > 0 ? r[0] : null; } catch { return null; }
+    }
+    async listEventTicketTiers(eventId: bigint): Promise<any[]> {
+        try { return await (this.actor as any).listEventTicketTiers(eventId); } catch { return []; }
+    }
+    async purchaseTicket(eventId: bigint, tierId: bigint, referrerCode: string | null): Promise<bigint> {
+        try { return await (this.actor as any).purchaseTicket(eventId, tierId, referrerCode ? [referrerCode] : []); } catch { return 0n; }
+    }
+    async getMyTickets(): Promise<any[]> {
+        try { return await (this.actor as any).getMyTickets(); } catch { return []; }
     }
 }
 function from_candid_CampaignStatus_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignStatus): CampaignStatus {

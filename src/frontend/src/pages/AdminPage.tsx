@@ -5,8 +5,23 @@ import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend.d";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -1596,6 +1611,1362 @@ function TenantsTab() {
   );
 }
 
+// ── MLM Admin Tab ─────────────────────────────────────────────────────────────
+function MLMAdminTab() {
+  const backend = useBackend();
+
+  // ── Rate Table state ──────────────────────────────────────────────────────
+  const [rates, setRates] = useState<any[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [rateTier, setRateTier] = useState("associate");
+  const [rateLevel, setRateLevel] = useState("1");
+  const [rateEarningType, setRateEarningType] = useState("directReferral");
+  const [ratePercent, setRatePercent] = useState("");
+  const [rateFlatAmt, setRateFlatAmt] = useState("");
+  const [rateSaving, setRateSaving] = useState(false);
+
+  const loadRates = useCallback(async () => {
+    if (!backend) return;
+    setRatesLoading(true);
+    try {
+      const result = await (backend as any).getCommissionRates();
+      setRates(result ?? []);
+    } catch {
+      toast.error("Failed to load commission rates");
+    } finally {
+      setRatesLoading(false);
+    }
+  }, [backend]);
+
+  useEffect(() => {
+    loadRates();
+  }, [loadRates]);
+
+  const handleSaveRate = async () => {
+    if (!backend) return;
+    setRateSaving(true);
+    try {
+      await (backend as any).setCommissionRate(
+        rateTier,
+        BigInt(Number(rateLevel)),
+        rateEarningType,
+        BigInt(Math.round(Number(ratePercent) * 100)),
+        BigInt(Math.round(Number(rateFlatAmt) * 100)),
+      );
+      toast.success("Commission rate saved");
+      loadRates();
+    } catch {
+      toast.error("Failed to save rate");
+    } finally {
+      setRateSaving(false);
+    }
+  };
+
+  const handleDeactivateRate = async (
+    tier: string,
+    level: bigint,
+    earningType: string,
+  ) => {
+    if (!backend) return;
+    try {
+      await (backend as any).deactivateCommissionRate(tier, level, earningType);
+      toast.success("Rate deactivated");
+      loadRates();
+    } catch {
+      toast.error("Failed to deactivate rate");
+    }
+  };
+
+  // ── Member Tiers state ────────────────────────────────────────────────────
+  const [memberTiers, setMemberTiers] = useState<any[]>([]);
+  const [memberTiersLoading, setMemberTiersLoading] = useState(false);
+  const [setTierPrincipal, setSetTierPrincipal] = useState("");
+  const [setTierValue, setSetTierValue] = useState("associate");
+  const [setTierSaving, setSetTierSaving] = useState(false);
+
+  const loadMemberTiers = useCallback(async () => {
+    if (!backend) return;
+    setMemberTiersLoading(true);
+    try {
+      const result = await (backend as any).listAllMemberTiers();
+      setMemberTiers(result ?? []);
+    } catch {
+      toast.error("Failed to load member tiers");
+    } finally {
+      setMemberTiersLoading(false);
+    }
+  }, [backend]);
+
+  const handleSetTier = async () => {
+    if (!backend || !setTierPrincipal.trim()) return;
+    setSetTierSaving(true);
+    try {
+      await (backend as any).setMemberTier(
+        setTierPrincipal.trim(),
+        setTierValue,
+      );
+      toast.success("Member tier updated");
+      loadMemberTiers();
+      setSetTierPrincipal("");
+    } catch {
+      toast.error("Failed to set tier");
+    } finally {
+      setSetTierSaving(false);
+    }
+  };
+
+  // ── Pay Cycle state ───────────────────────────────────────────────────────
+  const [payCyclePrincipal, setPayCyclePrincipal] = useState("");
+  const [payCycleRunning, setPayCycleRunning] = useState(false);
+  const [payCycleResult, setPayCycleResult] = useState<string | null>(null);
+  const [earningsPrincipal, setEarningsPrincipal] = useState("");
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [memberEarnings, setMemberEarnings] = useState<any[]>([]);
+
+  const handleRunPayCycle = async () => {
+    if (!backend || !payCyclePrincipal.trim()) return;
+    setPayCycleRunning(true);
+    setPayCycleResult(null);
+    try {
+      const result = await (backend as any).runPayCycle(
+        payCyclePrincipal.trim(),
+      );
+      const count = typeof result === "bigint" ? Number(result) : (result ?? 0);
+      setPayCycleResult(`${count} earnings marked as paid`);
+      toast.success(`Pay cycle complete: ${count} records updated`);
+    } catch {
+      toast.error("Pay cycle failed");
+    } finally {
+      setPayCycleRunning(false);
+    }
+  };
+
+  const handleLoadEarnings = async () => {
+    if (!backend || !earningsPrincipal.trim()) return;
+    setEarningsLoading(true);
+    try {
+      const result = await (backend as any).getMemberEarnings(
+        earningsPrincipal.trim(),
+      );
+      setMemberEarnings(result ?? []);
+    } catch {
+      toast.error("Failed to load earnings");
+    } finally {
+      setEarningsLoading(false);
+    }
+  };
+
+  // ── Reports & Pools state ─────────────────────────────────────────────────
+  const [royaltyPools, setRoyaltyPools] = useState<any[]>([]);
+  const [poolsLoading, setPoolsLoading] = useState(false);
+  const [fsuStatus, setFsuStatus] = useState<any>(null);
+  const [newPoolType, setNewPoolType] = useState("global");
+  const [newPoolCurrency, setNewPoolCurrency] = useState("USD");
+  const [newPoolStart, setNewPoolStart] = useState("");
+  const [newPoolEnd, setNewPoolEnd] = useState("");
+  const [poolCreating, setPoolCreating] = useState(false);
+  const [fundPoolId, setFundPoolId] = useState("");
+  const [fundPoolAmt, setFundPoolAmt] = useState("");
+  const [fundPoolLoading, setFundPoolLoading] = useState(false);
+  const [distPoolId, setDistPoolId] = useState("");
+  const [distMinTier, setDistMinTier] = useState("0");
+  const [distPoolLoading, setDistPoolLoading] = useState(false);
+  const [fsuFundAmt, setFsuFundAmt] = useState("");
+  const [fsuFunding, setFsuFunding] = useState(false);
+  const [fsuDistUnits, setFsuDistUnits] = useState("");
+  const [fsuDistDesc, setFsuDistDesc] = useState("");
+  const [fsuDistributing, setFsuDistributing] = useState(false);
+
+  const loadPools = useCallback(async () => {
+    if (!backend) return;
+    setPoolsLoading(true);
+    try {
+      const [pools, fsu] = await Promise.all([
+        (backend as any).listRoyaltyPools(),
+        (backend as any).getFSUPoolStatus(),
+      ]);
+      setRoyaltyPools(pools ?? []);
+      setFsuStatus(fsu ?? null);
+    } catch {
+      toast.error("Failed to load pool data");
+    } finally {
+      setPoolsLoading(false);
+    }
+  }, [backend]);
+
+  useEffect(() => {
+    loadPools();
+  }, [loadPools]);
+
+  const handleCreatePool = async () => {
+    if (!backend || !newPoolStart || !newPoolEnd) return;
+    setPoolCreating(true);
+    try {
+      const startMs = new Date(newPoolStart).getTime();
+      const endMs = new Date(newPoolEnd).getTime();
+      await (backend as any).createRoyaltyPool(
+        newPoolType,
+        newPoolCurrency,
+        BigInt(startMs * 1_000_000),
+        BigInt(endMs * 1_000_000),
+      );
+      toast.success("Royalty pool created");
+      loadPools();
+    } catch {
+      toast.error("Failed to create pool");
+    } finally {
+      setPoolCreating(false);
+    }
+  };
+
+  const handleFundPool = async () => {
+    if (!backend || !fundPoolId || !fundPoolAmt) return;
+    setFundPoolLoading(true);
+    try {
+      await (backend as any).addToRoyaltyPool(
+        BigInt(fundPoolId),
+        BigInt(Math.round(Number(fundPoolAmt) * 100)),
+      );
+      toast.success("Pool funded");
+      loadPools();
+    } catch {
+      toast.error("Failed to fund pool");
+    } finally {
+      setFundPoolLoading(false);
+    }
+  };
+
+  const handleDistributePool = async () => {
+    if (!backend || !distPoolId) return;
+    setDistPoolLoading(true);
+    try {
+      await (backend as any).distributeRoyaltyPool(
+        BigInt(distPoolId),
+        BigInt(Number(distMinTier)),
+      );
+      toast.success("Pool distributed");
+      loadPools();
+    } catch {
+      toast.error("Failed to distribute pool");
+    } finally {
+      setDistPoolLoading(false);
+    }
+  };
+
+  const handleFundFSU = async () => {
+    if (!backend || !fsuFundAmt) return;
+    setFsuFunding(true);
+    try {
+      await (backend as any).addToFSUPool(
+        BigInt(Math.round(Number(fsuFundAmt) * 100)),
+      );
+      toast.success("FSU pool funded");
+      loadPools();
+    } catch {
+      toast.error("Failed to fund FSU pool");
+    } finally {
+      setFsuFunding(false);
+    }
+  };
+
+  const handleDistributeFSU = async () => {
+    if (!backend || !fsuDistUnits) return;
+    setFsuDistributing(true);
+    try {
+      await (backend as any).distributeFSU(
+        BigInt(Number(fsuDistUnits)),
+        fsuDistDesc || "FSU Distribution",
+      );
+      toast.success("FSU distributed");
+      loadPools();
+    } catch {
+      toast.error("Failed to distribute FSU");
+    } finally {
+      setFsuDistributing(false);
+    }
+  };
+
+  const tierOptions = [
+    "free",
+    "associate",
+    "affiliate",
+    "partner",
+    "executive",
+    "ambassador",
+    "founder",
+  ];
+  const earningTypeOptions = [
+    "directReferral",
+    "levelOverride",
+    "royaltyPool",
+    "eventCommission",
+    "finFracFran",
+    "activityBonus",
+  ];
+  const poolTypeOptions = ["global", "leadership", "event", "finFracFran"];
+
+  const tierBadgeColor: Record<string, string> = {
+    free: "bg-slate-500/20 text-slate-300",
+    associate: "bg-blue-500/20 text-blue-300",
+    affiliate: "bg-indigo-500/20 text-indigo-300",
+    partner: "bg-violet-500/20 text-violet-300",
+    executive: "bg-amber-500/20 text-amber-300",
+    ambassador: "bg-emerald-500/20 text-emerald-300",
+    founder: "bg-rose-500/20 text-rose-300",
+  };
+
+  const earningTypeBadgeColor: Record<string, string> = {
+    directReferral: "bg-blue-500/20 text-blue-300",
+    levelOverride: "bg-indigo-500/20 text-indigo-300",
+    royaltyPool: "bg-amber-500/20 text-amber-300",
+    eventCommission: "bg-emerald-500/20 text-emerald-300",
+    finFracFran: "bg-rose-500/20 text-rose-300",
+    activityBonus: "bg-cyan-500/20 text-cyan-300",
+  };
+
+  return (
+    <Tabs defaultValue="rate-table" className="w-full">
+      <TabsList className="mb-4 flex-wrap h-auto gap-1 bg-slate-800/50">
+        <TabsTrigger
+          value="rate-table"
+          data-ocid="admin.mlm.rate_table.tab"
+          className="text-xs"
+        >
+          Rate Table
+        </TabsTrigger>
+        <TabsTrigger
+          value="member-tiers"
+          data-ocid="admin.mlm.member_tiers.tab"
+          className="text-xs"
+        >
+          Member Tiers
+        </TabsTrigger>
+        <TabsTrigger
+          value="pay-cycles"
+          data-ocid="admin.mlm.pay_cycles.tab"
+          className="text-xs"
+        >
+          Pay Cycles
+        </TabsTrigger>
+        <TabsTrigger
+          value="reports"
+          data-ocid="admin.mlm.reports.tab"
+          className="text-xs"
+        >
+          Reports &amp; Pools
+        </TabsTrigger>
+      </TabsList>
+
+      {/* ── Rate Table ──────────────────────────────────────────────────── */}
+      <TabsContent value="rate-table">
+        <div className="space-y-6">
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-200">
+                Add / Edit Commission Rate
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Configure the MLM commission rate matrix
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">Tier</Label>
+                  <Select value={rateTier} onValueChange={setRateTier}>
+                    <SelectTrigger
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                      data-ocid="admin.mlm.rate_tier.select"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {tierOptions.map((t) => (
+                        <SelectItem
+                          key={t}
+                          value={t}
+                          className="text-xs capitalize"
+                        >
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">Level (1–6)</Label>
+                  <Input
+                    value={rateLevel}
+                    onChange={(e) => setRateLevel(e.target.value)}
+                    type="number"
+                    min={1}
+                    max={6}
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.rate_level.input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">Earning Type</Label>
+                  <Select
+                    value={rateEarningType}
+                    onValueChange={setRateEarningType}
+                  >
+                    <SelectTrigger
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                      data-ocid="admin.mlm.rate_type.select"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {earningTypeOptions.map((t) => (
+                        <SelectItem key={t} value={t} className="text-xs">
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">Percent (%)</Label>
+                  <Input
+                    value={ratePercent}
+                    onChange={(e) => setRatePercent(e.target.value)}
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 10.00"
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.rate_percent.input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">
+                    Flat Amount ($)
+                  </Label>
+                  <Input
+                    value={rateFlatAmt}
+                    onChange={(e) => setRateFlatAmt(e.target.value)}
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 10.00"
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.rate_flat.input"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={handleSaveRate}
+                    disabled={rateSaving}
+                    size="sm"
+                    className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                    data-ocid="admin.mlm.rate.save_button"
+                  >
+                    {rateSaving ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : null}
+                    Save Rate
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <CardTitle className="text-sm text-slate-200">
+                Commission Rate Table
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadRates}
+                disabled={ratesLoading}
+                className="text-xs h-7 border-slate-600"
+                data-ocid="admin.mlm.rates.button"
+              >
+                {ratesLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {ratesLoading ? (
+                <div className="p-4" data-ocid="admin.mlm.rates.loading_state">
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : rates.length === 0 ? (
+                <div
+                  className="p-8 text-center text-slate-500 text-sm"
+                  data-ocid="admin.mlm.rates.empty_state"
+                >
+                  No commission rates configured yet.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-xs text-slate-400">
+                        Tier
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Level
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Type
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        %
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Flat ($)
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rates.map((r, i) => {
+                      const tier = Object.keys(r.tier ?? {})[0] ?? "unknown";
+                      const etype =
+                        Object.keys(r.earningType ?? {})[0] ?? "unknown";
+                      const level = Number(r.level ?? 0);
+                      const pct = (Number(r.basisPoints ?? 0) / 100).toFixed(2);
+                      const flat = (
+                        Number(r.flatAmountCents ?? 0) / 100
+                      ).toFixed(2);
+                      return (
+                        <TableRow
+                          key={`${tier}-${String(level)}-${etype}`}
+                          className="border-slate-700"
+                          data-ocid={`admin.mlm.rate.item.${i + 1}`}
+                        >
+                          <TableCell>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs ${tierBadgeColor[tier] ?? "bg-slate-600/30 text-slate-300"}`}
+                            >
+                              {tier}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {level}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs ${earningTypeBadgeColor[etype] ?? "bg-slate-600/30 text-slate-300"}`}
+                            >
+                              {etype}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {pct}%
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            ${flat}
+                          </TableCell>
+                          <TableCell>
+                            {r.active ? (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-slate-600/30 text-slate-400">
+                                Inactive
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {r.active && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDeactivateRate(
+                                    tier,
+                                    BigInt(level),
+                                    etype,
+                                  )
+                                }
+                                className="h-6 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-900/20"
+                                data-ocid={`admin.mlm.rate.delete_button.${i + 1}`}
+                              >
+                                Deactivate
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* ── Member Tiers ─────────────────────────────────────────────────── */}
+      <TabsContent value="member-tiers">
+        <div className="space-y-6">
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-200">
+                Set Member Tier
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3 items-end flex-wrap">
+                <div className="space-y-1 flex-1 min-w-[200px]">
+                  <Label className="text-xs text-slate-400">
+                    Member Principal
+                  </Label>
+                  <Input
+                    value={setTierPrincipal}
+                    onChange={(e) => setSetTierPrincipal(e.target.value)}
+                    placeholder="xxxxx-xxxxx-..."
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.set_tier_principal.input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-400">New Tier</Label>
+                  <Select value={setTierValue} onValueChange={setSetTierValue}>
+                    <SelectTrigger
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 w-40"
+                      data-ocid="admin.mlm.set_tier.select"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {tierOptions.map((t) => (
+                        <SelectItem
+                          key={t}
+                          value={t}
+                          className="text-xs capitalize"
+                        >
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleSetTier}
+                  disabled={setTierSaving || !setTierPrincipal.trim()}
+                  size="sm"
+                  className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                  data-ocid="admin.mlm.set_tier.save_button"
+                >
+                  {setTierSaving ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Set Tier
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <CardTitle className="text-sm text-slate-200">
+                All Member Tiers
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadMemberTiers}
+                disabled={memberTiersLoading}
+                className="text-xs h-7 border-slate-600"
+                data-ocid="admin.mlm.member_tiers.button"
+              >
+                {memberTiersLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {memberTiersLoading ? (
+                <div
+                  className="p-4"
+                  data-ocid="admin.mlm.member_tiers.loading_state"
+                >
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : memberTiers.length === 0 ? (
+                <div
+                  className="p-8 text-center text-slate-500 text-sm"
+                  data-ocid="admin.mlm.member_tiers.empty_state"
+                >
+                  No member tier records yet.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-xs text-slate-400">
+                        Principal
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Tier
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Level
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Joined
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Upgraded
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Status
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {memberTiers.map((m, i) => {
+                      const tier = Object.keys(m.tier ?? {})[0] ?? "free";
+                      const tierLevelMap: Record<string, number> = {
+                        free: 0,
+                        associate: 1,
+                        affiliate: 2,
+                        partner: 3,
+                        executive: 4,
+                        ambassador: 5,
+                        founder: 6,
+                      };
+                      return (
+                        <TableRow
+                          key={String(m.memberId ?? i)}
+                          className="border-slate-700"
+                          data-ocid={`admin.mlm.member_tier.item.${i + 1}`}
+                        >
+                          <TableCell className="font-mono text-xs text-slate-300">
+                            {String(m.memberId ?? "").slice(0, 12)}…
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs capitalize ${tierBadgeColor[tier] ?? "bg-slate-600/30 text-slate-300"}`}
+                            >
+                              {tier}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {tierLevelMap[tier] ?? 0}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {m.joinedAt
+                              ? new Date(
+                                  Number(m.joinedAt) / 1_000_000,
+                                ).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {m.upgradedAt && m.upgradedAt.length > 0
+                              ? new Date(
+                                  Number(m.upgradedAt[0]) / 1_000_000,
+                                ).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {m.isActive ? (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-slate-600/30 text-slate-400">
+                                Inactive
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* ── Pay Cycles ───────────────────────────────────────────────────── */}
+      <TabsContent value="pay-cycles">
+        <div className="space-y-6">
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-200">
+                Run Pay Cycle
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Mark all pending earnings as paid for a specific member
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3 items-end flex-wrap">
+                <div className="space-y-1 flex-1 min-w-[240px]">
+                  <Label className="text-xs text-slate-400">
+                    Member Principal
+                  </Label>
+                  <Input
+                    value={payCyclePrincipal}
+                    onChange={(e) => setPayCyclePrincipal(e.target.value)}
+                    placeholder="xxxxx-xxxxx-..."
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.pay_cycle_principal.input"
+                  />
+                </div>
+                <Button
+                  onClick={handleRunPayCycle}
+                  disabled={payCycleRunning || !payCyclePrincipal.trim()}
+                  size="sm"
+                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  data-ocid="admin.mlm.pay_cycle.button"
+                >
+                  {payCycleRunning ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Run Pay Cycle
+                </Button>
+              </div>
+              {payCycleResult && (
+                <div
+                  className="mt-3 px-3 py-2 rounded bg-emerald-900/30 border border-emerald-700/40 text-emerald-300 text-xs"
+                  data-ocid="admin.mlm.pay_cycle.success_state"
+                >
+                  ✓ {payCycleResult}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-200">
+                View Member Earnings
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Load the full earnings ledger for any member
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-3 items-end flex-wrap mb-4">
+                <div className="space-y-1 flex-1 min-w-[240px]">
+                  <Label className="text-xs text-slate-400">
+                    Member Principal
+                  </Label>
+                  <Input
+                    value={earningsPrincipal}
+                    onChange={(e) => setEarningsPrincipal(e.target.value)}
+                    placeholder="xxxxx-xxxxx-..."
+                    className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                    data-ocid="admin.mlm.earnings_principal.input"
+                  />
+                </div>
+                <Button
+                  onClick={handleLoadEarnings}
+                  disabled={earningsLoading || !earningsPrincipal.trim()}
+                  size="sm"
+                  className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                  data-ocid="admin.mlm.load_earnings.button"
+                >
+                  {earningsLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Load Earnings
+                </Button>
+              </div>
+              {memberEarnings.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-xs text-slate-400">
+                        Date
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Type
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Amount ($)
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Level
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Status
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {memberEarnings.map((e, i) => {
+                      const etype =
+                        Object.keys(e.earningType ?? {})[0] ?? "unknown";
+                      const status =
+                        Object.keys(e.status ?? {})[0] ?? "pending";
+                      const statusColor =
+                        status === "paid"
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : status === "processing"
+                            ? "bg-sky-500/20 text-sky-300"
+                            : "bg-amber-500/20 text-amber-300";
+                      return (
+                        <TableRow
+                          key={String(e.id ?? i)}
+                          className="border-slate-700"
+                          data-ocid={`admin.mlm.earning.item.${i + 1}`}
+                        >
+                          <TableCell className="text-slate-300 text-xs">
+                            {e.createdAt
+                              ? new Date(
+                                  Number(e.createdAt) / 1_000_000,
+                                ).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs ${earningTypeBadgeColor[etype] ?? "bg-slate-600/30 text-slate-300"}`}
+                            >
+                              {etype}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-slate-200 text-xs font-medium">
+                            ${(Number(e.amountCents ?? 0) / 100).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {Number(e.level ?? 0)}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs ${statusColor}`}
+                            >
+                              {status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : earningsPrincipal && !earningsLoading ? (
+                <div
+                  className="text-center text-slate-500 text-sm py-6"
+                  data-ocid="admin.mlm.earnings.empty_state"
+                >
+                  No earnings found for this member.
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* ── Reports & Pools ──────────────────────────────────────────────── */}
+      <TabsContent value="reports">
+        <div className="space-y-6">
+          {/* FSU Pool Status */}
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader className="flex flex-row items-center justify-between py-3">
+              <div>
+                <CardTitle className="text-sm text-slate-200">
+                  FinFracFran™ FSU Pool
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-400">
+                  Fractal Franchise Share Unit distribution pool
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadPools}
+                disabled={poolsLoading}
+                className="text-xs h-7 border-slate-600"
+                data-ocid="admin.mlm.pools.button"
+              >
+                {poolsLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Refresh"
+                )}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {fsuStatus ? (
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="bg-slate-900/60 rounded p-3">
+                    <p className="text-xs text-slate-400">Pool Size</p>
+                    <p className="text-lg font-semibold text-amber-400">
+                      $
+                      {(Number(fsuStatus.totalPoolCents ?? 0) / 100).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/60 rounded p-3">
+                    <p className="text-xs text-slate-400">FSU Outstanding</p>
+                    <p className="text-lg font-semibold text-slate-200">
+                      {Number(
+                        fsuStatus.totalFSUOutstanding ?? 0,
+                      ).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/60 rounded p-3">
+                    <p className="text-xs text-slate-400">Value / FSU</p>
+                    <p className="text-lg font-semibold text-emerald-400">
+                      ${(Number(fsuStatus.fsuValueCents ?? 0) / 100).toFixed(4)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="text-xs text-slate-500 mb-4"
+                  data-ocid="admin.mlm.fsu.loading_state"
+                >
+                  Loading FSU status…
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-400">
+                    Fund FSU Pool ($)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={fsuFundAmt}
+                      onChange={(e) => setFsuFundAmt(e.target.value)}
+                      type="number"
+                      step="0.01"
+                      placeholder="Amount in $"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                      data-ocid="admin.mlm.fsu_fund.input"
+                    />
+                    <Button
+                      onClick={handleFundFSU}
+                      disabled={fsuFunding || !fsuFundAmt}
+                      size="sm"
+                      className="h-8 text-xs bg-amber-600 hover:bg-amber-700 whitespace-nowrap"
+                      data-ocid="admin.mlm.fsu_fund.button"
+                    >
+                      {fsuFunding ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Fund Pool"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-400">
+                    Distribute FSU Units
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={fsuDistUnits}
+                      onChange={(e) => setFsuDistUnits(e.target.value)}
+                      type="number"
+                      placeholder="Units"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 w-24"
+                      data-ocid="admin.mlm.fsu_dist_units.input"
+                    />
+                    <Input
+                      value={fsuDistDesc}
+                      onChange={(e) => setFsuDistDesc(e.target.value)}
+                      placeholder="Description"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 flex-1"
+                      data-ocid="admin.mlm.fsu_dist_desc.input"
+                    />
+                    <Button
+                      onClick={handleDistributeFSU}
+                      disabled={fsuDistributing || !fsuDistUnits}
+                      size="sm"
+                      className="h-8 text-xs bg-rose-600 hover:bg-rose-700 whitespace-nowrap"
+                      data-ocid="admin.mlm.fsu_distribute.button"
+                    >
+                      {fsuDistributing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Distribute"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Royalty Pools */}
+          <Card className="bg-slate-800/40 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-sm text-slate-200">
+                Royalty Pools
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Create, fund, and distribute royalty pools
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Create Pool */}
+              <div className="rounded border border-slate-700 p-4 bg-slate-900/30">
+                <p className="text-xs font-medium text-slate-300 mb-3">
+                  Create New Pool
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-400">Pool Type</Label>
+                    <Select value={newPoolType} onValueChange={setNewPoolType}>
+                      <SelectTrigger
+                        className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                        data-ocid="admin.mlm.new_pool_type.select"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-slate-700">
+                        {poolTypeOptions.map((t) => (
+                          <SelectItem key={t} value={t} className="text-xs">
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-400">Currency</Label>
+                    <Select
+                      value={newPoolCurrency}
+                      onValueChange={setNewPoolCurrency}
+                    >
+                      <SelectTrigger
+                        className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                        data-ocid="admin.mlm.new_pool_currency.select"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-900 border-slate-700">
+                        {["USD", "EUR", "GBP", "ICP"].map((c) => (
+                          <SelectItem key={c} value={c} className="text-xs">
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-400">
+                      Period Start
+                    </Label>
+                    <Input
+                      value={newPoolStart}
+                      onChange={(e) => setNewPoolStart(e.target.value)}
+                      type="date"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                      data-ocid="admin.mlm.new_pool_start.input"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-400">Period End</Label>
+                    <Input
+                      value={newPoolEnd}
+                      onChange={(e) => setNewPoolEnd(e.target.value)}
+                      type="date"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8"
+                      data-ocid="admin.mlm.new_pool_end.input"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreatePool}
+                  disabled={poolCreating || !newPoolStart || !newPoolEnd}
+                  size="sm"
+                  className="mt-3 h-8 text-xs bg-indigo-600 hover:bg-indigo-700"
+                  data-ocid="admin.mlm.create_pool.button"
+                >
+                  {poolCreating ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Create Pool
+                </Button>
+              </div>
+
+              {/* Fund / Distribute */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded border border-slate-700 p-4 bg-slate-900/30 space-y-2">
+                  <p className="text-xs font-medium text-slate-300">
+                    Fund a Pool
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={fundPoolId}
+                      onChange={(e) => setFundPoolId(e.target.value)}
+                      type="number"
+                      placeholder="Pool ID"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 w-24"
+                      data-ocid="admin.mlm.fund_pool_id.input"
+                    />
+                    <Input
+                      value={fundPoolAmt}
+                      onChange={(e) => setFundPoolAmt(e.target.value)}
+                      type="number"
+                      step="0.01"
+                      placeholder="Amount ($)"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 flex-1"
+                      data-ocid="admin.mlm.fund_pool_amt.input"
+                    />
+                    <Button
+                      onClick={handleFundPool}
+                      disabled={fundPoolLoading || !fundPoolId || !fundPoolAmt}
+                      size="sm"
+                      className="h-8 text-xs bg-amber-600 hover:bg-amber-700"
+                      data-ocid="admin.mlm.fund_pool.button"
+                    >
+                      {fundPoolLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Fund"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded border border-slate-700 p-4 bg-slate-900/30 space-y-2">
+                  <p className="text-xs font-medium text-slate-300">
+                    Distribute a Pool
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={distPoolId}
+                      onChange={(e) => setDistPoolId(e.target.value)}
+                      type="number"
+                      placeholder="Pool ID"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 w-24"
+                      data-ocid="admin.mlm.dist_pool_id.input"
+                    />
+                    <Input
+                      value={distMinTier}
+                      onChange={(e) => setDistMinTier(e.target.value)}
+                      type="number"
+                      min={0}
+                      max={6}
+                      placeholder="Min Tier (0-6)"
+                      className="bg-slate-900 border-slate-600 text-slate-200 text-xs h-8 flex-1"
+                      data-ocid="admin.mlm.dist_min_tier.input"
+                    />
+                    <Button
+                      onClick={handleDistributePool}
+                      disabled={distPoolLoading || !distPoolId}
+                      size="sm"
+                      className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                      data-ocid="admin.mlm.distribute_pool.button"
+                    >
+                      {distPoolLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        "Distribute"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pool Table */}
+              {poolsLoading ? (
+                <div data-ocid="admin.mlm.pools.loading_state">
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : royaltyPools.length === 0 ? (
+                <div
+                  className="text-center text-slate-500 text-sm py-6"
+                  data-ocid="admin.mlm.pools.empty_state"
+                >
+                  No royalty pools created yet.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-xs text-slate-400">
+                        ID
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Type
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Total ($)
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Currency
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Period
+                      </TableHead>
+                      <TableHead className="text-xs text-slate-400">
+                        Distributed
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {royaltyPools.map((p, i) => {
+                      const poolType =
+                        Object.keys(p.poolType ?? {})[0] ?? "global";
+                      const distributed = p.isDistributed ?? false;
+                      return (
+                        <TableRow
+                          key={String(p.id ?? i)}
+                          className="border-slate-700"
+                          data-ocid={`admin.mlm.pool.item.${i + 1}`}
+                        >
+                          <TableCell className="text-slate-300 text-xs font-mono">
+                            {String(p.id ?? "")}
+                          </TableCell>
+                          <TableCell>
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-violet-500/20 text-violet-300">
+                              {poolType}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-slate-200 text-xs font-medium">
+                            $
+                            {(Number(p.totalAmountCents ?? 0) / 100).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {p.currency ?? "USD"}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-xs">
+                            {p.periodStart
+                              ? new Date(
+                                  Number(p.periodStart) / 1_000_000,
+                                ).toLocaleDateString()
+                              : "—"}{" "}
+                            –{" "}
+                            {p.periodEnd
+                              ? new Date(
+                                  Number(p.periodEnd) / 1_000_000,
+                                ).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {distributed ? (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300">
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300">
+                                Pending
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 // ── Main AdminPage ────────────────────────────────────────────────────────────
 export function AdminPage() {
   const { user } = useAuth();
@@ -1724,6 +3095,14 @@ export function AdminPage() {
               <BarChart2 size={13} />
               Analytics
             </TabsTrigger>
+            <TabsTrigger
+              value="mlm"
+              className="text-xs gap-1.5"
+              data-ocid="admin.mlm.tab"
+            >
+              <TrendingUp size={13} />
+              MLM
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -1767,6 +3146,9 @@ export function AdminPage() {
           </TabsContent>
           <TabsContent value="analytics">
             <AnalyticsTab />
+          </TabsContent>
+          <TabsContent value="mlm">
+            <MLMAdminTab />
           </TabsContent>
         </Tabs>
       </div>

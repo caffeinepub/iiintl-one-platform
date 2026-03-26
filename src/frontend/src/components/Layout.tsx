@@ -29,6 +29,7 @@ import {
   BookMarked,
   BookOpen,
   Building2,
+  Calendar,
   CheckCheck,
   ChevronDown,
   ChevronLeft,
@@ -46,6 +47,8 @@ import {
   ShoppingBag,
   ShoppingCart,
   Shuffle,
+  Ticket,
+  TrendingUp,
   User,
   UserCog,
   Users,
@@ -98,6 +101,12 @@ function SidebarContent({
           label: t.sidebar.dashboard,
           icon: <LayoutDashboard size={16} />,
           ocid: "sidebar.dashboard_link",
+        },
+        {
+          to: "/campaign-hub",
+          label: "Campaign Hub",
+          icon: <Megaphone size={16} />,
+          ocid: "sidebar.campaign_hub_link",
         },
         {
           to: "/organizations",
@@ -192,6 +201,24 @@ function SidebarContent({
           icon: <Server size={16} />,
           ocid: "sidebar.myplan_link",
         },
+        {
+          to: "/mlm",
+          label: "Rewards & MLM",
+          icon: <TrendingUp size={16} />,
+          ocid: "sidebar.mlm_link",
+        },
+        {
+          to: "/events",
+          label: "Events",
+          icon: <Calendar size={16} />,
+          ocid: "sidebar.events_link",
+        },
+        {
+          to: "/my-tickets",
+          label: "My Tickets",
+          icon: <Ticket size={16} />,
+          ocid: "sidebar.mytickets_link",
+        },
       ],
     },
   ];
@@ -223,7 +250,7 @@ function SidebarContent({
         {sidebarSections.map((section) => (
           <div key={section.title} className="mb-1">
             {!collapsed && (
-              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40 font-display">
+              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400 font-display">
                 {section.title}
               </p>
             )}
@@ -236,8 +263,8 @@ function SidebarContent({
                 className={cn(
                   "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150 group",
                   isActive(link.to)
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-[3px] border-sidebar-primary"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                    ? "bg-sidebar-accent text-white border-l-[3px] border-sidebar-primary"
+                    : "text-slate-300 hover:bg-sidebar-accent/50 hover:text-white",
                   collapsed && "justify-center px-2",
                 )}
               >
@@ -259,7 +286,7 @@ function SidebarContent({
         {isAdmin && (
           <div className="mb-1">
             {!collapsed && (
-              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-primary/80 font-display">
+              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300/90 font-display">
                 {t.sidebar.admin}
               </p>
             )}
@@ -272,8 +299,8 @@ function SidebarContent({
                 className={cn(
                   "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150 group",
                   isActive(link.to)
-                    ? "bg-sidebar-primary/20 text-sidebar-primary border-l-[3px] border-sidebar-primary"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                    ? "bg-sidebar-primary/20 text-amber-300 border-l-[3px] border-sidebar-primary"
+                    : "text-slate-300 hover:bg-sidebar-accent/50 hover:text-white",
                   collapsed && "justify-center px-2",
                 )}
               >
@@ -409,7 +436,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                   <p className="font-display font-bold text-sidebar-foreground text-sm leading-tight truncate">
                     IIIntl One
                   </p>
-                  <p className="text-[9px] text-sidebar-foreground/50 truncate leading-tight">
+                  <p className="text-[9px] text-slate-400 truncate leading-tight">
                     Independent · Interdependent
                   </p>
                 </div>
@@ -471,7 +498,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                     <div className="mt-1">
                       <Link
                         to="/profile"
-                        className="text-[10px] text-sidebar-foreground/50 hover:text-sidebar-primary transition-colors underline-offset-2 hover:underline"
+                        className="text-[10px] text-slate-400 hover:text-white transition-colors underline-offset-2 hover:underline"
                         data-ocid="sidebar.view_profile_link"
                       >
                         View Profile
@@ -524,7 +551,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                       <p className="font-display font-bold text-sidebar-foreground text-sm">
                         IIIntl One
                       </p>
-                      <p className="text-[9px] text-sidebar-foreground/50">
+                      <p className="text-[9px] text-slate-400">
                         Independent · Interdependent
                       </p>
                     </div>
@@ -560,7 +587,7 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                           <p className="text-xs font-semibold text-sidebar-foreground truncate">
                             {user.name}
                           </p>
-                          <p className="text-[10px] text-sidebar-foreground/60 truncate">
+                          <p className="text-[10px] text-slate-400 truncate">
                             {user.email}
                           </p>
                         </div>
@@ -597,6 +624,11 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
           <nav className="hidden lg:flex items-center gap-1 flex-1">
             {[
               { to: "/", label: t.nav.home, ocid: "nav.home_link" },
+              {
+                to: "/campaign-hub",
+                label: "Campaign Hub",
+                ocid: "nav.campaign_hub_link",
+              },
               {
                 to: "/organizations",
                 label: t.nav.organizations,
@@ -971,6 +1003,11 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                   aria-label="Footer navigation"
                 >
                   {[
+                    {
+                      to: "/campaign-hub",
+                      label: "Campaign Hub",
+                      ocid: "footer.campaign_hub_link",
+                    },
                     { to: "/faq", label: "FAQ", ocid: "footer.faq_link" },
                     { to: "/docs", label: "Docs", ocid: "footer.docs_link" },
                     { to: "/store", label: "Store", ocid: "footer.store_link" },
@@ -998,6 +1035,11 @@ export function Layout({ children, breadcrumb, hideFooter }: LayoutProps) {
                       to: "/legal/terms",
                       label: "Terms",
                       ocid: "footer.terms_link",
+                    },
+                    {
+                      to: "/legal/sla",
+                      label: "SLA",
+                      ocid: "footer.sla_link",
                     },
                   ].map((link) => (
                     <Link

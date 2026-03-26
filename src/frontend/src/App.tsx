@@ -12,24 +12,31 @@ import { useBackend } from "@/hooks/useBackend";
 import { ActivismPage } from "@/pages/ActivismPage";
 import { AdminPage } from "@/pages/AdminPage";
 import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
+import { CampaignHubPage } from "@/pages/CampaignHubPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
 import { CartPage } from "@/pages/CartPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DocsPage } from "@/pages/DocsPage";
+import { EventDetailPage } from "@/pages/EventDetailPage";
+import { EventsPage } from "@/pages/EventsPage";
 import { FAQPage } from "@/pages/FAQPage";
 import { ForumDetailPage } from "@/pages/ForumDetailPage";
 import { ForumsPage } from "@/pages/ForumsPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
+import { MLMPage } from "@/pages/MLMPage";
 import { MembersPage } from "@/pages/MembersPage";
+import { MyTicketsPage } from "@/pages/MyTicketsPage";
 import { OrganizationDetailPage } from "@/pages/OrganizationDetailPage";
 import { OrganizationsPage } from "@/pages/OrganizationsPage";
 import { PricingPage } from "@/pages/PricingPage";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 import { ProductDetailPage } from "@/pages/ProductDetailPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { ReferralLandingPage } from "@/pages/ReferralLandingPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
+import { SLAPage } from "@/pages/SLAPage";
 import { StorePage } from "@/pages/StorePage";
 import { TenantAdminPage } from "@/pages/TenantAdminPage";
 import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
@@ -154,6 +161,50 @@ const vendorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/store/vendor/$vendorId",
   component: VendorPage,
+});
+
+const mlmRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mlm",
+  component: () => (
+    <ProtectedRoute>
+      <MLMPage />
+    </ProtectedRoute>
+  ),
+});
+
+const eventsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/events",
+  component: EventsPage,
+});
+
+const eventDetailRoute2 = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/events/$id",
+  component: EventDetailPage,
+});
+
+const myTicketsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/my-tickets",
+  component: () => (
+    <ProtectedRoute>
+      <MyTicketsPage />
+    </ProtectedRoute>
+  ),
+});
+
+const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/join",
+  component: ReferralLandingPage,
+});
+
+const campaignHubRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/campaign-hub",
+  component: CampaignHubPage,
 });
 
 // ── Protected routes ──
@@ -307,6 +358,11 @@ const privacyRoute = createRoute({
   path: "/legal/privacy",
   component: PrivacyPolicyPage,
 });
+const slaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/legal/sla",
+  component: SLAPage,
+});
 const termsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/legal/terms",
@@ -340,6 +396,13 @@ const routeTree = rootRoute.addChildren([
   tenantRoute,
   privacyRoute,
   termsRoute,
+  slaRoute,
+  campaignHubRoute,
+  mlmRoute,
+  eventsRoute,
+  eventDetailRoute2,
+  myTicketsRoute,
+  joinRoute,
 ]);
 
 // ── Router ──

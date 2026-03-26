@@ -251,6 +251,117 @@ export interface TenantSubscription {
     lastPaidAt: bigint | null;
     nextDueAt: bigint;
 }
+// MLM types
+export type MembershipTierLevel = "free" | "associate" | "affiliate" | "partner" | "executive" | "ambassador" | "founder";
+export type EarningType = "directReferral" | "levelOverride" | "royaltyPool" | "eventCommission" | "finFracFran" | "activityBonus";
+export type EarningStatus = "pending" | "processing" | "paid";
+export type RoyaltyPoolType = "global" | "leadership" | "event" | "finFracFran";
+export type FSUTxType = "earned" | "redeemed" | "transferred";
+export type TicketTierType = "general" | "vip" | "earlyBird" | "vipPlus";
+export type EventStatus = "upcoming" | "active" | "past" | "cancelled";
+export interface MemberTierRecord {
+    tier: MembershipTierLevel;
+    referralCode: string;
+    sponsorPrincipal: string | null;
+    joinedAt: bigint;
+    upgradedAt: bigint | null;
+}
+export interface EarningRecord {
+    id: bigint;
+    earningType: EarningType;
+    amountCents: bigint;
+    currency: string;
+    status: EarningStatus;
+    depthLevel: number;
+    description: string;
+    sourceId: string;
+    createdAt: bigint;
+}
+export interface EarningsSummary {
+    totalCents: bigint;
+    pendingCents: bigint;
+    paidCents: bigint;
+    directReferralCents: bigint;
+    levelOverrideCents: bigint;
+    royaltyPoolCents: bigint;
+    eventCommissionCents: bigint;
+    finFracFranCents: bigint;
+    activityBonusCents: bigint;
+}
+export interface DownlineMember {
+    principal: string;
+    displayName: string;
+    tier: MembershipTierLevel;
+    joinedAt: bigint;
+    directReferralCount: number;
+}
+export interface RoyaltyPool {
+    id: bigint;
+    poolType: RoyaltyPoolType;
+    periodLabel: string;
+    totalCents: bigint;
+    currency: string;
+    isDistributed: boolean;
+    createdAt: bigint;
+}
+export interface RoyaltyDistribution {
+    id: bigint;
+    poolId: bigint;
+    amountCents: bigint;
+    currency: string;
+    distributedAt: bigint;
+}
+export interface FSURecord {
+    fsuBalance: bigint;
+    lifetimeEarned: bigint;
+}
+export interface FSUTransaction {
+    id: bigint;
+    txType: FSUTxType;
+    fsuAmount: bigint;
+    usdCentsValue: bigint;
+    description: string;
+    createdAt: bigint;
+}
+export interface FSUPoolStatus {
+    poolSizeCents: bigint;
+    fsuValueCentsEach: bigint;
+    totalFSUOutstanding: bigint;
+    nextDistributionLabel: string;
+}
+export interface MLMEvent {
+    id: bigint;
+    title: string;
+    description: string;
+    location: string;
+    eventDate: bigint;
+    status: EventStatus;
+    imageUrl: string | null;
+    currency: string;
+    totalRevenueCents: bigint;
+    createdAt: bigint;
+    createdBy: string;
+}
+export interface TicketTier {
+    id: bigint;
+    eventId: bigint;
+    name: string;
+    tierType: TicketTierType;
+    priceCents: bigint;
+    currency: string;
+    capacity: bigint;
+    sold: bigint;
+    commissionBasisPoints: bigint;
+}
+export interface Ticket {
+    id: bigint;
+    eventId: bigint;
+    tierId: bigint;
+    qrCode: string;
+    isUsed: boolean;
+    pricePaidCents: bigint;
+    purchasedAt: bigint;
+}
 export interface backendInterface {
     addTransaction(walletAddress: string, amount: number, description: string, txType: TransactionType): Promise<void>;
     archiveCampaign(id: string): Promise<boolean>;
@@ -328,4 +439,25 @@ export interface backendInterface {
     listTenantBillingHistory(tenantId: bigint): Promise<Array<BillingRecord>>;
     getTenantStats(): Promise<TenantStats | null>;
     getPlatformAnalytics(): Promise<PlatformAnalytics | null>;
+    // MLM methods
+    initMemberMLM(sponsorCode: string | null): Promise<string>;
+    getMyTierRecord(): Promise<MemberTierRecord | null>;
+    getMyEarningsSummary(): Promise<EarningsSummary>;
+    getMyEarnings(): Promise<Array<EarningRecord>>;
+    getMyReferralCode(): Promise<string | null>;
+    getMyDownline(): Promise<Array<DownlineMember>>;
+    getMyUplineChain(): Promise<Array<MemberTierRecord>>;
+    getFSUPoolStatus(): Promise<FSUPoolStatus>;
+    getMyFSURecord(): Promise<FSURecord | null>;
+    redeemFSU(fsuAmount: bigint, description: string): Promise<bigint>;
+    getMyFSUTransactions(): Promise<Array<FSUTransaction>>;
+    listRoyaltyPools(): Promise<Array<RoyaltyPool>>;
+    getMyRoyaltyDistributions(): Promise<Array<RoyaltyDistribution>>;
+    upgradeMemberTier(tier: MembershipTierLevel): Promise<void>;
+    listMLMEvents(): Promise<Array<MLMEvent>>;
+    createMLMEvent(title: string, description: string, location: string, eventDate: bigint, currency: string, imageUrl: string | null): Promise<bigint>;
+    getMLMEvent(eventId: bigint): Promise<MLMEvent | null>;
+    listEventTicketTiers(eventId: bigint): Promise<Array<TicketTier>>;
+    purchaseTicket(eventId: bigint, tierId: bigint, referrerCode: string | null): Promise<bigint>;
+    getMyTickets(): Promise<Array<Ticket>>;
 }

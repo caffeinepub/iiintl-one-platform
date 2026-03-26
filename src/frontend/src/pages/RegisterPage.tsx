@@ -3,9 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { type AuthUser, useAuth } from "@/context/AuthContext";
+import { useBackend } from "@/hooks/useBackend";
 import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Fingerprint, Globe, Loader2 } from "lucide-react";
+import { ArrowRight, Fingerprint, Globe, Info, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ export function RegisterPage() {
   const { login, loginWithII, user } = useAuth();
   const navigate = useNavigate();
   const ii = useInternetIdentity();
+  const backend = useBackend();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,6 +31,14 @@ export function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [sponsorCode, setSponsorCode] = useState<string | null>(null);
+
+  // Read ?ref= from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setSponsorCode(ref);
+  }, []);
 
   // Auto-login when II identity becomes available
   useEffect(() => {
@@ -93,6 +103,14 @@ export function RegisterPage() {
       email,
     };
     login(newUser);
+
+    // Initialize MLM record and link sponsor if referral code present
+    try {
+      if (backend) await backend.initMemberMLM(sponsorCode ?? null);
+    } catch {
+      // Non-blocking — MLM init failure should not prevent registration
+    }
+
     setIsLoading(false);
     navigate({ to: "/dashboard" });
   };
@@ -198,6 +216,23 @@ export function RegisterPage() {
             </span>
             <Separator className="flex-1" />
           </div>
+
+          {/* Referral notice */}
+          {sponsorCode && (
+            <div
+              className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/60 border border-border/50 rounded-lg px-3 py-2.5 mb-5"
+              data-ocid="register.referral_notice"
+            >
+              <Info size={13} className="mt-0.5 shrink-0 text-primary" />
+              <span>
+                Referred by a member. Your referral code{" "}
+                <code className="font-mono font-bold text-foreground">
+                  {sponsorCode}
+                </code>{" "}
+                will be applied automatically.
+              </span>
+            </div>
+          )}
 
           <form className="space-y-4" onSubmit={handleSubmit} noValidate>
             <div className="grid grid-cols-2 gap-3">
