@@ -1,4 +1,13 @@
 // Version: 1.0.0
+type BillingRecord__495027963 =
+  {
+    amountCents : Nat;
+    createdAt : Int;
+    description : Text;
+    id : Text;
+    status : Text;
+    tenantId : Text
+  };
 type CampaignStatus__144160907 = {#active; #archived; #completed; #draft};
 type CampaignType__750479379 = {#action; #awareness; #fundraiser; #petition};
 type Campaign__370329394 =
@@ -228,6 +237,39 @@ type RoyaltyPool__1040213925 =
 type Set__532252804<T> = Set__710576254<T>;
 type Set__710576254<T> =
   {var root : Node__92254746<T>; var size : Nat__490723111};
+type TenantBranding__371891117 =
+  {
+    logoUrl : Text;
+    orgName : Text;
+    primaryColor : Text;
+    welcomeMessage : Text
+  };
+type TenantMember__744698245 =
+  {addedAt : Int; principal : Principal; role : Text; tenantId : Text};
+type TenantStatus__351584051 = {#active; #cancelled; #suspended; #trial};
+type TenantSubscription__316848908 =
+  {
+    monthlyCents : Nat;
+    renewalDate : Int;
+    startDate : Int;
+    tier : TenantTier__316287200
+  };
+type TenantTier__316287200 = {#enterprise; #organization; #starter};
+type Tenant__828322903 =
+  {
+    branding : ?TenantBranding__371891117;
+    createdAt : Int;
+    id : Text;
+    memberCount : Nat;
+    name : Text;
+    ownerPrincipal : Principal;
+    status : TenantStatus__351584051;
+    storageUsedMb : Nat;
+    subscription : ?TenantSubscription__316848908;
+    tier : TenantTier__316287200;
+    trialEndsAt : ?Int;
+    updatedAt : Int
+  };
 type ThreadStatus__267185935 = {#archived; #locked; #open};
 type TransactionType__767491300 = {#received; #sent};
 type Transaction__865268250 =
@@ -268,6 +310,11 @@ actor {
     };
   stable backerPledgeIndex :
     {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable billingRecords :
+    {
+      var root : Node__46230540<Text, BillingRecord__495027963>;
+      var size : Nat__490723111
+    };
   stable campaignPledgeIndex :
     {var root : Node__46230540<Text, [Text]>; var size : Nat__490723111};
   stable campaignSupporters :
@@ -336,12 +383,14 @@ actor {
       var root : Node__46230540<Principal, MemberTierRecord__809706739>;
       var size : Nat__490723111
     };
+  stable var nextBillingId : Nat;
   stable var nextCrowdfundingCampaignId : Nat;
   stable var nextCrowdfundingPledgeId : Nat;
   stable var nextEarningId : Nat;
   stable var nextFSUTxId : Nat;
   stable var nextReplyId : Nat;
   stable var nextRoyaltyPoolId : Nat;
+  stable var nextTenantId : Nat;
   stable var nextThreadId : Nat;
   stable var nextTransactionId : Nat;
   stable organizations :
@@ -349,6 +398,8 @@ actor {
       var root : Node__46230540<Text, Organization__103960640>;
       var size : Nat__490723111
     };
+  stable ownerToTenantId :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
   stable principalToUserId :
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
   stable referralCodeIndex :
@@ -356,6 +407,16 @@ actor {
   stable royaltyPools :
     {
       var root : Node__46230540<Text, RoyaltyPool__1040213925>;
+      var size : Nat__490723111
+    };
+  stable tenantMembers :
+    {
+      var root : Node__46230540<Text, [TenantMember__744698245]>;
+      var size : Nat__490723111
+    };
+  stable tenants :
+    {
+      var root : Node__46230540<Text, Tenant__828322903>;
       var size : Nat__490723111
     };
   stable threadReplies :

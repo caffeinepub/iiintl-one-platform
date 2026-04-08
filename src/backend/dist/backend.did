@@ -55,6 +55,55 @@ type ThreadStatus =
    locked;
    open;
  };
+type TenantTier = 
+ variant {
+   enterprise;
+   organization;
+   starter;
+ };
+type TenantSubscription = 
+ record {
+   monthlyCents: nat;
+   renewalDate: int;
+   startDate: int;
+   tier: TenantTier;
+ };
+type TenantStatus = 
+ variant {
+   active;
+   cancelled;
+   suspended;
+   trial;
+ };
+type TenantMember = 
+ record {
+   addedAt: int;
+   "principal": principal;
+   role: text;
+   tenantId: text;
+ };
+type TenantBranding = 
+ record {
+   logoUrl: text;
+   orgName: text;
+   primaryColor: text;
+   welcomeMessage: text;
+ };
+type Tenant = 
+ record {
+   branding: opt TenantBranding;
+   createdAt: int;
+   id: text;
+   memberCount: nat;
+   name: text;
+   ownerPrincipal: principal;
+   status: TenantStatus;
+   storageUsedMb: nat;
+   subscription: opt TenantSubscription;
+   tier: TenantTier;
+   trialEndsAt: opt int;
+   updatedAt: int;
+ };
 type RoyaltyPoolType = 
  variant {
    event;
@@ -361,8 +410,20 @@ type Campaign =
    tags: vec text;
    title: text;
  };
+type BillingRecord = 
+ record {
+   amountCents: nat;
+   createdAt: int;
+   description: text;
+   id: text;
+   status: text;
+   tenantId: text;
+ };
 service : {
   _initializeAccessControl: () -> ();
+  addBillingRecord: (tenantId: text, amountCents: nat, description: text,
+   status: text) -> (text);
+  addTenantMember: (tenantId: text, member: principal, role: text) -> (bool);
   addToFSUPool: (amount: nat, description: text) -> ();
   addToRoyaltyPool: (poolId: text, amount: nat) -> (bool);
   addTransaction: (walletAddress: text, amount: float64, description: 
@@ -375,6 +436,14 @@ service : {
   archiveOrg: (orgId: text) -> (bool);
   archiveThread: (threadId: nat) -> (bool);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  cancelTenant: (tenantId: text) -> (bool);
+  /// Admin-only. Iterates all tenants and suspends any that are in #trial
+  /// status with a trialEndsAt timestamp that has already passed.
+  /// Returns the count of tenants checked and the count expired.
+  checkAndExpireTrials: () -> (record {
+                                 checked: nat;
+                                 expired: nat;
+                               });
   createCampaign: (title: text, description: text, campaignType:
    CampaignType, orgId: text, goal: nat, startDate: int, endDate: int, tags:
    vec text) -> (text);
@@ -386,6 +455,7 @@ service : {
   createOrg: (name: text, description: text, region: text, orgType: text,
    website: text, foundedYear: int) -> (text);
   createRoyaltyPool: (poolType: RoyaltyPoolType, period: text) -> (text);
+  createTenant: (name: text, tier: TenantTier, trialDays: opt nat) -> (text);
   createThread: (title: text, body: text, category: ForumCategory, orgId:
    opt text, tags: vec text) -> (nat);
   deactivateCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
@@ -410,6 +480,10 @@ service : {
    (opt CrowdfundingCampaign) query;
   getCrowdfundingConfig: () -> (CrowdfundingConfig) query;
   getCrowdfundingPledge: (pledgeId: text) -> (opt CrowdfundingPledge) query;
+  /// Returns all tenants whose trial will expire within the next `daysFromNow` days,
+  /// including any that are already past their trial end date but not yet suspended.
+  /// Sorted by trialEndsAt ascending (earliest expiry first).
+  getExpiringTrials: (daysFromNow: nat) -> (vec Tenant) query;
   getFSUPoolStatus: () -> (FSUPoolStatus) query;
   getLinkedWallets: () -> (vec Wallet) query;
   getMemberEarnings: (member: principal) -> (vec EarningRecord) query;
@@ -422,6 +496,7 @@ service : {
   getMyPledges: () -> (vec CrowdfundingPledge) query;
   getMyReferralCode: () -> (opt text) query;
   getMyRoyaltyDistributions: () -> (vec EarningRecord) query;
+  getMyTenant: () -> (opt Tenant) query;
   getMyTierRecord: () -> (opt MemberTierRecord) query;
   getMyUplineChain: () -> (vec MemberTierRecord) query;
   getOrg: (orgId: text) -> (opt Organization) query;
@@ -429,6 +504,8 @@ service : {
   getPreferredLanguage: () -> (text) query;
   getReplies: (threadId: nat) -> (vec ForumReply) query;
   getRoyaltyPool: (poolId: text) -> (opt RoyaltyPool) query;
+  getTenant: (tenantId: text) -> (opt Tenant) query;
+  getTenantBranding: (tenantId: text) -> (opt TenantBranding) query;
   getThread: (threadId: nat) -> (opt ForumThread) query;
   getTransactionHistory: (walletAddress: opt text) -> (vec Transaction) query;
   getUserOrgs: (userId: text) -> (vec Organization) query;
@@ -446,6 +523,7 @@ service : {
   listActiveCampaigns: () -> (vec Campaign) query;
   listActiveOrgs: () -> (vec Organization) query;
   listAllMemberTiers: () -> (vec MemberTierRecord) query;
+  listBillingHistory: (tenantId: text) -> (vec BillingRecord) query;
   listCampaigns: () -> (vec Campaign) query;
   listCampaignsByOrg: (orgId: text) -> (vec Campaign) query;
   listCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
@@ -454,6 +532,8 @@ service : {
   listMyCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
   listOrgs: () -> (vec Organization) query;
   listRoyaltyPools: () -> (vec RoyaltyPool) query;
+  listTenantMembers: (tenantId: text) -> (vec TenantMember) query;
+  listTenants: () -> (vec Tenant) query;
   listThreads: () -> (vec ForumThread) query;
   listThreadsByCategory: (category: ForumCategory) -> (vec ForumThread) query;
   listThreadsByOrg: (orgId: text) -> (vec ForumThread) query;
@@ -465,12 +545,14 @@ service : {
    rewardTierId: opt text, referrerCode: opt text) -> (text);
   processReferralChainBonus: (referredMember: principal, baseAmount: 
    nat, earningType: EarningType, description: text) -> ();
+  reactivateTenant: (tenantId: text) -> (bool);
   recordEarning: (member: principal, amountUnits: nat, earningType:
    EarningType, description: text, sourceId: text) -> (text);
   redeemFSU: (amount: nat, description: text) -> (bool);
   refundPledge: (pledgeId: text) -> (bool);
   registerUser: (displayName: text, email: text) -> (text);
   rejectCrowdfundingCampaign: (campaignId: text) -> (bool);
+  removeTenantMember: (tenantId: text, member: principal) -> (bool);
   replyToThread: (threadId: nat, body: text) -> (nat);
   resolveReferralCode: (code: text) -> (opt principal) query;
   runPayCycle: (member: principal) -> (nat);
@@ -482,6 +564,7 @@ service : {
    nat, milestoneAchievementBonusBps: nat) -> ();
   setMemberTier: (target: principal, tier: MembershipTierLevel) -> (bool);
   setPreferredLanguage: (lang: text) -> ();
+  suspendTenant: (tenantId: text) -> (bool);
   unlinkWallet: (address: text) -> ();
   updateCampaign: (id: text, title: text, description: text, campaignType:
    CampaignType, goal: nat, startDate: int, endDate: int, tags: vec text) ->
@@ -490,5 +573,7 @@ service : {
    text, coverImageUrl: text) -> (bool);
   updateOrg: (orgId: text, name: text, description: text, region: text,
    orgType: text, website: text, foundedYear: int) -> (bool);
+  updateTenantBranding: (tenantId: text, logoUrl: text, primaryColor: 
+   text, orgName: text, welcomeMessage: text) -> (bool);
   upgradeMemberTier: (tier: MembershipTierLevel) -> (bool);
 }

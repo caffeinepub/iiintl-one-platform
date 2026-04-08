@@ -281,6 +281,8 @@ export interface ExtendedBackend extends backendInterface {
   getMyTenantBranding(): Promise<TenantBranding | null>;
   getTenantStats(): Promise<TenantStats | null>;
   getPlatformAnalytics(): Promise<PlatformAnalytics>;
+  checkAndExpireTrials(): Promise<{ expired: bigint; checked: bigint }>;
+  getExpiringTrials(daysFromNow: bigint): Promise<Tenant[]>;
 
   // MLM - Tiers & Referrals
   initMemberMLM(sponsorCode: string | null): Promise<string>;

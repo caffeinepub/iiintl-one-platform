@@ -10,6 +10,14 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface BillingRecord {
+  'id' : string,
+  'status' : string,
+  'createdAt' : bigint,
+  'description' : string,
+  'amountCents' : bigint,
+  'tenantId' : string,
+}
 export interface Campaign {
   'id' : string,
   'status' : CampaignStatus,
@@ -255,6 +263,45 @@ export type RoyaltyPoolType = { 'event' : null } |
   { 'leadership' : null } |
   { 'global' : null } |
   { 'finFracFran' : null };
+export interface Tenant {
+  'id' : string,
+  'status' : TenantStatus,
+  'subscription' : [] | [TenantSubscription],
+  'ownerPrincipal' : Principal,
+  'name' : string,
+  'createdAt' : bigint,
+  'memberCount' : bigint,
+  'tier' : TenantTier,
+  'storageUsedMb' : bigint,
+  'updatedAt' : bigint,
+  'branding' : [] | [TenantBranding],
+  'trialEndsAt' : [] | [bigint],
+}
+export interface TenantBranding {
+  'orgName' : string,
+  'primaryColor' : string,
+  'logoUrl' : string,
+  'welcomeMessage' : string,
+}
+export interface TenantMember {
+  'principal' : Principal,
+  'role' : string,
+  'tenantId' : string,
+  'addedAt' : bigint,
+}
+export type TenantStatus = { 'trial' : null } |
+  { 'active' : null } |
+  { 'cancelled' : null } |
+  { 'suspended' : null };
+export interface TenantSubscription {
+  'monthlyCents' : bigint,
+  'tier' : TenantTier,
+  'renewalDate' : bigint,
+  'startDate' : bigint,
+}
+export type TenantTier = { 'enterprise' : null } |
+  { 'starter' : null } |
+  { 'organization' : null };
 export type ThreadStatus = { 'open' : null } |
   { 'locked' : null } |
   { 'archived' : null };
@@ -298,6 +345,8 @@ export type WalletType = { 'internetIdentity' : null } |
   { 'stoic' : null };
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
+  'addBillingRecord' : ActorMethod<[string, bigint, string, string], string>,
+  'addTenantMember' : ActorMethod<[string, Principal, string], boolean>,
   'addToFSUPool' : ActorMethod<[bigint, string], undefined>,
   'addToRoyaltyPool' : ActorMethod<[string, bigint], boolean>,
   'addTransaction' : ActorMethod<
@@ -317,6 +366,16 @@ export interface _SERVICE {
   'archiveOrg' : ActorMethod<[string], boolean>,
   'archiveThread' : ActorMethod<[bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'cancelTenant' : ActorMethod<[string], boolean>,
+  /**
+   * / Admin-only. Iterates all tenants and suspends any that are in #trial
+   * / status with a trialEndsAt timestamp that has already passed.
+   * / Returns the count of tenants checked and the count expired.
+   */
+  'checkAndExpireTrials' : ActorMethod<
+    [],
+    { 'checked' : bigint, 'expired' : bigint }
+  >,
   'createCampaign' : ActorMethod<
     [
       string,
@@ -351,6 +410,7 @@ export interface _SERVICE {
     string
   >,
   'createRoyaltyPool' : ActorMethod<[RoyaltyPoolType, string], string>,
+  'createTenant' : ActorMethod<[string, TenantTier, [] | [bigint]], string>,
   'createThread' : ActorMethod<
     [string, string, ForumCategory, [] | [string], Array<string>],
     bigint
@@ -382,6 +442,12 @@ export interface _SERVICE {
   >,
   'getCrowdfundingConfig' : ActorMethod<[], CrowdfundingConfig>,
   'getCrowdfundingPledge' : ActorMethod<[string], [] | [CrowdfundingPledge]>,
+  /**
+   * / Returns all tenants whose trial will expire within the next `daysFromNow` days,
+   * / including any that are already past their trial end date but not yet suspended.
+   * / Sorted by trialEndsAt ascending (earliest expiry first).
+   */
+  'getExpiringTrials' : ActorMethod<[bigint], Array<Tenant>>,
   'getFSUPoolStatus' : ActorMethod<[], FSUPoolStatus>,
   'getLinkedWallets' : ActorMethod<[], Array<Wallet>>,
   'getMemberEarnings' : ActorMethod<[Principal], Array<EarningRecord>>,
@@ -394,6 +460,7 @@ export interface _SERVICE {
   'getMyPledges' : ActorMethod<[], Array<CrowdfundingPledge>>,
   'getMyReferralCode' : ActorMethod<[], [] | [string]>,
   'getMyRoyaltyDistributions' : ActorMethod<[], Array<EarningRecord>>,
+  'getMyTenant' : ActorMethod<[], [] | [Tenant]>,
   'getMyTierRecord' : ActorMethod<[], [] | [MemberTierRecord]>,
   'getMyUplineChain' : ActorMethod<[], Array<MemberTierRecord>>,
   'getOrg' : ActorMethod<[string], [] | [Organization]>,
@@ -401,6 +468,8 @@ export interface _SERVICE {
   'getPreferredLanguage' : ActorMethod<[], string>,
   'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
   'getRoyaltyPool' : ActorMethod<[string], [] | [RoyaltyPool]>,
+  'getTenant' : ActorMethod<[string], [] | [Tenant]>,
+  'getTenantBranding' : ActorMethod<[string], [] | [TenantBranding]>,
   'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
   'getTransactionHistory' : ActorMethod<[[] | [string]], Array<Transaction>>,
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
@@ -417,6 +486,7 @@ export interface _SERVICE {
   'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
   'listAllMemberTiers' : ActorMethod<[], Array<MemberTierRecord>>,
+  'listBillingHistory' : ActorMethod<[string], Array<BillingRecord>>,
   'listCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listCampaignsByOrg' : ActorMethod<[string], Array<Campaign>>,
   'listCrowdfundingCampaigns' : ActorMethod<[], Array<CrowdfundingCampaign>>,
@@ -427,6 +497,8 @@ export interface _SERVICE {
   'listMyCrowdfundingCampaigns' : ActorMethod<[], Array<CrowdfundingCampaign>>,
   'listOrgs' : ActorMethod<[], Array<Organization>>,
   'listRoyaltyPools' : ActorMethod<[], Array<RoyaltyPool>>,
+  'listTenantMembers' : ActorMethod<[string], Array<TenantMember>>,
+  'listTenants' : ActorMethod<[], Array<Tenant>>,
   'listThreads' : ActorMethod<[], Array<ForumThread>>,
   'listThreadsByCategory' : ActorMethod<[ForumCategory], Array<ForumThread>>,
   'listThreadsByOrg' : ActorMethod<[string], Array<ForumThread>>,
@@ -442,6 +514,7 @@ export interface _SERVICE {
     [Principal, bigint, EarningType, string],
     undefined
   >,
+  'reactivateTenant' : ActorMethod<[string], boolean>,
   'recordEarning' : ActorMethod<
     [Principal, bigint, EarningType, string, string],
     string
@@ -450,6 +523,7 @@ export interface _SERVICE {
   'refundPledge' : ActorMethod<[string], boolean>,
   'registerUser' : ActorMethod<[string, string], string>,
   'rejectCrowdfundingCampaign' : ActorMethod<[string], boolean>,
+  'removeTenantMember' : ActorMethod<[string, Principal], boolean>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
   'resolveReferralCode' : ActorMethod<[string], [] | [Principal]>,
   'runPayCycle' : ActorMethod<[Principal], bigint>,
@@ -461,6 +535,7 @@ export interface _SERVICE {
   'setCrowdfundingConfig' : ActorMethod<[bigint, bigint, bigint], undefined>,
   'setMemberTier' : ActorMethod<[Principal, MembershipTierLevel], boolean>,
   'setPreferredLanguage' : ActorMethod<[string], undefined>,
+  'suspendTenant' : ActorMethod<[string], boolean>,
   'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
     [
@@ -481,6 +556,10 @@ export interface _SERVICE {
   >,
   'updateOrg' : ActorMethod<
     [string, string, string, string, string, string, bigint],
+    boolean
+  >,
+  'updateTenantBranding' : ActorMethod<
+    [string, string, string, string, string],
     boolean
   >,
   'upgradeMemberTier' : ActorMethod<[MembershipTierLevel], boolean>,

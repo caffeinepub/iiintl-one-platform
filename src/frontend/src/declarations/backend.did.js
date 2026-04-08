@@ -100,6 +100,11 @@ export const RoyaltyPoolType = IDL.Variant({
   'global' : IDL.Null,
   'finFracFran' : IDL.Null,
 });
+export const TenantTier = IDL.Variant({
+  'enterprise' : IDL.Null,
+  'starter' : IDL.Null,
+  'organization' : IDL.Null,
+});
 export const ForumCategory = IDL.Variant({
   'resources' : IDL.Null,
   'general' : IDL.Null,
@@ -165,6 +170,38 @@ export const CrowdfundingConfig = IDL.Record({
   'defaultFSUContributionBps' : IDL.Nat,
   'milestoneAchievementBonusBps' : IDL.Nat,
   'creatorFSUBonus' : IDL.Nat,
+});
+export const TenantStatus = IDL.Variant({
+  'trial' : IDL.Null,
+  'active' : IDL.Null,
+  'cancelled' : IDL.Null,
+  'suspended' : IDL.Null,
+});
+export const TenantSubscription = IDL.Record({
+  'monthlyCents' : IDL.Nat,
+  'tier' : TenantTier,
+  'renewalDate' : IDL.Int,
+  'startDate' : IDL.Int,
+});
+export const TenantBranding = IDL.Record({
+  'orgName' : IDL.Text,
+  'primaryColor' : IDL.Text,
+  'logoUrl' : IDL.Text,
+  'welcomeMessage' : IDL.Text,
+});
+export const Tenant = IDL.Record({
+  'id' : IDL.Text,
+  'status' : TenantStatus,
+  'subscription' : IDL.Opt(TenantSubscription),
+  'ownerPrincipal' : IDL.Principal,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'memberCount' : IDL.Nat,
+  'tier' : TenantTier,
+  'storageUsedMb' : IDL.Nat,
+  'updatedAt' : IDL.Int,
+  'branding' : IDL.Opt(TenantBranding),
+  'trialEndsAt' : IDL.Opt(IDL.Int),
 });
 export const FSUPoolStatus = IDL.Record({
   'totalOutstandingFSU' : IDL.Nat,
@@ -315,6 +352,20 @@ export const Transaction = IDL.Record({
   'txType' : TransactionType,
   'amountICP' : IDL.Float64,
 });
+export const BillingRecord = IDL.Record({
+  'id' : IDL.Text,
+  'status' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'description' : IDL.Text,
+  'amountCents' : IDL.Nat,
+  'tenantId' : IDL.Text,
+});
+export const TenantMember = IDL.Record({
+  'principal' : IDL.Principal,
+  'role' : IDL.Text,
+  'tenantId' : IDL.Text,
+  'addedAt' : IDL.Int,
+});
 export const Role = IDL.Variant({
   'member' : IDL.Null,
   'admin' : IDL.Null,
@@ -333,6 +384,16 @@ export const UserSummary = IDL.Record({
 
 export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
+  'addBillingRecord' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+      [IDL.Text],
+      [],
+    ),
+  'addTenantMember' : IDL.Func(
+      [IDL.Text, IDL.Principal, IDL.Text],
+      [IDL.Bool],
+      [],
+    ),
   'addToFSUPool' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'addToRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'addTransaction' : IDL.Func(
@@ -355,6 +416,12 @@ export const idlService = IDL.Service({
   'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'cancelTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'checkAndExpireTrials' : IDL.Func(
+      [],
+      [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+      [],
+    ),
   'createCampaign' : IDL.Func(
       [
         IDL.Text,
@@ -392,6 +459,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
+  'createTenant' : IDL.Func(
+      [IDL.Text, TenantTier, IDL.Opt(IDL.Nat)],
+      [IDL.Text],
+      [],
+    ),
   'createThread' : IDL.Func(
       [IDL.Text, IDL.Text, ForumCategory, IDL.Opt(IDL.Text), IDL.Vec(IDL.Text)],
       [IDL.Nat],
@@ -440,6 +512,7 @@ export const idlService = IDL.Service({
       [IDL.Opt(CrowdfundingPledge)],
       ['query'],
     ),
+  'getExpiringTrials' : IDL.Func([IDL.Nat], [IDL.Vec(Tenant)], ['query']),
   'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
   'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
   'getMemberEarnings' : IDL.Func(
@@ -464,6 +537,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(EarningRecord)],
       ['query'],
     ),
+  'getMyTenant' : IDL.Func([], [IDL.Opt(Tenant)], ['query']),
   'getMyTierRecord' : IDL.Func([], [IDL.Opt(MemberTierRecord)], ['query']),
   'getMyUplineChain' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
   'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
@@ -471,6 +545,12 @@ export const idlService = IDL.Service({
   'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
   'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
   'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
+  'getTenant' : IDL.Func([IDL.Text], [IDL.Opt(Tenant)], ['query']),
+  'getTenantBranding' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(TenantBranding)],
+      ['query'],
+    ),
   'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
   'getTransactionHistory' : IDL.Func(
       [IDL.Opt(IDL.Text)],
@@ -495,6 +575,11 @@ export const idlService = IDL.Service({
   'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
   'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
+  'listBillingHistory' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(BillingRecord)],
+      ['query'],
+    ),
   'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
   'listCrowdfundingCampaigns' : IDL.Func(
@@ -514,6 +599,12 @@ export const idlService = IDL.Service({
     ),
   'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
   'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
+  'listTenantMembers' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(TenantMember)],
+      ['query'],
+    ),
+  'listTenants' : IDL.Func([], [IDL.Vec(Tenant)], ['query']),
   'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
   'listThreadsByCategory' : IDL.Func(
       [ForumCategory],
@@ -535,6 +626,7 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'reactivateTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'recordEarning' : IDL.Func(
       [IDL.Principal, IDL.Nat, EarningType, IDL.Text, IDL.Text],
       [IDL.Text],
@@ -544,6 +636,7 @@ export const idlService = IDL.Service({
   'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'removeTenantMember' : IDL.Func([IDL.Text, IDL.Principal], [IDL.Bool], []),
   'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
   'resolveReferralCode' : IDL.Func(
       [IDL.Text],
@@ -564,6 +657,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
+  'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
       [
@@ -586,6 +680,11 @@ export const idlService = IDL.Service({
     ),
   'updateOrg' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+      [IDL.Bool],
+      [],
+    ),
+  'updateTenantBranding' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
       [IDL.Bool],
       [],
     ),
@@ -687,6 +786,11 @@ export const idlFactory = ({ IDL }) => {
     'global' : IDL.Null,
     'finFracFran' : IDL.Null,
   });
+  const TenantTier = IDL.Variant({
+    'enterprise' : IDL.Null,
+    'starter' : IDL.Null,
+    'organization' : IDL.Null,
+  });
   const ForumCategory = IDL.Variant({
     'resources' : IDL.Null,
     'general' : IDL.Null,
@@ -752,6 +856,38 @@ export const idlFactory = ({ IDL }) => {
     'defaultFSUContributionBps' : IDL.Nat,
     'milestoneAchievementBonusBps' : IDL.Nat,
     'creatorFSUBonus' : IDL.Nat,
+  });
+  const TenantStatus = IDL.Variant({
+    'trial' : IDL.Null,
+    'active' : IDL.Null,
+    'cancelled' : IDL.Null,
+    'suspended' : IDL.Null,
+  });
+  const TenantSubscription = IDL.Record({
+    'monthlyCents' : IDL.Nat,
+    'tier' : TenantTier,
+    'renewalDate' : IDL.Int,
+    'startDate' : IDL.Int,
+  });
+  const TenantBranding = IDL.Record({
+    'orgName' : IDL.Text,
+    'primaryColor' : IDL.Text,
+    'logoUrl' : IDL.Text,
+    'welcomeMessage' : IDL.Text,
+  });
+  const Tenant = IDL.Record({
+    'id' : IDL.Text,
+    'status' : TenantStatus,
+    'subscription' : IDL.Opt(TenantSubscription),
+    'ownerPrincipal' : IDL.Principal,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'memberCount' : IDL.Nat,
+    'tier' : TenantTier,
+    'storageUsedMb' : IDL.Nat,
+    'updatedAt' : IDL.Int,
+    'branding' : IDL.Opt(TenantBranding),
+    'trialEndsAt' : IDL.Opt(IDL.Int),
   });
   const FSUPoolStatus = IDL.Record({
     'totalOutstandingFSU' : IDL.Nat,
@@ -899,6 +1035,20 @@ export const idlFactory = ({ IDL }) => {
     'txType' : TransactionType,
     'amountICP' : IDL.Float64,
   });
+  const BillingRecord = IDL.Record({
+    'id' : IDL.Text,
+    'status' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'description' : IDL.Text,
+    'amountCents' : IDL.Nat,
+    'tenantId' : IDL.Text,
+  });
+  const TenantMember = IDL.Record({
+    'principal' : IDL.Principal,
+    'role' : IDL.Text,
+    'tenantId' : IDL.Text,
+    'addedAt' : IDL.Int,
+  });
   const Role = IDL.Variant({
     'member' : IDL.Null,
     'admin' : IDL.Null,
@@ -917,6 +1067,16 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     '_initializeAccessControl' : IDL.Func([], [], []),
+    'addBillingRecord' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
+    'addTenantMember' : IDL.Func(
+        [IDL.Text, IDL.Principal, IDL.Text],
+        [IDL.Bool],
+        [],
+      ),
     'addToFSUPool' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'addToRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
     'addTransaction' : IDL.Func(
@@ -939,6 +1099,12 @@ export const idlFactory = ({ IDL }) => {
     'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'cancelTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'checkAndExpireTrials' : IDL.Func(
+        [],
+        [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+        [],
+      ),
     'createCampaign' : IDL.Func(
         [
           IDL.Text,
@@ -976,6 +1142,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
+    'createTenant' : IDL.Func(
+        [IDL.Text, TenantTier, IDL.Opt(IDL.Nat)],
+        [IDL.Text],
+        [],
+      ),
     'createThread' : IDL.Func(
         [
           IDL.Text,
@@ -1030,6 +1201,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(CrowdfundingPledge)],
         ['query'],
       ),
+    'getExpiringTrials' : IDL.Func([IDL.Nat], [IDL.Vec(Tenant)], ['query']),
     'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
     'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
     'getMemberEarnings' : IDL.Func(
@@ -1054,6 +1226,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(EarningRecord)],
         ['query'],
       ),
+    'getMyTenant' : IDL.Func([], [IDL.Opt(Tenant)], ['query']),
     'getMyTierRecord' : IDL.Func([], [IDL.Opt(MemberTierRecord)], ['query']),
     'getMyUplineChain' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
     'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
@@ -1061,6 +1234,12 @@ export const idlFactory = ({ IDL }) => {
     'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
     'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
     'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
+    'getTenant' : IDL.Func([IDL.Text], [IDL.Opt(Tenant)], ['query']),
+    'getTenantBranding' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(TenantBranding)],
+        ['query'],
+      ),
     'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
     'getTransactionHistory' : IDL.Func(
         [IDL.Opt(IDL.Text)],
@@ -1085,6 +1264,11 @@ export const idlFactory = ({ IDL }) => {
     'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
     'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
+    'listBillingHistory' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(BillingRecord)],
+        ['query'],
+      ),
     'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
     'listCrowdfundingCampaigns' : IDL.Func(
@@ -1104,6 +1288,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
     'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
+    'listTenantMembers' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(TenantMember)],
+        ['query'],
+      ),
+    'listTenants' : IDL.Func([], [IDL.Vec(Tenant)], ['query']),
     'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
     'listThreadsByCategory' : IDL.Func(
         [ForumCategory],
@@ -1129,6 +1319,7 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'reactivateTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'recordEarning' : IDL.Func(
         [IDL.Principal, IDL.Nat, EarningType, IDL.Text, IDL.Text],
         [IDL.Text],
@@ -1138,6 +1329,7 @@ export const idlFactory = ({ IDL }) => {
     'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'removeTenantMember' : IDL.Func([IDL.Text, IDL.Principal], [IDL.Bool], []),
     'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
     'resolveReferralCode' : IDL.Func(
         [IDL.Text],
@@ -1158,6 +1350,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
+    'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
         [
@@ -1180,6 +1373,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'updateOrg' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
+        [IDL.Bool],
+        [],
+      ),
+    'updateTenantBranding' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [IDL.Bool],
         [],
       ),

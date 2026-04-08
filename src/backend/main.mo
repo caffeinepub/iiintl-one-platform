@@ -2173,4 +2173,300 @@ actor {
       };
     };
   };
+
+  // =========================================================================
+  // === TENANT MODULE =======================================================
+  // =========================================================================
+
+  // --- Tenant Types ---
+
+  public type TenantTier = {
+    #starter;
+    #organization;
+    #enterprise;
+  };
+
+  public type TenantStatus = {
+    #trial;
+    #active;
+    #suspended;
+    #cancelled;
+  };
+
+  public type TenantBranding = {
+    logoUrl : Text;
+    primaryColor : Text;
+    orgName : Text;
+    welcomeMessage : Text;
+  };
+
+  public type TenantSubscription = {
+    tier : TenantTier;
+    startDate : Int;
+    renewalDate : Int;
+    monthlyCents : Nat;
+  };
+
+  public type Tenant = {
+    id : Text;
+    name : Text;
+    ownerPrincipal : Principal;
+    tier : TenantTier;
+    status : TenantStatus;
+    trialEndsAt : ?Int;
+    subscription : ?TenantSubscription;
+    branding : ?TenantBranding;
+    memberCount : Nat;
+    storageUsedMb : Nat;
+    createdAt : Int;
+    updatedAt : Int;
+  };
+
+  public type TenantMember = {
+    tenantId : Text;
+    principal : Principal;
+    role : Text;
+    addedAt : Int;
+  };
+
+  public type BillingRecord = {
+    id : Text;
+    tenantId : Text;
+    amountCents : Nat;
+    description : Text;
+    status : Text;
+    createdAt : Int;
+  };
+
+  // --- Tenant Storage ---
+
+  let tenants = Map.empty<Text, Tenant>();
+  let ownerToTenantId = Map.empty<Principal, Text>();
+  let tenantMembers = Map.empty<Text, [TenantMember]>();
+  let billingRecords = Map.empty<Text, BillingRecord>();
+  var nextTenantId : Nat = 1;
+  var nextBillingId : Nat = 1;
+
+  // --- Tenant Functions ---
+
+  public shared ({ caller }) func createTenant(
+    name : Text,
+    tier : TenantTier,
+    trialDays : ?Nat,
+  ) : async Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let tenantId = "tenant-" # nextTenantId.toText();
+    nextTenantId += 1;
+    let trialEndsAt : ?Int = switch (trialDays) {
+      case (null) { null };
+      case (?days) { ?(Time.now() + days * 24 * 60 * 60 * 1_000_000_000) };
+    };
+    let tenant : Tenant = {
+      id = tenantId;
+      name;
+      ownerPrincipal = caller;
+      tier;
+      status = if (trialEndsAt != null) { #trial } else { #active };
+      trialEndsAt;
+      subscription = null;
+      branding = null;
+      memberCount = 0;
+      storageUsedMb = 0;
+      createdAt = Time.now();
+      updatedAt = Time.now();
+    };
+    tenants.add(tenantId, tenant);
+    ownerToTenantId.add(caller, tenantId);
+    tenantId;
+  };
+
+  public query func getTenant(tenantId : Text) : async ?Tenant {
+    tenants.get(tenantId);
+  };
+
+  public query ({ caller }) func getMyTenant() : async ?Tenant {
+    switch (ownerToTenantId.get(caller)) {
+      case (null) { null };
+      case (?tid) { tenants.get(tid) };
+    };
+  };
+
+  public shared ({ caller }) func suspendTenant(tenantId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (tenants.get(tenantId)) {
+      case (null) { false };
+      case (?t) {
+        tenants.add(tenantId, { t with status = #suspended; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func reactivateTenant(tenantId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (tenants.get(tenantId)) {
+      case (null) { false };
+      case (?t) {
+        tenants.add(tenantId, { t with status = #active; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func cancelTenant(tenantId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (tenants.get(tenantId)) {
+      case (null) { false };
+      case (?t) {
+        tenants.add(tenantId, { t with status = #cancelled; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public query func listTenants() : async [Tenant] {
+    tenants.values().toArray();
+  };
+
+  public shared ({ caller }) func addTenantMember(tenantId : Text, member : Principal, role : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let existing = switch (tenantMembers.get(tenantId)) {
+      case (null) { [] };
+      case (?ms)  { ms };
+    };
+    let newMember : TenantMember = { tenantId; principal = member; role; addedAt = Time.now() };
+    tenantMembers.add(tenantId, existing.concat([newMember]));
+    true;
+  };
+
+  public shared ({ caller }) func removeTenantMember(tenantId : Text, member : Principal) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (tenantMembers.get(tenantId)) {
+      case (null) { false };
+      case (?ms) {
+        tenantMembers.add(tenantId, ms.filter(func(m) { m.principal != member }));
+        true;
+      };
+    };
+  };
+
+  public query func listTenantMembers(tenantId : Text) : async [TenantMember] {
+    switch (tenantMembers.get(tenantId)) {
+      case (null) { [] };
+      case (?ms)  { ms };
+    };
+  };
+
+  public shared ({ caller }) func addBillingRecord(
+    tenantId : Text,
+    amountCents : Nat,
+    description : Text,
+    status : Text,
+  ) : async Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let billingId = "bill-" # nextBillingId.toText();
+    nextBillingId += 1;
+    let record : BillingRecord = { id = billingId; tenantId; amountCents; description; status; createdAt = Time.now() };
+    billingRecords.add(billingId, record);
+    billingId;
+  };
+
+  public query func listBillingHistory(tenantId : Text) : async [BillingRecord] {
+    billingRecords.values().filter(func(r) { r.tenantId == tenantId }).toArray();
+  };
+
+  public shared ({ caller }) func updateTenantBranding(
+    tenantId : Text,
+    logoUrl : Text,
+    primaryColor : Text,
+    orgName : Text,
+    welcomeMessage : Text,
+  ) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (tenants.get(tenantId)) {
+      case (null) { false };
+      case (?t) {
+        let branding : TenantBranding = { logoUrl; primaryColor; orgName; welcomeMessage };
+        tenants.add(tenantId, { t with branding = ?branding; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public query func getTenantBranding(tenantId : Text) : async ?TenantBranding {
+    switch (tenants.get(tenantId)) {
+      case (null) { null };
+      case (?t)   { t.branding };
+    };
+  };
+
+  // --- Trial Auto-Expiry Functions ---
+
+  /// Admin-only. Iterates all tenants and suspends any that are in #trial
+  /// status with a trialEndsAt timestamp that has already passed.
+  /// Returns the count of tenants checked and the count expired.
+  public shared ({ caller }) func checkAndExpireTrials() : async { expired : Nat; checked : Nat } {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let now = Time.now();
+    var expired = 0;
+    var checked = 0;
+    for ((tenantId, tenant) in tenants.entries()) {
+      checked += 1;
+      switch (tenant.status) {
+        case (#trial) {
+          switch (tenant.trialEndsAt) {
+            case (null) {};
+            case (?endsAt) {
+              if (endsAt < now) {
+                tenants.add(tenantId, { tenant with status = #suspended; updatedAt = now });
+                expired += 1;
+              };
+            };
+          };
+        };
+        case (_) {};
+      };
+    };
+    { expired; checked };
+  };
+
+  /// Returns all tenants whose trial will expire within the next `daysFromNow` days,
+  /// including any that are already past their trial end date but not yet suspended.
+  /// Sorted by trialEndsAt ascending (earliest expiry first).
+  public query func getExpiringTrials(daysFromNow : Nat) : async [Tenant] {
+    let now = Time.now();
+    let windowNs : Int = daysFromNow * 24 * 60 * 60 * 1_000_000_000;
+    let cutoff : Int = now + windowNs;
+    let expiring = tenants.values().filter(func(t) {
+      if (t.status != #trial) { return false };
+      switch (t.trialEndsAt) {
+        case (null)    { false };
+        case (?endsAt) { endsAt <= cutoff };
+      };
+    }).toArray();
+    // Sort ascending by trialEndsAt (earliest first)
+    expiring.sort(func(a : Tenant, b : Tenant) : { #less; #equal; #greater } {
+      let aEnd = switch (a.trialEndsAt) { case (?v) v; case (null) 0 };
+      let bEnd = switch (b.trialEndsAt) { case (?v) v; case (null) 0 };
+      Int.compare(aEnd, bEnd);
+    });
+  };
 };

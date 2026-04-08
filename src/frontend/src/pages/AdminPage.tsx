@@ -56,6 +56,7 @@ import {
   Building,
   Building2,
   CheckCircle,
+  Clock,
   Coins,
   FileText,
   HelpCircle,
@@ -1466,6 +1467,30 @@ function TenantsTab() {
     {},
   );
 
+  // Trial expiry automation state
+  const [expiryRunning, setExpiryRunning] = useState(false);
+  const [expiryResult, setExpiryResult] = useState<{
+    expired: bigint;
+    checked: bigint;
+  } | null>(null);
+  const [expiryError, setExpiryError] = useState<string | null>(null);
+  const [expiringTrials, setExpiringTrials] = useState<Tenant[]>([]);
+  const [expiringLoading, setExpiringLoading] = useState(true);
+
+  const loadExpiringTrials = useCallback(async () => {
+    if (!backend) return;
+    setExpiringLoading(true);
+    try {
+      const eb = backend as unknown as ExtendedBackend;
+      const results = await eb.getExpiringTrials(BigInt(7));
+      setExpiringTrials(results);
+    } catch {
+      // non-critical — silently ignore
+    } finally {
+      setExpiringLoading(false);
+    }
+  }, [backend]);
+
   useEffect(() => {
     if (!backend) return;
     setLoading(true);
@@ -1474,7 +1499,32 @@ function TenantsTab() {
       .then((data) => setTenants(data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [backend]);
+    loadExpiringTrials();
+  }, [backend, loadExpiringTrials]);
+
+  async function handleRunExpiryCheck() {
+    if (!backend) return;
+    setExpiryRunning(true);
+    setExpiryResult(null);
+    setExpiryError(null);
+    try {
+      const eb = backend as unknown as ExtendedBackend;
+      const result = await eb.checkAndExpireTrials();
+      setExpiryResult(result);
+      // Refresh both lists after running
+      const [updatedTenants] = await Promise.all([
+        backend.listAllTenants(),
+        loadExpiringTrials(),
+      ]);
+      setTenants(updatedTenants);
+    } catch (err) {
+      setExpiryError(
+        err instanceof Error ? err.message : "Failed to run expiry check",
+      );
+    } finally {
+      setExpiryRunning(false);
+    }
+  }
 
   async function handleSuspend(id: string) {
     if (!backend) return;
@@ -1531,98 +1581,204 @@ function TenantsTab() {
     return <Badge className={map[status] ?? ""}>{status}</Badge>;
   };
 
-  if (loading) {
-    return (
-      <div data-ocid="admin.tenants.loading_state" className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-12 w-full rounded-lg" />
-        ))}
-      </div>
-    );
-  }
-
-  if (tenants.length === 0) {
-    return (
-      <div
-        data-ocid="admin.tenants.empty_state"
-        className="text-center py-16 text-muted-foreground"
-      >
-        <Building size={32} className="mx-auto mb-3 opacity-30" />
-        <p className="text-sm">No tenants registered yet.</p>
-      </div>
-    );
-  }
-
   return (
-    <div data-ocid="admin.tenants.table">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Org Name</TableHead>
-            <TableHead>Owner</TableHead>
-            <TableHead>Tier</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tenants.map((tenant, idx) => (
-            <TableRow
-              key={tenant.id}
-              data-ocid={`admin.tenants.row.${idx + 1}`}
+    <div className="space-y-6">
+      {/* ── Trial Expiry Automation Panel ─────────────────────────────────── */}
+      <Card
+        className="border-border bg-card"
+        data-ocid="admin.tenants.expiry_automation"
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Clock size={15} className="text-primary" />
+              Trial Expiry Automation
+            </CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs"
+              disabled={expiryRunning}
+              onClick={handleRunExpiryCheck}
+              data-ocid="admin.tenants.run_expiry_check.button"
             >
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {tenant.id.slice(0, 8)}...
-              </TableCell>
-              <TableCell className="font-medium">{tenant.orgName}</TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {tenant.ownerPrincipal.toString().slice(0, 12)}...
-              </TableCell>
-              <TableCell>{tierBadge(tenant.tier)}</TableCell>
-              <TableCell>{statusBadge(tenant.status)}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {new Date(
-                  Number(tenant.createdAt) / 1_000_000,
-                ).toLocaleDateString()}
-              </TableCell>
-              <TableCell>
-                {tenant.status === TenantStatus.suspended ||
-                tenant.status === TenantStatus.cancelled ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs"
-                    disabled={actionLoading[tenant.id]}
-                    onClick={() => handleReactivate(tenant.id)}
-                    data-ocid={`admin.tenants.reactivate.button.${idx + 1}`}
+              {expiryRunning ? (
+                <Loader2 size={12} className="mr-1.5 animate-spin" />
+              ) : (
+                <Clock size={12} className="mr-1.5" />
+              )}
+              {expiryRunning ? "Running…" : "Run Expiry Check"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Result / error banners */}
+          {expiryResult && (
+            <div
+              className="flex items-center gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-400"
+              data-ocid="admin.tenants.expiry_result_banner"
+            >
+              <CheckCircle size={14} className="shrink-0" />
+              Checked{" "}
+              <span className="font-semibold">
+                {String(expiryResult.checked)}
+              </span>{" "}
+              tenant{expiryResult.checked !== BigInt(1) ? "s" : ""} —{" "}
+              <span className="font-semibold">
+                {String(expiryResult.expired)}
+              </span>{" "}
+              trial{expiryResult.expired !== BigInt(1) ? "s" : ""} suspended.
+            </div>
+          )}
+          {expiryError && (
+            <div
+              className="flex items-center gap-2 rounded-md bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400"
+              data-ocid="admin.tenants.expiry_error_banner"
+            >
+              <XCircle size={14} className="shrink-0" />
+              {expiryError}
+            </div>
+          )}
+
+          {/* Expiring Soon sub-section */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Expiring Soon (next 7 days)
+            </p>
+            {expiringLoading ? (
+              <div className="space-y-1.5">
+                <Skeleton className="h-8 w-full rounded" />
+                <Skeleton className="h-8 w-full rounded" />
+              </div>
+            ) : expiringTrials.length === 0 ? (
+              <p
+                className="text-xs text-muted-foreground italic"
+                data-ocid="admin.tenants.expiring_empty"
+              >
+                No trials expiring in the next 7 days.
+              </p>
+            ) : (
+              <div
+                className="space-y-1"
+                data-ocid="admin.tenants.expiring_list"
+              >
+                {expiringTrials.map((t, idx) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-3 py-2 text-xs"
+                    data-ocid={`admin.tenants.expiring_item.${idx + 1}`}
                   >
-                    {actionLoading[tenant.id] ? (
-                      <Loader2 size={11} className="mr-1 animate-spin" />
-                    ) : null}
-                    Reactivate
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="text-xs"
-                    disabled={actionLoading[tenant.id]}
-                    onClick={() => handleSuspend(tenant.id)}
-                    data-ocid={`admin.tenants.suspend.button.${idx + 1}`}
-                  >
-                    {actionLoading[tenant.id] ? (
-                      <Loader2 size={11} className="mr-1 animate-spin" />
-                    ) : null}
-                    Suspend
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
+                    <span className="font-medium truncate min-w-0">
+                      {t.orgName}
+                    </span>
+                    <span className="font-mono text-muted-foreground shrink-0">
+                      {t.ownerPrincipal.toString().slice(0, 10)}…
+                    </span>
+                    <span className="shrink-0">{tierBadge(t.tier)}</span>
+                    <span className="text-muted-foreground shrink-0">
+                      {t.trialEndsAt
+                        ? new Date(
+                            Number(t.trialEndsAt) / 1_000_000,
+                          ).toLocaleDateString()
+                        : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Tenant Table ───────────────────────────────────────────────────── */}
+      {loading ? (
+        <div data-ocid="admin.tenants.loading_state" className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      ) : tenants.length === 0 ? (
+        <div
+          data-ocid="admin.tenants.empty_state"
+          className="text-center py-16 text-muted-foreground"
+        >
+          <Building size={32} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No tenants registered yet.</p>
+        </div>
+      ) : (
+        <div data-ocid="admin.tenants.table">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Org Name</TableHead>
+                <TableHead>Owner</TableHead>
+                <TableHead>Tier</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tenants.map((tenant, idx) => (
+                <TableRow
+                  key={tenant.id}
+                  data-ocid={`admin.tenants.row.${idx + 1}`}
+                >
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {tenant.id.slice(0, 8)}...
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {tenant.orgName}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {tenant.ownerPrincipal.toString().slice(0, 12)}...
+                  </TableCell>
+                  <TableCell>{tierBadge(tenant.tier)}</TableCell>
+                  <TableCell>{statusBadge(tenant.status)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(
+                      Number(tenant.createdAt) / 1_000_000,
+                    ).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    {tenant.status === TenantStatus.suspended ||
+                    tenant.status === TenantStatus.cancelled ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        disabled={actionLoading[tenant.id]}
+                        onClick={() => handleReactivate(tenant.id)}
+                        data-ocid={`admin.tenants.reactivate.button.${idx + 1}`}
+                      >
+                        {actionLoading[tenant.id] ? (
+                          <Loader2 size={11} className="mr-1 animate-spin" />
+                        ) : null}
+                        Reactivate
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="text-xs"
+                        disabled={actionLoading[tenant.id]}
+                        onClick={() => handleSuspend(tenant.id)}
+                        data-ocid={`admin.tenants.suspend.button.${idx + 1}`}
+                      >
+                        {actionLoading[tenant.id] ? (
+                          <Loader2 size={11} className="mr-1 animate-spin" />
+                        ) : null}
+                        Suspend
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
