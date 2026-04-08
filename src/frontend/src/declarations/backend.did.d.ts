@@ -34,6 +34,145 @@ export type CampaignType = { 'action' : null } |
   { 'awareness' : null } |
   { 'fundraiser' : null } |
   { 'petition' : null };
+export interface CommissionRate {
+  'basisPoints' : bigint,
+  'tier' : MembershipTierLevel,
+  'flatAmountUnits' : bigint,
+  'isActive' : boolean,
+  'earningType' : EarningType,
+  'depthLevel' : bigint,
+}
+export interface CrowdfundingCampaign {
+  'id' : string,
+  'status' : CrowdfundingStatus,
+  'coverImageUrl' : string,
+  'title' : string,
+  'creator' : Principal,
+  'rewardTiers' : Array<CrowdfundingRewardTier>,
+  'fundingModel' : CrowdfundingFundingModel,
+  'approvedByAdmin' : boolean,
+  'createdAt' : bigint,
+  'description' : string,
+  'deadline' : bigint,
+  'tenantId' : string,
+  'goalCents' : bigint,
+  'updatedAt' : bigint,
+  'fsuContributionBps' : bigint,
+  'backerCount' : bigint,
+  'currency' : string,
+  'totalFSUDistributed' : bigint,
+  'category' : CrowdfundingCategory,
+  'raisedCents' : bigint,
+  'milestones' : Array<CrowdfundingMilestone>,
+}
+export type CrowdfundingCategory = { 'research' : null } |
+  { 'civic' : null } |
+  { 'education' : null } |
+  { 'community' : null } |
+  { 'crisisResponse' : null } |
+  { 'humanitarian' : null } |
+  { 'youth' : null };
+export interface CrowdfundingConfig {
+  'defaultFSUContributionBps' : bigint,
+  'milestoneAchievementBonusBps' : bigint,
+  'creatorFSUBonus' : bigint,
+}
+export type CrowdfundingFundingModel = { 'allOrNothing' : null } |
+  { 'keepWhatYouRaise' : null };
+export interface CrowdfundingMilestone {
+  'id' : string,
+  'title' : string,
+  'achievedAt' : [] | [bigint],
+  'bonusFSUAmount' : bigint,
+  'description' : string,
+  'targetCents' : bigint,
+}
+export interface CrowdfundingPledge {
+  'id' : string,
+  'status' : string,
+  'referrerCode' : [] | [string],
+  'receiptCode' : string,
+  'createdAt' : bigint,
+  'backer' : Principal,
+  'campaignId' : string,
+  'amountCents' : bigint,
+  'rewardTierId' : [] | [string],
+  'fsuEarned' : bigint,
+}
+export interface CrowdfundingRewardTier {
+  'id' : string,
+  'title' : string,
+  'description' : string,
+  'maxBackers' : [] | [bigint],
+  'backerCount' : bigint,
+  'minPledgeCents' : bigint,
+}
+export type CrowdfundingStatus = { 'active' : null } |
+  { 'cancelled' : null } |
+  { 'pending' : null } |
+  { 'funded' : null } |
+  { 'failed' : null };
+export interface DownlineMember {
+  'principal' : Principal,
+  'referralCode' : string,
+  'joinedAt' : bigint,
+  'tier' : MembershipTierLevel,
+  'directReferralCount' : bigint,
+}
+export interface EarningRecord {
+  'id' : string,
+  'member' : Principal,
+  'status' : EarningStatus,
+  'createdAt' : bigint,
+  'description' : string,
+  'sourceId' : string,
+  'earningType' : EarningType,
+  'amountUnits' : bigint,
+  'depthLevel' : bigint,
+}
+export type EarningStatus = { 'pending' : null } |
+  { 'paid' : null } |
+  { 'processing' : null };
+export type EarningType = { 'eventCommission' : null } |
+  { 'activityBonus' : null } |
+  { 'directReferral' : null } |
+  { 'levelOverride' : null } |
+  { 'royaltyPool' : null } |
+  { 'finFracFran' : null };
+export interface EarningsSummary {
+  'eventCommission' : bigint,
+  'activityBonus' : bigint,
+  'totalPaid' : bigint,
+  'totalLifetime' : bigint,
+  'directReferral' : bigint,
+  'levelOverride' : bigint,
+  'totalPending' : bigint,
+  'royaltyPool' : bigint,
+  'finFracFran' : bigint,
+}
+export interface FSUPoolStatus {
+  'totalOutstandingFSU' : bigint,
+  'valuePerUnitCents' : bigint,
+  'poolSizeUnits' : bigint,
+  'nextDistributionLabel' : string,
+}
+export interface FSURecord {
+  'member' : Principal,
+  'balance' : bigint,
+  'lifetimeEarned' : bigint,
+}
+export interface FSUTransaction {
+  'id' : string,
+  'member' : Principal,
+  'valuePerUnitCents' : bigint,
+  'createdAt' : bigint,
+  'description' : string,
+  'txType' : FSUTxType,
+  'amount' : bigint,
+}
+export type FSUTxType = { 'redeemed' : null } |
+  { 'transferred' : null } |
+  { 'earned' : null };
 export type ForumCategory = { 'resources' : null } |
   { 'general' : null } |
   { 'regional' : null } |
@@ -62,6 +201,22 @@ export interface ForumThread {
   'category' : ForumCategory,
   'isPinned' : boolean,
 }
+export interface MemberTierRecord {
+  'principal' : Principal,
+  'referralCode' : string,
+  'joinedAt' : bigint,
+  'tier' : MembershipTierLevel,
+  'upgradedAt' : bigint,
+  'sponsorPrincipal' : [] | [Principal],
+  'sponsorCode' : [] | [string],
+}
+export type MembershipTierLevel = { 'free' : null } |
+  { 'founder' : null } |
+  { 'executive' : null } |
+  { 'affiliate' : null } |
+  { 'ambassador' : null } |
+  { 'partner' : null } |
+  { 'associate' : null };
 export interface OrgMember {
   'userId' : string,
   'joinedAt' : bigint,
@@ -88,6 +243,18 @@ export type Role = { 'member' : null } |
   { 'admin' : null } |
   { 'moderator' : null } |
   { 'guest' : null };
+export interface RoyaltyPool {
+  'id' : string,
+  'isDistributed' : boolean,
+  'period' : string,
+  'createdAt' : bigint,
+  'totalUnits' : bigint,
+  'poolType' : RoyaltyPoolType,
+}
+export type RoyaltyPoolType = { 'event' : null } |
+  { 'leadership' : null } |
+  { 'global' : null } |
+  { 'finFracFran' : null };
 export type ThreadStatus = { 'open' : null } |
   { 'locked' : null } |
   { 'archived' : null };
@@ -131,10 +298,21 @@ export type WalletType = { 'internetIdentity' : null } |
   { 'stoic' : null };
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
+  'addToFSUPool' : ActorMethod<[bigint, string], undefined>,
+  'addToRoyaltyPool' : ActorMethod<[string, bigint], boolean>,
   'addTransaction' : ActorMethod<
     [string, number, string, TransactionType],
     undefined
   >,
+  'adminListAllCrowdfundingCampaigns' : ActorMethod<
+    [],
+    Array<CrowdfundingCampaign>
+  >,
+  'adminListCrowdfundingPledges' : ActorMethod<
+    [string],
+    Array<CrowdfundingPledge>
+  >,
+  'approveCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'archiveCampaign' : ActorMethod<[string], boolean>,
   'archiveOrg' : ActorMethod<[string], boolean>,
   'archiveThread' : ActorMethod<[bigint], boolean>,
@@ -152,33 +330,84 @@ export interface _SERVICE {
     ],
     string
   >,
+  'createCrowdfundingCampaign' : ActorMethod<
+    [
+      string,
+      string,
+      CrowdfundingCategory,
+      CrowdfundingFundingModel,
+      bigint,
+      string,
+      bigint,
+      string,
+      Array<CrowdfundingRewardTier>,
+      Array<CrowdfundingMilestone>,
+      [] | [bigint],
+    ],
+    string
+  >,
   'createOrg' : ActorMethod<
     [string, string, string, string, string, bigint],
     string
   >,
+  'createRoyaltyPool' : ActorMethod<[RoyaltyPoolType, string], string>,
   'createThread' : ActorMethod<
     [string, string, ForumCategory, [] | [string], Array<string>],
     bigint
   >,
+  'deactivateCommissionRate' : ActorMethod<
+    [MembershipTierLevel, bigint, EarningType],
+    boolean
+  >,
+  'distributeFSU' : ActorMethod<[bigint, string], undefined>,
+  'distributeRoyaltyPool' : ActorMethod<[string, bigint], boolean>,
+  'finalizeCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCampaign' : ActorMethod<[string], [] | [Campaign]>,
+  'getCampaignPledges' : ActorMethod<[string], Array<CrowdfundingPledge>>,
   'getCampaignProgress' : ActorMethod<
     [string],
     [] | [{ 'goal' : bigint, 'progress' : bigint }]
   >,
   'getCampaignSupporterCount' : ActorMethod<[string], [] | [bigint]>,
+  'getCommissionRate' : ActorMethod<
+    [MembershipTierLevel, bigint, EarningType],
+    [] | [CommissionRate]
+  >,
+  'getCommissionRates' : ActorMethod<[], Array<CommissionRate>>,
+  'getCrowdfundingCampaign' : ActorMethod<
+    [string],
+    [] | [CrowdfundingCampaign]
+  >,
+  'getCrowdfundingConfig' : ActorMethod<[], CrowdfundingConfig>,
+  'getCrowdfundingPledge' : ActorMethod<[string], [] | [CrowdfundingPledge]>,
+  'getFSUPoolStatus' : ActorMethod<[], FSUPoolStatus>,
   'getLinkedWallets' : ActorMethod<[], Array<Wallet>>,
+  'getMemberEarnings' : ActorMethod<[Principal], Array<EarningRecord>>,
+  'getMemberTierRecord' : ActorMethod<[Principal], [] | [MemberTierRecord]>,
+  'getMyDownline' : ActorMethod<[], Array<DownlineMember>>,
+  'getMyEarnings' : ActorMethod<[], Array<EarningRecord>>,
+  'getMyEarningsSummary' : ActorMethod<[], EarningsSummary>,
+  'getMyFSURecord' : ActorMethod<[], [] | [FSURecord]>,
+  'getMyFSUTransactions' : ActorMethod<[], Array<FSUTransaction>>,
+  'getMyPledges' : ActorMethod<[], Array<CrowdfundingPledge>>,
+  'getMyReferralCode' : ActorMethod<[], [] | [string]>,
+  'getMyRoyaltyDistributions' : ActorMethod<[], Array<EarningRecord>>,
+  'getMyTierRecord' : ActorMethod<[], [] | [MemberTierRecord]>,
+  'getMyUplineChain' : ActorMethod<[], Array<MemberTierRecord>>,
   'getOrg' : ActorMethod<[string], [] | [Organization]>,
   'getOrgMembers' : ActorMethod<[string], Array<OrgMember>>,
   'getPreferredLanguage' : ActorMethod<[], string>,
   'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
+  'getRoyaltyPool' : ActorMethod<[string], [] | [RoyaltyPool]>,
   'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
   'getTransactionHistory' : ActorMethod<[[] | [string]], Array<Transaction>>,
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWalletBalance' : ActorMethod<[string], number>,
   'incrementThreadView' : ActorMethod<[bigint], boolean>,
+  'initMemberMLM' : ActorMethod<[[] | [string]], string>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'joinCampaign' : ActorMethod<[string], boolean>,
   'joinOrg' : ActorMethod<[string], boolean>,
@@ -187,18 +416,50 @@ export interface _SERVICE {
   'linkWallet' : ActorMethod<[WalletType, string, string], undefined>,
   'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
+  'listAllMemberTiers' : ActorMethod<[], Array<MemberTierRecord>>,
   'listCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listCampaignsByOrg' : ActorMethod<[string], Array<Campaign>>,
+  'listCrowdfundingCampaigns' : ActorMethod<[], Array<CrowdfundingCampaign>>,
+  'listCrowdfundingCampaignsByCategory' : ActorMethod<
+    [CrowdfundingCategory],
+    Array<CrowdfundingCampaign>
+  >,
+  'listMyCrowdfundingCampaigns' : ActorMethod<[], Array<CrowdfundingCampaign>>,
   'listOrgs' : ActorMethod<[], Array<Organization>>,
+  'listRoyaltyPools' : ActorMethod<[], Array<RoyaltyPool>>,
   'listThreads' : ActorMethod<[], Array<ForumThread>>,
   'listThreadsByCategory' : ActorMethod<[ForumCategory], Array<ForumThread>>,
   'listThreadsByOrg' : ActorMethod<[string], Array<ForumThread>>,
   'listUsers' : ActorMethod<[], Array<UserSummary>>,
   'lockThread' : ActorMethod<[bigint], boolean>,
+  'markEarningPaid' : ActorMethod<[string], boolean>,
   'pinThread' : ActorMethod<[bigint], boolean>,
+  'pledgeToCrowdfundingCampaign' : ActorMethod<
+    [string, bigint, [] | [string], [] | [string]],
+    string
+  >,
+  'processReferralChainBonus' : ActorMethod<
+    [Principal, bigint, EarningType, string],
+    undefined
+  >,
+  'recordEarning' : ActorMethod<
+    [Principal, bigint, EarningType, string, string],
+    string
+  >,
+  'redeemFSU' : ActorMethod<[bigint, string], boolean>,
+  'refundPledge' : ActorMethod<[string], boolean>,
   'registerUser' : ActorMethod<[string, string], string>,
+  'rejectCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
+  'resolveReferralCode' : ActorMethod<[string], [] | [Principal]>,
+  'runPayCycle' : ActorMethod<[Principal], bigint>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'setCommissionRate' : ActorMethod<
+    [MembershipTierLevel, bigint, EarningType, bigint, bigint],
+    boolean
+  >,
+  'setCrowdfundingConfig' : ActorMethod<[bigint, bigint, bigint], undefined>,
+  'setMemberTier' : ActorMethod<[Principal, MembershipTierLevel], boolean>,
   'setPreferredLanguage' : ActorMethod<[string], undefined>,
   'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
@@ -214,10 +475,15 @@ export interface _SERVICE {
     ],
     boolean
   >,
+  'updateCrowdfundingCampaign' : ActorMethod<
+    [string, string, string, string],
+    boolean
+  >,
   'updateOrg' : ActorMethod<
     [string, string, string, string, string, string, bigint],
     boolean
   >,
+  'upgradeMemberTier' : ActorMethod<[MembershipTierLevel], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

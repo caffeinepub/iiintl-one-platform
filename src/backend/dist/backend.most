@@ -18,9 +18,121 @@ type Campaign__370329394 =
     tags : [Text];
     title : Text
   };
+type CommissionRate__799861196 =
+  {
+    basisPoints : Nat;
+    depthLevel : Nat;
+    earningType : EarningType__346322206;
+    flatAmountUnits : Nat;
+    isActive : Bool;
+    tier : MembershipTierLevel__427620915
+  };
+type CrowdfundingCampaign__122328023 =
+  {
+    approvedByAdmin : Bool;
+    backerCount : Nat;
+    category : CrowdfundingCategory__1016361014;
+    coverImageUrl : Text;
+    createdAt : Int;
+    creator : Principal;
+    currency : Text;
+    deadline : Int;
+    description : Text;
+    fsuContributionBps : Nat;
+    fundingModel : CrowdfundingFundingModel__795465353;
+    goalCents : Nat;
+    id : Text;
+    milestones : [CrowdfundingMilestone__419333787];
+    raisedCents : Nat;
+    rewardTiers : [CrowdfundingRewardTier__567043231];
+    status : CrowdfundingStatus__212397832;
+    tenantId : Text;
+    title : Text;
+    totalFSUDistributed : Nat;
+    updatedAt : Int
+  };
+type CrowdfundingCategory__1016361014 =
+  {
+    #civic;
+    #community;
+    #crisisResponse;
+    #education;
+    #humanitarian;
+    #research;
+    #youth
+  };
+type CrowdfundingFundingModel__795465353 = {#allOrNothing; #keepWhatYouRaise};
+type CrowdfundingMilestone__419333787 =
+  {
+    achievedAt : ?Int;
+    bonusFSUAmount : Nat;
+    description : Text;
+    id : Text;
+    targetCents : Nat;
+    title : Text
+  };
+type CrowdfundingPledge__780171264 =
+  {
+    amountCents : Nat;
+    backer : Principal;
+    campaignId : Text;
+    createdAt : Int;
+    fsuEarned : Nat;
+    id : Text;
+    receiptCode : Text;
+    referrerCode : ?Text;
+    rewardTierId : ?Text;
+    status : Text
+  };
+type CrowdfundingRewardTier__567043231 =
+  {
+    backerCount : Nat;
+    description : Text;
+    id : Text;
+    maxBackers : ?Nat;
+    minPledgeCents : Nat;
+    title : Text
+  };
+type CrowdfundingStatus__212397832 =
+  {#active; #cancelled; #failed; #funded; #pending};
 type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type EarningRecord__4576500 =
+  {
+    amountUnits : Nat;
+    createdAt : Int;
+    depthLevel : Nat;
+    description : Text;
+    earningType : EarningType__346322206;
+    id : Text;
+    member : Principal;
+    sourceId : Text;
+    status : EarningStatus__520673500
+  };
+type EarningStatus__520673500 = {#paid; #pending; #processing};
+type EarningType__346322206 =
+  {
+    #activityBonus;
+    #directReferral;
+    #eventCommission;
+    #finFracFran;
+    #levelOverride;
+    #royaltyPool
+  };
+type FSURecord__1012355602 =
+  {balance : Nat; lifetimeEarned : Nat; member : Principal};
+type FSUTransaction__823757434 =
+  {
+    amount : Nat;
+    createdAt : Int;
+    description : Text;
+    id : Text;
+    member : Principal;
+    txType : FSUTxType__105426121;
+    valuePerUnitCents : Nat
+  };
+type FSUTxType__105426121 = {#earned; #redeemed; #transferred};
 type ForumCategory__993514995 =
   {#activism; #announcements; #campaigns; #general; #regional; #resources};
 type ForumReply__954910620 =
@@ -57,6 +169,26 @@ type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
   {var root : Node__46230540<K, V>; var size : Nat__490723111};
 type Map__605269027<K, V> = Map__158565046<K, V>;
+type MemberTierRecord__809706739 =
+  {
+    joinedAt : Int;
+    principal : Principal;
+    referralCode : Text;
+    sponsorCode : ?Text;
+    sponsorPrincipal : ?Principal;
+    tier : MembershipTierLevel__427620915;
+    upgradedAt : Int
+  };
+type MembershipTierLevel__427620915 =
+  {
+    #affiliate;
+    #ambassador;
+    #associate;
+    #executive;
+    #founder;
+    #free;
+    #partner
+  };
 type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
@@ -82,6 +214,17 @@ type Organization__103960640 =
     website : Text
   };
 type Role__931309261 = {#admin; #guest; #member; #moderator};
+type RoyaltyPoolType__427016335 =
+  {#event; #finFracFran; #global; #leadership};
+type RoyaltyPool__1040213925 =
+  {
+    createdAt : Int;
+    id : Text;
+    isDistributed : Bool;
+    period : Text;
+    poolType : RoyaltyPoolType__427016335;
+    totalUnits : Nat
+  };
 type Set__532252804<T> = Set__710576254<T>;
 type Set__710576254<T> =
   {var root : Node__92254746<T>; var size : Nat__490723111};
@@ -123,6 +266,10 @@ actor {
       var adminAssigned : Bool;
       userRoles : Map__605269027<Principal, UserRole__1054455867>
     };
+  stable backerPledgeIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable campaignPledgeIndex :
+    {var root : Node__46230540<Text, [Text]>; var size : Nat__490723111};
   stable campaignSupporters :
     {
       var root : Node__46230540<Text, Set__532252804<Principal>>;
@@ -131,6 +278,32 @@ actor {
   stable campaigns :
     {
       var root : Node__46230540<Text, Campaign__370329394>;
+      var size : Nat__490723111
+    };
+  stable commissionRates :
+    {
+      var root : Node__46230540<Text, CommissionRate__799861196>;
+      var size : Nat__490723111
+    };
+  stable crowdfundingCampaigns :
+    {
+      var root : Node__46230540<Text, CrowdfundingCampaign__122328023>;
+      var size : Nat__490723111
+    };
+  stable var crowdfundingConfig :
+    {
+      creatorFSUBonus : Nat;
+      defaultFSUContributionBps : Nat;
+      milestoneAchievementBonusBps : Nat
+    };
+  stable crowdfundingPledges :
+    {
+      var root : Node__46230540<Text, CrowdfundingPledge__780171264>;
+      var size : Nat__490723111
+    };
+  stable earningRecords :
+    {
+      var root : Node__46230540<Text, EarningRecord__4576500>;
       var size : Nat__490723111
     };
   stable forumReplies :
@@ -143,7 +316,32 @@ actor {
       var root : Node__46230540<Nat, ForumThread__828182490>;
       var size : Nat__490723111
     };
+  stable var fsuPool : Nat;
+  stable fsuRecords :
+    {
+      var root : Node__46230540<Principal, FSURecord__1012355602>;
+      var size : Nat__490723111
+    };
+  stable fsuTransactions :
+    {
+      var root : Node__46230540<Text, FSUTransaction__823757434>;
+      var size : Nat__490723111
+    };
+  stable memberEarningsIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable memberFSUTxIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable memberTiers :
+    {
+      var root : Node__46230540<Principal, MemberTierRecord__809706739>;
+      var size : Nat__490723111
+    };
+  stable var nextCrowdfundingCampaignId : Nat;
+  stable var nextCrowdfundingPledgeId : Nat;
+  stable var nextEarningId : Nat;
+  stable var nextFSUTxId : Nat;
   stable var nextReplyId : Nat;
+  stable var nextRoyaltyPoolId : Nat;
   stable var nextThreadId : Nat;
   stable var nextTransactionId : Nat;
   stable organizations :
@@ -153,6 +351,13 @@ actor {
     };
   stable principalToUserId :
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable referralCodeIndex :
+    {var root : Node__46230540<Text, Principal>; var size : Nat__490723111};
+  stable royaltyPools :
+    {
+      var root : Node__46230540<Text, RoyaltyPool__1040213925>;
+      var size : Nat__490723111
+    };
   stable threadReplies :
     {
       var root : Node__46230540<Nat, Set__532252804<Nat>>;

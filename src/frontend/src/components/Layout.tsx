@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
   FileText,
   Globe,
   HelpCircle,
@@ -200,6 +201,12 @@ function SidebarContent({
           label: "My Plan",
           icon: <Server size={16} />,
           ocid: "sidebar.myplan_link",
+        },
+        {
+          to: "/crowdfunding",
+          label: "Crowdfunding",
+          icon: <DollarSign size={16} />,
+          ocid: "sidebar.crowdfunding_link",
         },
         {
           to: "/mlm",

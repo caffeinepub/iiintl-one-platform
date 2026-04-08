@@ -1067,4 +1067,1110 @@ actor {
       };
     };
   };
+
+  // =========================================================================
+  // === MLM / REFERRAL / ROYALTY / FINFRACFRAN™ MODULE =====================
+  // =========================================================================
+
+  // --- MLM Types ---
+
+  public type MembershipTierLevel = {
+    #free;       // 0
+    #associate;  // 1
+    #affiliate;  // 2
+    #partner;    // 3
+    #executive;  // 4
+    #ambassador; // 5
+    #founder;    // 6
+  };
+
+  public type EarningType = {
+    #directReferral;
+    #levelOverride;
+    #royaltyPool;
+    #eventCommission;
+    #finFracFran;
+    #activityBonus;
+  };
+
+  public type EarningStatus = {
+    #pending;
+    #processing;
+    #paid;
+  };
+
+  public type MemberTierRecord = {
+    principal : Principal;
+    tier : MembershipTierLevel;
+    referralCode : Text;
+    sponsorCode : ?Text;
+    sponsorPrincipal : ?Principal;
+    joinedAt : Int;
+    upgradedAt : Int;
+  };
+
+  public type EarningRecord = {
+    id : Text;
+    member : Principal;
+    amountUnits : Nat;
+    earningType : EarningType;
+    description : Text;
+    sourceId : Text;
+    depthLevel : Nat;
+    status : EarningStatus;
+    createdAt : Int;
+  };
+
+  public type CommissionRate = {
+    tier : MembershipTierLevel;
+    depthLevel : Nat;
+    earningType : EarningType;
+    basisPoints : Nat;
+    flatAmountUnits : Nat;
+    isActive : Bool;
+  };
+
+  public type EarningsSummary = {
+    totalLifetime : Nat;
+    totalPending : Nat;
+    totalPaid : Nat;
+    directReferral : Nat;
+    levelOverride : Nat;
+    royaltyPool : Nat;
+    eventCommission : Nat;
+    finFracFran : Nat;
+    activityBonus : Nat;
+  };
+
+  public type DownlineMember = {
+    principal : Principal;
+    tier : MembershipTierLevel;
+    referralCode : Text;
+    joinedAt : Int;
+    directReferralCount : Nat;
+  };
+
+  public type RoyaltyPoolType = {
+    #global;
+    #leadership;
+    #event;
+    #finFracFran;
+  };
+
+  public type RoyaltyPool = {
+    id : Text;
+    poolType : RoyaltyPoolType;
+    totalUnits : Nat;
+    period : Text;
+    isDistributed : Bool;
+    createdAt : Int;
+  };
+
+  public type FSUTxType = {
+    #earned;
+    #redeemed;
+    #transferred;
+  };
+
+  public type FSURecord = {
+    member : Principal;
+    balance : Nat;
+    lifetimeEarned : Nat;
+  };
+
+  public type FSUTransaction = {
+    id : Text;
+    member : Principal;
+    txType : FSUTxType;
+    amount : Nat;
+    valuePerUnitCents : Nat;
+    description : Text;
+    createdAt : Int;
+  };
+
+  public type FSUPoolStatus = {
+    poolSizeUnits : Nat;
+    valuePerUnitCents : Nat;
+    totalOutstandingFSU : Nat;
+    nextDistributionLabel : Text;
+  };
+
+  // --- MLM Storage ---
+
+  let memberTiers = Map.empty<Principal, MemberTierRecord>();
+  let referralCodeIndex = Map.empty<Text, Principal>();
+  let earningRecords = Map.empty<Text, EarningRecord>();
+  let memberEarningsIndex = Map.empty<Principal, [Text]>();
+  let commissionRates = Map.empty<Text, CommissionRate>();
+  let royaltyPools = Map.empty<Text, RoyaltyPool>();
+  let fsuRecords = Map.empty<Principal, FSURecord>();
+  let fsuTransactions = Map.empty<Text, FSUTransaction>();
+  let memberFSUTxIndex = Map.empty<Principal, [Text]>();
+  var fsuPool : Nat = 0;
+  var nextEarningId : Nat = 1;
+  var nextFSUTxId : Nat = 1;
+  var nextRoyaltyPoolId : Nat = 1;
+
+  // --- MLM Private Helpers ---
+
+  private func _tierWeight(tier : MembershipTierLevel) : Nat {
+    switch tier {
+      case (#free)       { 0 };
+      case (#associate)  { 1 };
+      case (#affiliate)  { 2 };
+      case (#partner)    { 3 };
+      case (#executive)  { 4 };
+      case (#ambassador) { 5 };
+      case (#founder)    { 6 };
+    };
+  };
+
+  private func _tierFromWeight(w : Nat) : MembershipTierLevel {
+    if      (w == 1) #associate
+    else if (w == 2) #affiliate
+    else if (w == 3) #partner
+    else if (w == 4) #executive
+    else if (w == 5) #ambassador
+    else if (w == 6) #founder
+    else             #free;
+  };
+
+  private func _recordEarning(member : Principal, amountUnits : Nat, earningType : EarningType, description : Text, sourceId : Text) : Text {
+    let earningId = "earn-" # nextEarningId.toText();
+    nextEarningId += 1;
+    let record : EarningRecord = {
+      id = earningId;
+      member;
+      amountUnits;
+      earningType;
+      description;
+      sourceId;
+      depthLevel = 0;
+      status = #pending;
+      createdAt = Time.now();
+    };
+    earningRecords.add(earningId, record);
+    let existingIds = switch (memberEarningsIndex.get(member)) {
+      case (null)    { [] };
+      case (?ids)    { ids };
+    };
+    memberEarningsIndex.add(member, existingIds.concat([earningId]));
+    // Update FSU balance if finFracFran earning
+    switch (earningType) {
+      case (#finFracFran) {
+        let existing = switch (fsuRecords.get(member)) {
+          case (null) { { member; balance = 0; lifetimeEarned = 0 } };
+          case (?r)   { r };
+        };
+        fsuRecords.add(member, { existing with balance = existing.balance + amountUnits; lifetimeEarned = existing.lifetimeEarned + amountUnits });
+      };
+      case (_) {};
+    };
+    earningId;
+  };
+
+  private func _addToFSUPool(amount : Nat, _description : Text) {
+    fsuPool += amount;
+  };
+
+  private func _processReferralChainBonus(referredMember : Principal, baseAmount : Nat, earningType : EarningType, description : Text) {
+    var current = referredMember;
+    var depth = 1;
+    while (depth <= 6) {
+      switch (memberTiers.get(current)) {
+        case (null) { depth := 7 };
+        case (?rec) {
+          switch (rec.sponsorPrincipal) {
+            case (null) { depth := 7 };
+            case (?sponsor) {
+              let tierW = _tierWeight(rec.tier);
+              if (tierW >= depth) {
+                let commissionAmt = baseAmount * (if (depth < 7) { Nat.sub(7, depth) } else { 0 }) / 100;
+                if (commissionAmt > 0) {
+                  ignore _recordEarning(sponsor, commissionAmt, earningType, description # " (L" # depth.toText() # ")", "chain");
+                };
+              };
+              current := sponsor;
+              depth += 1;
+            };
+          };
+        };
+      };
+    };
+  };
+
+  private func _distributeFSU(totalFSU : Nat, description : Text) {
+    let members = memberTiers.values().toArray();
+    let totalWeight = members.foldLeft(0, func(acc, m) { acc + _tierWeight(m.tier) });
+    if (totalWeight == 0) { return };
+    members.forEach(func(m) {
+      let w = _tierWeight(m.tier);
+      if (w > 0) {
+        let share = totalFSU * w / totalWeight;
+        if (share > 0) {
+          ignore _recordEarning(m.principal, share, #finFracFran, description, "fsu-dist");
+        };
+      };
+    });
+  };
+
+  // --- MLM Public Functions ---
+
+  public shared ({ caller }) func initMemberMLM(sponsorCode : ?Text) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    switch (memberTiers.get(caller)) {
+      case (?_) { Runtime.trap("MLM already initialized") };
+      case (null) {};
+    };
+    let code = "REF-" # caller.toText().size().toText() # "-" # Time.now().toText();
+    var sponsorPrincipal : ?Principal = null;
+    switch (sponsorCode) {
+      case (null) {};
+      case (?sc) {
+        sponsorPrincipal := referralCodeIndex.get(sc);
+      };
+    };
+    let rec : MemberTierRecord = {
+      principal = caller;
+      tier = #free;
+      referralCode = code;
+      sponsorCode;
+      sponsorPrincipal;
+      joinedAt = Time.now();
+      upgradedAt = Time.now();
+    };
+    memberTiers.add(caller, rec);
+    referralCodeIndex.add(code, caller);
+    code;
+  };
+
+  public query ({ caller }) func getMyTierRecord() : async ?MemberTierRecord {
+    memberTiers.get(caller);
+  };
+
+  public query func getMemberTierRecord(p : Principal) : async ?MemberTierRecord {
+    memberTiers.get(p);
+  };
+
+  public shared ({ caller }) func setMemberTier(target : Principal, tier : MembershipTierLevel) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (memberTiers.get(target)) {
+      case (null) { false };
+      case (?rec) {
+        memberTiers.add(target, { rec with tier; upgradedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func upgradeMemberTier(tier : MembershipTierLevel) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    switch (memberTiers.get(caller)) {
+      case (null) { false };
+      case (?rec) {
+        if (_tierWeight(tier) <= _tierWeight(rec.tier)) {
+          Runtime.trap("Cannot downgrade tier");
+        };
+        memberTiers.add(caller, { rec with tier; upgradedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public query ({ caller }) func getMyReferralCode() : async ?Text {
+    switch (memberTiers.get(caller)) {
+      case (null)  { null };
+      case (?rec)  { ?rec.referralCode };
+    };
+  };
+
+  public query func resolveReferralCode(code : Text) : async ?Principal {
+    referralCodeIndex.get(code);
+  };
+
+  public shared ({ caller }) func setCommissionRate(
+    tier : MembershipTierLevel,
+    depthLevel : Nat,
+    earningType : EarningType,
+    basisPoints : Nat,
+    flatAmountUnits : Nat,
+  ) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let key = _tierWeight(tier).toText() # "-" # depthLevel.toText() # "-" # debug_show(earningType);
+    commissionRates.add(key, { tier; depthLevel; earningType; basisPoints; flatAmountUnits; isActive = true });
+    true;
+  };
+
+  public shared ({ caller }) func deactivateCommissionRate(
+    tier : MembershipTierLevel,
+    depthLevel : Nat,
+    earningType : EarningType,
+  ) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let key = _tierWeight(tier).toText() # "-" # depthLevel.toText() # "-" # debug_show(earningType);
+    switch (commissionRates.get(key)) {
+      case (null) { false };
+      case (?rate) {
+        commissionRates.add(key, { rate with isActive = false });
+        true;
+      };
+    };
+  };
+
+  public query func getCommissionRate(tier : MembershipTierLevel, depthLevel : Nat, earningType : EarningType) : async ?CommissionRate {
+    let key = _tierWeight(tier).toText() # "-" # depthLevel.toText() # "-" # debug_show(earningType);
+    commissionRates.get(key);
+  };
+
+  public query func getCommissionRates() : async [CommissionRate] {
+    commissionRates.values().toArray();
+  };
+
+  public shared ({ caller }) func recordEarning(
+    member : Principal,
+    amountUnits : Nat,
+    earningType : EarningType,
+    description : Text,
+    sourceId : Text,
+  ) : async Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    _recordEarning(member, amountUnits, earningType, description, sourceId);
+  };
+
+  public query ({ caller }) func getMyEarnings() : async [EarningRecord] {
+    let ids = switch (memberEarningsIndex.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { earningRecords.get(id) });
+  };
+
+  public query ({ caller }) func getMyEarningsSummary() : async EarningsSummary {
+    let ids = switch (memberEarningsIndex.get(caller)) {
+      case (null) { return { totalLifetime = 0; totalPending = 0; totalPaid = 0; directReferral = 0; levelOverride = 0; royaltyPool = 0; eventCommission = 0; finFracFran = 0; activityBonus = 0 } };
+      case (?ids) { ids };
+    };
+    let earnings = ids.filterMap(func(id) { earningRecords.get(id) });
+    var totalLifetime = 0;
+    var totalPending = 0;
+    var totalPaid = 0;
+    var directReferral = 0;
+    var levelOverride = 0;
+    var royaltyPool = 0;
+    var eventCommission = 0;
+    var finFracFran = 0;
+    var activityBonus = 0;
+    earnings.forEach(func(e) {
+      totalLifetime += e.amountUnits;
+      switch (e.status) {
+        case (#pending)    { totalPending    += e.amountUnits };
+        case (#processing) { totalPending    += e.amountUnits };
+        case (#paid)       { totalPaid       += e.amountUnits };
+      };
+      switch (e.earningType) {
+        case (#directReferral)  { directReferral  += e.amountUnits };
+        case (#levelOverride)   { levelOverride   += e.amountUnits };
+        case (#royaltyPool)     { royaltyPool     += e.amountUnits };
+        case (#eventCommission) { eventCommission += e.amountUnits };
+        case (#finFracFran)     { finFracFran     += e.amountUnits };
+        case (#activityBonus)   { activityBonus   += e.amountUnits };
+      };
+    });
+    { totalLifetime; totalPending; totalPaid; directReferral; levelOverride; royaltyPool; eventCommission; finFracFran; activityBonus };
+  };
+
+  public shared ({ caller }) func markEarningPaid(earnId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (earningRecords.get(earnId)) {
+      case (null) { false };
+      case (?e) {
+        earningRecords.add(earnId, { e with status = #paid });
+        true;
+      };
+    };
+  };
+
+  public query ({ caller }) func getMyDownline() : async [DownlineMember] {
+    let myTierOpt = memberTiers.get(caller);
+    let myCode = switch (myTierOpt) {
+      case (null)  { return [] };
+      case (?rec)  { rec.referralCode };
+    };
+    memberTiers.values().filter(
+      func(rec) {
+        switch (rec.sponsorCode) {
+          case (null) { false };
+          case (?sc)  { sc == myCode };
+        };
+      }
+    ).map(func(rec) : DownlineMember {
+      let directCount = memberTiers.values().filter(
+        func(r) {
+          switch (r.sponsorCode) {
+            case (null) { false };
+            case (?sc)  { sc == rec.referralCode };
+          };
+        }
+      ).size();
+      { principal = rec.principal; tier = rec.tier; referralCode = rec.referralCode; joinedAt = rec.joinedAt; directReferralCount = directCount };
+    }).toArray();
+  };
+
+  public query ({ caller }) func getMyUplineChain() : async [MemberTierRecord] {
+    var result : [MemberTierRecord] = [];
+    var current = caller;
+    var depth = 0;
+    while (depth < 6) {
+      switch (memberTiers.get(current)) {
+        case (null) { depth := 7 };
+        case (?rec) {
+          switch (rec.sponsorPrincipal) {
+            case (null) { depth := 7 };
+            case (?sponsor) {
+              switch (memberTiers.get(sponsor)) {
+                case (null) { depth := 7 };
+                case (?sr) {
+                  result := result.concat([sr]);
+                  current := sponsor;
+                  depth += 1;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+    result;
+  };
+
+  public shared ({ caller }) func processReferralChainBonus(
+    referredMember : Principal,
+    baseAmount : Nat,
+    earningType : EarningType,
+    description : Text,
+  ) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    _processReferralChainBonus(referredMember, baseAmount, earningType, description);
+  };
+
+  public shared ({ caller }) func addToFSUPool(amount : Nat, description : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    _addToFSUPool(amount, description);
+  };
+
+  public query func getFSUPoolStatus() : async FSUPoolStatus {
+    let outstanding = fsuRecords.values().foldLeft(0, func(acc, r) { acc + r.balance });
+    {
+      poolSizeUnits = fsuPool;
+      valuePerUnitCents = if (outstanding > 0) { fsuPool / outstanding } else { 1 };
+      totalOutstandingFSU = outstanding;
+      nextDistributionLabel = "End of current period";
+    };
+  };
+
+  public query ({ caller }) func getMyFSURecord() : async ?FSURecord {
+    fsuRecords.get(caller);
+  };
+
+  public query ({ caller }) func getMyFSUTransactions() : async [FSUTransaction] {
+    let ids = switch (memberFSUTxIndex.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { fsuTransactions.get(id) });
+  };
+
+  public shared ({ caller }) func distributeFSU(totalFSU : Nat, description : Text) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    _distributeFSU(totalFSU, description);
+  };
+
+  public shared ({ caller }) func redeemFSU(amount : Nat, description : Text) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    switch (fsuRecords.get(caller)) {
+      case (null) { false };
+      case (?rec) {
+        if (rec.balance < amount) { Runtime.trap("Insufficient FSU balance") };
+        fsuRecords.add(caller, { rec with balance = Nat.sub(rec.balance, amount) });
+        let txId = "fsu-" # nextFSUTxId.toText();
+        nextFSUTxId += 1;
+        let valuePerUnit : Nat = 1;
+        let tx : FSUTransaction = {
+          id = txId;
+          member = caller;
+          txType = #redeemed;
+          amount;
+          valuePerUnitCents = valuePerUnit;
+          description;
+          createdAt = Time.now();
+        };
+        fsuTransactions.add(txId, tx);
+        let existing = switch (memberFSUTxIndex.get(caller)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        memberFSUTxIndex.add(caller, existing.concat([txId]));
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func createRoyaltyPool(poolType : RoyaltyPoolType, period : Text) : async Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let poolId = "pool-" # nextRoyaltyPoolId.toText();
+    nextRoyaltyPoolId += 1;
+    let pool : RoyaltyPool = {
+      id = poolId;
+      poolType;
+      totalUnits = 0;
+      period;
+      isDistributed = false;
+      createdAt = Time.now();
+    };
+    royaltyPools.add(poolId, pool);
+    poolId;
+  };
+
+  public shared ({ caller }) func addToRoyaltyPool(poolId : Text, amount : Nat) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (royaltyPools.get(poolId)) {
+      case (null) { false };
+      case (?pool) {
+        royaltyPools.add(poolId, { pool with totalUnits = pool.totalUnits + amount });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func distributeRoyaltyPool(poolId : Text, minTierLevel : Nat) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (royaltyPools.get(poolId)) {
+      case (null) { false };
+      case (?pool) {
+        if (pool.isDistributed) { Runtime.trap("Pool already distributed") };
+        let eligible = memberTiers.values().filter(func(rec) { _tierWeight(rec.tier) >= minTierLevel }).toArray();
+        if (eligible.size() > 0) {
+          let share = pool.totalUnits / eligible.size();
+          eligible.forEach(func(rec) {
+            ignore _recordEarning(rec.principal, share, #royaltyPool, "Royalty pool distribution: " # poolId, poolId);
+          });
+        };
+        royaltyPools.add(poolId, { pool with isDistributed = true });
+        true;
+      };
+    };
+  };
+
+  public query func getRoyaltyPool(poolId : Text) : async ?RoyaltyPool {
+    royaltyPools.get(poolId);
+  };
+
+  public query func listRoyaltyPools() : async [RoyaltyPool] {
+    royaltyPools.values().toArray();
+  };
+
+  public query ({ caller }) func getMyRoyaltyDistributions() : async [EarningRecord] {
+    let ids = switch (memberEarningsIndex.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) {
+      switch (earningRecords.get(id)) {
+        case (null) { null };
+        case (?e) {
+          switch (e.earningType) {
+            case (#royaltyPool) { ?e };
+            case (_) { null };
+          };
+        };
+      };
+    });
+  };
+
+  public query func listAllMemberTiers() : async [MemberTierRecord] {
+    memberTiers.values().toArray();
+  };
+
+  public query ({ caller }) func getMemberEarnings(member : Principal) : async [EarningRecord] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let ids = switch (memberEarningsIndex.get(member)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { earningRecords.get(id) });
+  };
+
+  public shared ({ caller }) func runPayCycle(member : Principal) : async Nat {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let ids = switch (memberEarningsIndex.get(member)) {
+      case (null) { return 0 };
+      case (?ids) { ids };
+    };
+    var count = 0;
+    ids.forEach(func(id) {
+      switch (earningRecords.get(id)) {
+        case (null) {};
+        case (?e) {
+          switch (e.status) {
+            case (#pending) {
+              earningRecords.add(id, { e with status = #paid });
+              count += 1;
+            };
+            case (_) {};
+          };
+        };
+      };
+    });
+    count;
+  };
+
+  // =========================================================================
+  // === CROWDFUNDING MODULE (FinFracFran™ at Core) ==========================
+  // =========================================================================
+
+  // --- Crowdfunding Types ---
+
+  public type CrowdfundingCategory = {
+    #civic;
+    #humanitarian;
+    #education;
+    #research;
+    #community;
+    #youth;
+    #crisisResponse;
+  };
+
+  public type CrowdfundingFundingModel = {
+    #allOrNothing;
+    #keepWhatYouRaise;
+  };
+
+  public type CrowdfundingStatus = {
+    #pending;
+    #active;
+    #funded;
+    #failed;
+    #cancelled;
+  };
+
+  public type CrowdfundingRewardTier = {
+    id : Text;
+    title : Text;
+    description : Text;
+    minPledgeCents : Nat;
+    maxBackers : ?Nat;
+    backerCount : Nat;
+  };
+
+  public type CrowdfundingMilestone = {
+    id : Text;
+    title : Text;
+    description : Text;
+    targetCents : Nat;
+    bonusFSUAmount : Nat;
+    achievedAt : ?Int;
+  };
+
+  public type CrowdfundingCampaign = {
+    id : Text;
+    creator : Principal;
+    tenantId : Text;
+    title : Text;
+    description : Text;
+    category : CrowdfundingCategory;
+    fundingModel : CrowdfundingFundingModel;
+    status : CrowdfundingStatus;
+    goalCents : Nat;
+    currency : Text;
+    raisedCents : Nat;
+    backerCount : Nat;
+    deadline : Int;
+    coverImageUrl : Text;
+    rewardTiers : [CrowdfundingRewardTier];
+    milestones : [CrowdfundingMilestone];
+    fsuContributionBps : Nat;
+    totalFSUDistributed : Nat;
+    approvedByAdmin : Bool;
+    createdAt : Int;
+    updatedAt : Int;
+  };
+
+  public type CrowdfundingPledge = {
+    id : Text;
+    campaignId : Text;
+    backer : Principal;
+    amountCents : Nat;
+    rewardTierId : ?Text;
+    fsuEarned : Nat;
+    referrerCode : ?Text;
+    status : Text;
+    receiptCode : Text;
+    createdAt : Int;
+  };
+
+  public type CrowdfundingConfig = {
+    defaultFSUContributionBps : Nat;
+    creatorFSUBonus : Nat;
+    milestoneAchievementBonusBps : Nat;
+  };
+
+  // --- Crowdfunding Storage ---
+
+  let crowdfundingCampaigns = Map.empty<Text, CrowdfundingCampaign>();
+  let crowdfundingPledges = Map.empty<Text, CrowdfundingPledge>();
+  let campaignPledgeIndex = Map.empty<Text, [Text]>();
+  let backerPledgeIndex = Map.empty<Principal, [Text]>();
+  var nextCrowdfundingCampaignId : Nat = 1;
+  var nextCrowdfundingPledgeId : Nat = 1;
+  var crowdfundingConfig : CrowdfundingConfig = {
+    defaultFSUContributionBps = 500;
+    creatorFSUBonus = 100;
+    milestoneAchievementBonusBps = 200;
+  };
+
+  // --- Crowdfunding Public Functions ---
+
+  public shared ({ caller }) func setCrowdfundingConfig(
+    defaultFSUContributionBps : Nat,
+    creatorFSUBonus : Nat,
+    milestoneAchievementBonusBps : Nat,
+  ) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    crowdfundingConfig := {
+      defaultFSUContributionBps;
+      creatorFSUBonus;
+      milestoneAchievementBonusBps;
+    };
+  };
+
+  public query func getCrowdfundingConfig() : async CrowdfundingConfig {
+    crowdfundingConfig;
+  };
+
+  public shared ({ caller }) func approveCrowdfundingCampaign(campaignId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (crowdfundingCampaigns.get(campaignId)) {
+      case (null) { false };
+      case (?c) {
+        crowdfundingCampaigns.add(campaignId, { c with approvedByAdmin = true; status = #active; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func rejectCrowdfundingCampaign(campaignId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (crowdfundingCampaigns.get(campaignId)) {
+      case (null) { false };
+      case (?c) {
+        crowdfundingCampaigns.add(campaignId, { c with status = #cancelled; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public query ({ caller }) func adminListAllCrowdfundingCampaigns() : async [CrowdfundingCampaign] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    crowdfundingCampaigns.values().toArray();
+  };
+
+  public query ({ caller }) func adminListCrowdfundingPledges(campaignId : Text) : async [CrowdfundingPledge] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let ids = switch (campaignPledgeIndex.get(campaignId)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { crowdfundingPledges.get(id) });
+  };
+
+  public shared ({ caller }) func createCrowdfundingCampaign(
+    title : Text,
+    description : Text,
+    category : CrowdfundingCategory,
+    fundingModel : CrowdfundingFundingModel,
+    goalCents : Nat,
+    currency : Text,
+    deadline : Int,
+    coverImageUrl : Text,
+    rewardTiers : [CrowdfundingRewardTier],
+    milestones : [CrowdfundingMilestone],
+    fsuContributionBps : ?Nat,
+  ) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    let campaignId = "cf-" # nextCrowdfundingCampaignId.toText();
+    nextCrowdfundingCampaignId += 1;
+    let bps = switch (fsuContributionBps) {
+      case (null) { crowdfundingConfig.defaultFSUContributionBps };
+      case (?v)   { v };
+    };
+    let campaign : CrowdfundingCampaign = {
+      id = campaignId;
+      creator = caller;
+      tenantId = "platform";
+      title;
+      description;
+      category;
+      fundingModel;
+      status = #pending;
+      goalCents;
+      currency;
+      raisedCents = 0;
+      backerCount = 0;
+      deadline;
+      coverImageUrl;
+      rewardTiers;
+      milestones;
+      fsuContributionBps = bps;
+      totalFSUDistributed = 0;
+      approvedByAdmin = false;
+      createdAt = Time.now();
+      updatedAt = Time.now();
+    };
+    crowdfundingCampaigns.add(campaignId, campaign);
+    campaignId;
+  };
+
+  public shared ({ caller }) func updateCrowdfundingCampaign(
+    campaignId : Text,
+    title : Text,
+    description : Text,
+    coverImageUrl : Text,
+  ) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    switch (crowdfundingCampaigns.get(campaignId)) {
+      case (null) { false };
+      case (?c) {
+        if (c.creator != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only creator or admin");
+        };
+        crowdfundingCampaigns.add(campaignId, { c with title; description; coverImageUrl; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public query func getCrowdfundingCampaign(campaignId : Text) : async ?CrowdfundingCampaign {
+    crowdfundingCampaigns.get(campaignId);
+  };
+
+  public query func listCrowdfundingCampaigns() : async [CrowdfundingCampaign] {
+    crowdfundingCampaigns.values().filter(func(c) { c.approvedByAdmin and c.status == #active }).toArray();
+  };
+
+  public query func listCrowdfundingCampaignsByCategory(category : CrowdfundingCategory) : async [CrowdfundingCampaign] {
+    crowdfundingCampaigns.values().filter(func(c) { c.approvedByAdmin and c.status == #active and c.category == category }).toArray();
+  };
+
+  public query ({ caller }) func listMyCrowdfundingCampaigns() : async [CrowdfundingCampaign] {
+    crowdfundingCampaigns.values().filter(func(c) { c.creator == caller }).toArray();
+  };
+
+  public shared ({ caller }) func finalizeCrowdfundingCampaign(campaignId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (crowdfundingCampaigns.get(campaignId)) {
+      case (null) { false };
+      case (?c) {
+        let newStatus : CrowdfundingStatus = if (c.raisedCents >= c.goalCents) { #funded } else {
+          switch (c.fundingModel) {
+            case (#allOrNothing)    { #failed };
+            case (#keepWhatYouRaise){ #funded };
+          };
+        };
+        crowdfundingCampaigns.add(campaignId, { c with status = newStatus; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  public shared ({ caller }) func pledgeToCrowdfundingCampaign(
+    campaignId : Text,
+    amountCents : Nat,
+    rewardTierId : ?Text,
+    referrerCode : ?Text,
+  ) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    let campaign = switch (crowdfundingCampaigns.get(campaignId)) {
+      case (null) { Runtime.trap("Campaign not found") };
+      case (?c)   { c };
+    };
+    if (campaign.status != #active) {
+      Runtime.trap("Campaign is not active");
+    };
+
+    // Compute FSU contribution
+    let fsuContribution = amountCents * campaign.fsuContributionBps / 10000;
+    _addToFSUPool(fsuContribution, "Pledge to crowdfunding campaign: " # campaignId);
+
+    // Backer earns FSU
+    let backerFSU = fsuContribution;
+    if (backerFSU > 0) {
+      ignore _recordEarning(caller, backerFSU, #finFracFran, "FSU from crowdfunding pledge: " # campaignId, campaignId);
+    };
+
+    // Referral chain bonus
+    switch (referrerCode) {
+      case (null) {};
+      case (?code) {
+        switch (referralCodeIndex.get(code)) {
+          case (null) {};
+          case (?referrer) {
+            let referralBonus = amountCents * 3 / 100;
+            if (referralBonus > 0) {
+              ignore _recordEarning(referrer, referralBonus, #directReferral, "Crowdfunding referral bonus: " # campaignId, campaignId);
+              _processReferralChainBonus(referrer, referralBonus, #levelOverride, "Crowdfunding referral chain: " # campaignId);
+            };
+          };
+        };
+      };
+    };
+
+    // Create pledge record
+    let pledgeId = "pledge-" # nextCrowdfundingPledgeId.toText();
+    nextCrowdfundingPledgeId += 1;
+    let receiptCode = "RCPT-" # caller.toText().size().toText() # "-" # Time.now().toText();
+    let pledge : CrowdfundingPledge = {
+      id = pledgeId;
+      campaignId;
+      backer = caller;
+      amountCents;
+      rewardTierId;
+      fsuEarned = backerFSU;
+      referrerCode;
+      status = "confirmed";
+      receiptCode;
+      createdAt = Time.now();
+    };
+    crowdfundingPledges.add(pledgeId, pledge);
+
+    // Update campaign indexes
+    let existingCampaignPledges = switch (campaignPledgeIndex.get(campaignId)) {
+      case (null) { [] };
+      case (?ids) { ids };
+    };
+    campaignPledgeIndex.add(campaignId, existingCampaignPledges.concat([pledgeId]));
+    let existingBackerPledges = switch (backerPledgeIndex.get(caller)) {
+      case (null) { [] };
+      case (?ids) { ids };
+    };
+    backerPledgeIndex.add(caller, existingBackerPledges.concat([pledgeId]));
+
+    // Update campaign raised amount and backer count
+    let updatedCampaign = {
+      campaign with
+      raisedCents = campaign.raisedCents + amountCents;
+      backerCount = campaign.backerCount + 1;
+      updatedAt = Time.now();
+    };
+
+    // Check milestones and distribute bonus FSU
+    var newTotalFSU = campaign.totalFSUDistributed;
+    let updatedMilestones = updatedCampaign.milestones.map(func(m : CrowdfundingMilestone) : CrowdfundingMilestone {
+      switch (m.achievedAt) {
+        case (?_) { m };
+        case (null) {
+          if (updatedCampaign.raisedCents >= m.targetCents) {
+            let bonusFSU = m.bonusFSUAmount;
+            if (bonusFSU > 0) {
+              _distributeFSU(bonusFSU, "Milestone achieved: " # m.title # " for campaign: " # campaignId);
+              newTotalFSU += bonusFSU;
+            };
+            { m with achievedAt = ?Time.now() };
+          } else {
+            m;
+          };
+        };
+      };
+    });
+
+    crowdfundingCampaigns.add(campaignId, {
+      updatedCampaign with
+      milestones = updatedMilestones;
+      totalFSUDistributed = newTotalFSU;
+    });
+
+    pledgeId;
+  };
+
+  public query ({ caller }) func getMyPledges() : async [CrowdfundingPledge] {
+    let ids = switch (backerPledgeIndex.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { crowdfundingPledges.get(id) });
+  };
+
+  public query func getCampaignPledges(campaignId : Text) : async [CrowdfundingPledge] {
+    let ids = switch (campaignPledgeIndex.get(campaignId)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { crowdfundingPledges.get(id) });
+  };
+
+  public query func getCrowdfundingPledge(pledgeId : Text) : async ?CrowdfundingPledge {
+    crowdfundingPledges.get(pledgeId);
+  };
+
+  public shared ({ caller }) func refundPledge(pledgeId : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (crowdfundingPledges.get(pledgeId)) {
+      case (null) { false };
+      case (?pledge) {
+        crowdfundingPledges.add(pledgeId, { pledge with status = "refunded" });
+        true;
+      };
+    };
+  };
 };

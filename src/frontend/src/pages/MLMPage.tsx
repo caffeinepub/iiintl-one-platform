@@ -1,3 +1,4 @@
+import { MembershipTierLevel } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,6 @@ import type {
   FSURecord,
   FSUTransaction,
   MemberTierRecord,
-  MembershipTierLevel,
   RoyaltyDistribution,
   RoyaltyPool,
 } from "@/types/appTypes";
@@ -150,8 +150,9 @@ export function MLMPage() {
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeTier, setUpgradeTier] =
-    useState<MembershipTierLevel>("associate");
+  const [upgradeTier, setUpgradeTier] = useState<MembershipTierLevel>(
+    MembershipTierLevel.associate,
+  );
   const [upgrading, setUpgrading] = useState(false);
   const [redeemAmount, setRedeemAmount] = useState("");
   const [redeemDesc, setRedeemDesc] = useState("");
@@ -438,22 +439,22 @@ export function MLMPage() {
                       {[
                         {
                           label: "Total Earned",
-                          value: centsToDisplay(summary.totalCents),
+                          value: centsToDisplay(summary.totalLifetime),
                           icon: <DollarSign size={18} />,
                         },
                         {
                           label: "Pending",
-                          value: centsToDisplay(summary.pendingCents),
+                          value: centsToDisplay(summary.totalPending),
                           icon: <TrendingUp size={18} />,
                         },
                         {
                           label: "Paid Out",
-                          value: centsToDisplay(summary.paidCents),
+                          value: centsToDisplay(summary.totalPaid),
                           icon: <CheckCircle size={18} />,
                         },
                         {
                           label: "FSU Balance",
-                          value: fsuRecord ? String(fsuRecord.fsuBalance) : "0",
+                          value: fsuRecord ? String(fsuRecord.balance) : "0",
                           icon: <Star size={18} />,
                         },
                       ].map((s) => (
@@ -485,16 +486,18 @@ export function MLMPage() {
                       <CardContent className="space-y-3">
                         {(
                           [
-                            ["directReferral", summary.directReferralCents],
-                            ["levelOverride", summary.levelOverrideCents],
-                            ["royaltyPool", summary.royaltyPoolCents],
-                            ["eventCommission", summary.eventCommissionCents],
-                            ["finFracFran", summary.finFracFranCents],
-                            ["activityBonus", summary.activityBonusCents],
+                            ["directReferral", summary.directReferral],
+                            ["levelOverride", summary.levelOverride],
+                            ["royaltyPool", summary.royaltyPool],
+                            ["eventCommission", summary.eventCommission],
+                            ["finFracFran", summary.finFracFran],
+                            ["activityBonus", summary.activityBonus],
                           ] as [string, bigint][]
                         ).map(([type, cents]) => {
                           const total =
-                            summary.totalCents > 0n ? summary.totalCents : 1n;
+                            summary.totalLifetime > 0n
+                              ? summary.totalLifetime
+                              : 1n;
                           const pct = Math.round(
                             (Number(cents) / Number(total)) * 100,
                           );
@@ -573,7 +576,7 @@ export function MLMPage() {
                               L{e.depthLevel}
                             </TableCell>
                             <TableCell className="font-medium">
-                              {centsToDisplay(e.amountCents)}
+                              {centsToDisplay(e.amountUnits)}
                             </TableCell>
                             <TableCell>
                               <span
@@ -646,25 +649,32 @@ export function MLMPage() {
                       >
                         {downline.map((m, i) => (
                           <div
-                            key={m.principal}
+                            key={m.referralCode}
                             className="flex items-center gap-3 rounded-xl border bg-card p-3"
                             data-ocid={`downline.item.${i + 1}`}
                           >
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                              {m.displayName.slice(0, 2).toUpperCase()}
+                              {String(m.referralCode).slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">
-                                {m.displayName}
+                                {m.referralCode}
                               </p>
                               <p className="font-mono text-xs text-muted-foreground">
-                                {m.principal.slice(0, 12)}...
+                                {typeof m.principal === "object" &&
+                                m.principal !== null &&
+                                "toText" in (m.principal as object)
+                                  ? (m.principal as { toText: () => string })
+                                      .toText()
+                                      .slice(0, 12)
+                                  : String(m.principal).slice(0, 12)}
+                                ...
                               </p>
                             </div>
                             <div className="text-right">
                               <TierBadge tier={m.tier} />
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {m.directReferralCount} refs
+                                {String(m.directReferralCount)} refs
                               </p>
                             </div>
                           </div>
@@ -746,7 +756,7 @@ export function MLMPage() {
                               Pool Size
                             </span>
                             <span className="font-semibold">
-                              {centsToDisplay(fsuPool.poolSizeCents)}
+                              {centsToDisplay(fsuPool.poolSizeUnits)}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -754,7 +764,7 @@ export function MLMPage() {
                               FSU Value Each
                             </span>
                             <span className="font-semibold">
-                              {centsToDisplay(fsuPool.fsuValueCentsEach)}
+                              {centsToDisplay(fsuPool.valuePerUnitCents)}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -762,7 +772,7 @@ export function MLMPage() {
                               Total Outstanding
                             </span>
                             <span className="font-semibold">
-                              {String(fsuPool.totalFSUOutstanding)} FSU
+                              {String(fsuPool.totalOutstandingFSU)} FSU
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -797,7 +807,7 @@ export function MLMPage() {
                               Current Balance
                             </span>
                             <span className="text-xl font-bold text-amber-600">
-                              {String(fsuRecord.fsuBalance)} FSU
+                              {String(fsuRecord.balance)} FSU
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -908,10 +918,10 @@ export function MLMPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="font-mono">
-                                {String(tx.fsuAmount)}
+                                {String(tx.amount)}
                               </TableCell>
                               <TableCell>
-                                {centsToDisplay(tx.usdCentsValue)}
+                                {centsToDisplay(tx.valuePerUnitCents)}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {tx.description}
@@ -959,14 +969,12 @@ export function MLMPage() {
                             </span>
                           </div>
                           <p className="mb-1 text-sm font-medium">
-                            {pool.periodLabel}
+                            {pool.period}
                           </p>
                           <p className="text-xl font-bold">
-                            {centsToDisplay(pool.totalCents)}
+                            {centsToDisplay(pool.totalUnits)}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {pool.currency}
-                          </p>
+                          <p className="text-xs text-muted-foreground">Units</p>
                         </CardContent>
                       </Card>
                     ))
@@ -999,17 +1007,17 @@ export function MLMPage() {
                         <TableBody>
                           {royaltyDists.map((d, i) => (
                             <TableRow
-                              key={String(d.id)}
+                              key={d.id}
                               data-ocid={`royaltydist.item.${i + 1}`}
                             >
                               <TableCell className="text-sm">
-                                {formatTs(d.distributedAt)}
+                                {formatTs(d.createdAt)}
                               </TableCell>
                               <TableCell className="text-sm">
-                                Pool #{String(d.poolId)}
+                                Pool #{d.sourceId}
                               </TableCell>
                               <TableCell className="font-medium">
-                                {centsToDisplay(d.amountCents)}
+                                {centsToDisplay(d.amountUnits)}
                               </TableCell>
                             </TableRow>
                           ))}

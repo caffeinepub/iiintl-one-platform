@@ -55,6 +55,22 @@ type ThreadStatus =
    locked;
    open;
  };
+type RoyaltyPoolType = 
+ variant {
+   event;
+   finFracFran;
+   global;
+   leadership;
+ };
+type RoyaltyPool = 
+ record {
+   createdAt: int;
+   id: text;
+   isDistributed: bool;
+   period: text;
+   poolType: RoyaltyPoolType;
+   totalUnits: nat;
+ };
 type Role = 
  variant {
    admin;
@@ -92,6 +108,26 @@ type OrgMember =
    role: OrgMemberRole;
    userId: text;
  };
+type MembershipTierLevel = 
+ variant {
+   affiliate;
+   ambassador;
+   associate;
+   executive;
+   founder;
+   free;
+   partner;
+ };
+type MemberTierRecord = 
+ record {
+   joinedAt: int;
+   "principal": principal;
+   referralCode: text;
+   sponsorCode: opt text;
+   sponsorPrincipal: opt principal;
+   tier: MembershipTierLevel;
+   upgradedAt: int;
+ };
 type ForumThread = 
  record {
    body: text;
@@ -124,6 +160,175 @@ type ForumCategory =
    general;
    regional;
    resources;
+ };
+type FSUTxType = 
+ variant {
+   earned;
+   redeemed;
+   transferred;
+ };
+type FSUTransaction = 
+ record {
+   amount: nat;
+   createdAt: int;
+   description: text;
+   id: text;
+   member: principal;
+   txType: FSUTxType;
+   valuePerUnitCents: nat;
+ };
+type FSURecord = 
+ record {
+   balance: nat;
+   lifetimeEarned: nat;
+   member: principal;
+ };
+type FSUPoolStatus = 
+ record {
+   nextDistributionLabel: text;
+   poolSizeUnits: nat;
+   totalOutstandingFSU: nat;
+   valuePerUnitCents: nat;
+ };
+type EarningsSummary = 
+ record {
+   activityBonus: nat;
+   directReferral: nat;
+   eventCommission: nat;
+   finFracFran: nat;
+   levelOverride: nat;
+   royaltyPool: nat;
+   totalLifetime: nat;
+   totalPaid: nat;
+   totalPending: nat;
+ };
+type EarningType = 
+ variant {
+   activityBonus;
+   directReferral;
+   eventCommission;
+   finFracFran;
+   levelOverride;
+   royaltyPool;
+ };
+type EarningStatus = 
+ variant {
+   paid;
+   pending;
+   processing;
+ };
+type EarningRecord = 
+ record {
+   amountUnits: nat;
+   createdAt: int;
+   depthLevel: nat;
+   description: text;
+   earningType: EarningType;
+   id: text;
+   member: principal;
+   sourceId: text;
+   status: EarningStatus;
+ };
+type DownlineMember = 
+ record {
+   directReferralCount: nat;
+   joinedAt: int;
+   "principal": principal;
+   referralCode: text;
+   tier: MembershipTierLevel;
+ };
+type CrowdfundingStatus = 
+ variant {
+   active;
+   cancelled;
+   failed;
+   funded;
+   pending;
+ };
+type CrowdfundingRewardTier = 
+ record {
+   backerCount: nat;
+   description: text;
+   id: text;
+   maxBackers: opt nat;
+   minPledgeCents: nat;
+   title: text;
+ };
+type CrowdfundingPledge = 
+ record {
+   amountCents: nat;
+   backer: principal;
+   campaignId: text;
+   createdAt: int;
+   fsuEarned: nat;
+   id: text;
+   receiptCode: text;
+   referrerCode: opt text;
+   rewardTierId: opt text;
+   status: text;
+ };
+type CrowdfundingMilestone = 
+ record {
+   achievedAt: opt int;
+   bonusFSUAmount: nat;
+   description: text;
+   id: text;
+   targetCents: nat;
+   title: text;
+ };
+type CrowdfundingFundingModel = 
+ variant {
+   allOrNothing;
+   keepWhatYouRaise;
+ };
+type CrowdfundingConfig = 
+ record {
+   creatorFSUBonus: nat;
+   defaultFSUContributionBps: nat;
+   milestoneAchievementBonusBps: nat;
+ };
+type CrowdfundingCategory = 
+ variant {
+   civic;
+   community;
+   crisisResponse;
+   education;
+   humanitarian;
+   research;
+   youth;
+ };
+type CrowdfundingCampaign = 
+ record {
+   approvedByAdmin: bool;
+   backerCount: nat;
+   category: CrowdfundingCategory;
+   coverImageUrl: text;
+   createdAt: int;
+   creator: principal;
+   currency: text;
+   deadline: int;
+   description: text;
+   fsuContributionBps: nat;
+   fundingModel: CrowdfundingFundingModel;
+   goalCents: nat;
+   id: text;
+   milestones: vec CrowdfundingMilestone;
+   raisedCents: nat;
+   rewardTiers: vec CrowdfundingRewardTier;
+   status: CrowdfundingStatus;
+   tenantId: text;
+   title: text;
+   totalFSUDistributed: nat;
+   updatedAt: int;
+ };
+type CommissionRate = 
+ record {
+   basisPoints: nat;
+   depthLevel: nat;
+   earningType: EarningType;
+   flatAmountUnits: nat;
+   isActive: bool;
+   tier: MembershipTierLevel;
  };
 type CampaignType = 
  variant {
@@ -158,8 +363,14 @@ type Campaign =
  };
 service : {
   _initializeAccessControl: () -> ();
+  addToFSUPool: (amount: nat, description: text) -> ();
+  addToRoyaltyPool: (poolId: text, amount: nat) -> (bool);
   addTransaction: (walletAddress: text, amount: float64, description: 
    text, txType: TransactionType) -> ();
+  adminListAllCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
+  adminListCrowdfundingPledges: (campaignId: text) ->
+   (vec CrowdfundingPledge) query;
+  approveCrowdfundingCampaign: (campaignId: text) -> (bool);
   archiveCampaign: (id: text) -> (bool);
   archiveOrg: (orgId: text) -> (bool);
   archiveThread: (threadId: nat) -> (bool);
@@ -167,30 +378,64 @@ service : {
   createCampaign: (title: text, description: text, campaignType:
    CampaignType, orgId: text, goal: nat, startDate: int, endDate: int, tags:
    vec text) -> (text);
+  createCrowdfundingCampaign: (title: text, description: text, category:
+   CrowdfundingCategory, fundingModel: CrowdfundingFundingModel, goalCents:
+   nat, currency: text, deadline: int, coverImageUrl: text, rewardTiers:
+   vec CrowdfundingRewardTier, milestones: vec CrowdfundingMilestone,
+   fsuContributionBps: opt nat) -> (text);
   createOrg: (name: text, description: text, region: text, orgType: text,
    website: text, foundedYear: int) -> (text);
+  createRoyaltyPool: (poolType: RoyaltyPoolType, period: text) -> (text);
   createThread: (title: text, body: text, category: ForumCategory, orgId:
    opt text, tags: vec text) -> (nat);
+  deactivateCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
+   earningType: EarningType) -> (bool);
+  distributeFSU: (totalFSU: nat, description: text) -> ();
+  distributeRoyaltyPool: (poolId: text, minTierLevel: nat) -> (bool);
+  finalizeCrowdfundingCampaign: (campaignId: text) -> (bool);
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
   getCampaign: (id: text) -> (opt Campaign) query;
+  getCampaignPledges: (campaignId: text) -> (vec CrowdfundingPledge) query;
   getCampaignProgress: (campaignId: text) ->
    (opt record {
           goal: nat;
           progress: nat;
         }) query;
   getCampaignSupporterCount: (campaignId: text) -> (opt nat) query;
+  getCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
+   earningType: EarningType) -> (opt CommissionRate) query;
+  getCommissionRates: () -> (vec CommissionRate) query;
+  getCrowdfundingCampaign: (campaignId: text) ->
+   (opt CrowdfundingCampaign) query;
+  getCrowdfundingConfig: () -> (CrowdfundingConfig) query;
+  getCrowdfundingPledge: (pledgeId: text) -> (opt CrowdfundingPledge) query;
+  getFSUPoolStatus: () -> (FSUPoolStatus) query;
   getLinkedWallets: () -> (vec Wallet) query;
+  getMemberEarnings: (member: principal) -> (vec EarningRecord) query;
+  getMemberTierRecord: (p: principal) -> (opt MemberTierRecord) query;
+  getMyDownline: () -> (vec DownlineMember) query;
+  getMyEarnings: () -> (vec EarningRecord) query;
+  getMyEarningsSummary: () -> (EarningsSummary) query;
+  getMyFSURecord: () -> (opt FSURecord) query;
+  getMyFSUTransactions: () -> (vec FSUTransaction) query;
+  getMyPledges: () -> (vec CrowdfundingPledge) query;
+  getMyReferralCode: () -> (opt text) query;
+  getMyRoyaltyDistributions: () -> (vec EarningRecord) query;
+  getMyTierRecord: () -> (opt MemberTierRecord) query;
+  getMyUplineChain: () -> (vec MemberTierRecord) query;
   getOrg: (orgId: text) -> (opt Organization) query;
   getOrgMembers: (orgId: text) -> (vec OrgMember) query;
   getPreferredLanguage: () -> (text) query;
   getReplies: (threadId: nat) -> (vec ForumReply) query;
+  getRoyaltyPool: (poolId: text) -> (opt RoyaltyPool) query;
   getThread: (threadId: nat) -> (opt ForumThread) query;
   getTransactionHistory: (walletAddress: opt text) -> (vec Transaction) query;
   getUserOrgs: (userId: text) -> (vec Organization) query;
   getUserProfile: (user: principal) -> (opt UserProfile) query;
   getWalletBalance: (address: text) -> (float64) query;
   incrementThreadView: (threadId: nat) -> (bool);
+  initMemberMLM: (sponsorCode: opt text) -> (text);
   isCallerAdmin: () -> (bool) query;
   joinCampaign: (campaignId: text) -> (bool);
   joinOrg: (orgId: text) -> (bool);
@@ -200,23 +445,50 @@ service : {
    ();
   listActiveCampaigns: () -> (vec Campaign) query;
   listActiveOrgs: () -> (vec Organization) query;
+  listAllMemberTiers: () -> (vec MemberTierRecord) query;
   listCampaigns: () -> (vec Campaign) query;
   listCampaignsByOrg: (orgId: text) -> (vec Campaign) query;
+  listCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
+  listCrowdfundingCampaignsByCategory: (category: CrowdfundingCategory) ->
+   (vec CrowdfundingCampaign) query;
+  listMyCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
   listOrgs: () -> (vec Organization) query;
+  listRoyaltyPools: () -> (vec RoyaltyPool) query;
   listThreads: () -> (vec ForumThread) query;
   listThreadsByCategory: (category: ForumCategory) -> (vec ForumThread) query;
   listThreadsByOrg: (orgId: text) -> (vec ForumThread) query;
   listUsers: () -> (vec UserSummary) query;
   lockThread: (threadId: nat) -> (bool);
+  markEarningPaid: (earnId: text) -> (bool);
   pinThread: (threadId: nat) -> (bool);
+  pledgeToCrowdfundingCampaign: (campaignId: text, amountCents: nat,
+   rewardTierId: opt text, referrerCode: opt text) -> (text);
+  processReferralChainBonus: (referredMember: principal, baseAmount: 
+   nat, earningType: EarningType, description: text) -> ();
+  recordEarning: (member: principal, amountUnits: nat, earningType:
+   EarningType, description: text, sourceId: text) -> (text);
+  redeemFSU: (amount: nat, description: text) -> (bool);
+  refundPledge: (pledgeId: text) -> (bool);
   registerUser: (displayName: text, email: text) -> (text);
+  rejectCrowdfundingCampaign: (campaignId: text) -> (bool);
   replyToThread: (threadId: nat, body: text) -> (nat);
+  resolveReferralCode: (code: text) -> (opt principal) query;
+  runPayCycle: (member: principal) -> (nat);
   saveCallerUserProfile: (profile: UserProfile) -> ();
+  setCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
+   earningType: EarningType, basisPoints: nat, flatAmountUnits: nat) ->
+   (bool);
+  setCrowdfundingConfig: (defaultFSUContributionBps: nat, creatorFSUBonus:
+   nat, milestoneAchievementBonusBps: nat) -> ();
+  setMemberTier: (target: principal, tier: MembershipTierLevel) -> (bool);
   setPreferredLanguage: (lang: text) -> ();
   unlinkWallet: (address: text) -> ();
   updateCampaign: (id: text, title: text, description: text, campaignType:
    CampaignType, goal: nat, startDate: int, endDate: int, tags: vec text) ->
    (bool);
+  updateCrowdfundingCampaign: (campaignId: text, title: text, description:
+   text, coverImageUrl: text) -> (bool);
   updateOrg: (orgId: text, name: text, description: text, region: text,
    orgType: text, website: text, foundedYear: int) -> (bool);
+  upgradeMemberTier: (tier: MembershipTierLevel) -> (bool);
 }

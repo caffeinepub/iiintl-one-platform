@@ -1,4 +1,24 @@
 import type { backendInterface } from "@/backend";
+import type {
+  CrowdfundingCampaign,
+  CrowdfundingCategory,
+  CrowdfundingConfig,
+  CrowdfundingFundingModel,
+  CrowdfundingMilestone,
+  CrowdfundingPledge,
+  CrowdfundingRewardTier,
+  CrowdfundingStatus,
+} from "@/backend";
+export type {
+  CrowdfundingCategory,
+  CrowdfundingFundingModel,
+  CrowdfundingStatus,
+  CrowdfundingRewardTier,
+  CrowdfundingMilestone,
+  CrowdfundingCampaign,
+  CrowdfundingPledge,
+  CrowdfundingConfig,
+} from "@/backend";
 /**
  * Supplemental application types for features not yet reflected in the backend DID.
  * These types support the Tenant/PaaS, MLM/Rewards, and Events modules
@@ -129,135 +149,43 @@ export interface PlatformAnalytics {
 }
 
 // ── MLM / Rewards Types ──────────────────────────────────────────────────────
+// These types are generated from the backend DID — re-exported here for use in frontend pages.
 
-export type MembershipTierLevel =
-  | "free"
-  | "associate"
-  | "affiliate"
-  | "partner"
-  | "executive"
-  | "ambassador"
-  | "founder";
-export type EarningType =
-  | "directReferral"
-  | "levelOverride"
-  | "royaltyPool"
-  | "eventCommission"
-  | "finFracFran"
-  | "activityBonus";
-export type EarningStatus = "pending" | "processing" | "paid";
-export type RoyaltyPoolType = "global" | "leadership" | "event" | "finFracFran";
-export type FSUTxType = "earned" | "redeemed" | "transferred";
+import type {
+  CommissionRate,
+  DownlineMember,
+  EarningRecord,
+  EarningStatus,
+  EarningType,
+  EarningsSummary,
+  FSUPoolStatus,
+  FSURecord,
+  FSUTransaction,
+  FSUTxType,
+  MemberTierRecord,
+  MembershipTierLevel,
+  RoyaltyPool,
+  RoyaltyPoolType,
+} from "@/backend";
+export type {
+  MembershipTierLevel,
+  EarningType,
+  EarningStatus,
+  RoyaltyPoolType,
+  FSUTxType,
+  MemberTierRecord,
+  EarningRecord,
+  CommissionRate,
+  EarningsSummary,
+  DownlineMember,
+  RoyaltyPool,
+  FSURecord,
+  FSUTransaction,
+  FSUPoolStatus,
+} from "@/backend";
 
-export interface MemberTierRecord {
-  memberId: Principal;
-  tier: MembershipTierLevel;
-  referralCode: string;
-  sponsorId: Principal | null;
-  joinedAt: bigint;
-  upgradedAt: bigint | null;
-  isActive: boolean;
-}
-
-export interface EarningRecord {
-  id: bigint;
-  memberId: Principal;
-  /** amount in cents as bigint */
-  amountCents: bigint;
-  currency: string;
-  earningType: EarningType;
-  status: EarningStatus;
-  /** depth level — pages reference this as `depthLevel` */
-  depthLevel: bigint;
-  sourceId: string;
-  description: string;
-  createdAt: bigint;
-}
-
-export interface CommissionRate {
-  tier: MembershipTierLevel;
-  level: bigint;
-  earningType: EarningType;
-  basisPoints: bigint;
-  flatAmountCents: bigint;
-  active: boolean;
-}
-
-export interface EarningsSummary {
-  /** total lifetime cents as bigint */
-  totalCents: bigint;
-  pendingCents: bigint;
-  paidCents: bigint;
-  directReferralCents: bigint;
-  levelOverrideCents: bigint;
-  royaltyPoolCents: bigint;
-  eventCommissionCents: bigint;
-  finFracFranCents: bigint;
-  activityBonusCents: bigint;
-  fsuBalance: bigint;
-}
-
-/** Downline member with display info as expected by MLMPage */
-export interface DownlineMember {
-  /** string representation of principal */
-  principal: string;
-  displayName: string;
-  tier: MembershipTierLevel;
-  directReferralCount: number;
-  joinedAt: bigint;
-  isActive: boolean;
-}
-
-export interface RoyaltyPool {
-  id: bigint;
-  poolType: RoyaltyPoolType;
-  /** totalCents as bigint */
-  totalCents: bigint;
-  currency: string;
-  /** human-readable period label e.g. "Jan 2026 – Feb 2026" */
-  periodLabel: string;
-  isDistributed: boolean;
-  createdAt: bigint;
-}
-
-export interface RoyaltyDistribution {
-  id: bigint;
-  poolId: bigint;
-  memberId: Principal;
-  /** amountCents as bigint */
-  amountCents: bigint;
-  currency: string;
-  distributedAt: bigint;
-}
-
-export interface FSURecord {
-  memberId: Principal;
-  /** balance — pages reference as `fsuBalance` */
-  fsuBalance: bigint;
-  lifetimeEarned: bigint;
-}
-
-export interface FSUTransaction {
-  id: bigint;
-  memberId: Principal;
-  txType: FSUTxType;
-  /** FSU units — pages reference as `fsuAmount` */
-  fsuAmount: bigint;
-  /** USD cent value — pages reference as `usdCentsValue` */
-  usdCentsValue: bigint;
-  description: string;
-  /** timestamp — pages reference as `createdAt` */
-  createdAt: bigint;
-}
-
-export interface FSUPoolStatus {
-  /** pool size cents — pages reference as `poolSizeCents` */
-  poolSizeCents: bigint;
-  totalFSUOutstanding: bigint;
-  /** fsu value per unit cents — pages reference as `fsuValueCentsEach` */
-  fsuValueCentsEach: bigint;
-  nextDistributionLabel: string;
-}
+// RoyaltyDistribution — backend now returns EarningRecord[] for pool distributions
+export type RoyaltyDistribution = EarningRecord;
 
 // ── Event / Ticketing Types ──────────────────────────────────────────────────
 
@@ -301,8 +229,11 @@ export interface Ticket {
   purchasedAt: bigint;
 }
 
+// ── Crowdfunding / FinFracFran™ Types ────────────────────────────────────────
+// These types are now generated from the backend DID — re-exported at the top of this file.
+
 // ── Extended Backend Interface ────────────────────────────────────────────────
-// Augments the generated backendInterface with Tenant, MLM, and Events methods.
+// Augments the generated backendInterface with Tenant, MLM, Events, and Crowdfunding methods.
 
 export interface ExtendedBackend extends backendInterface {
   // Tenant / PaaS
@@ -352,69 +283,73 @@ export interface ExtendedBackend extends backendInterface {
   getPlatformAnalytics(): Promise<PlatformAnalytics>;
 
   // MLM - Tiers & Referrals
-  initMemberMLM(sponsorCode: string | null): Promise<boolean>;
+  initMemberMLM(sponsorCode: string | null): Promise<string>;
   getMyTierRecord(): Promise<MemberTierRecord | null>;
-  getMemberTierRecord(memberId: string): Promise<MemberTierRecord | null>;
-  setMemberTier(target: string, tier: MembershipTierLevel): Promise<boolean>;
+  getMemberTierRecord(
+    p: import("@icp-sdk/core/principal").Principal,
+  ): Promise<MemberTierRecord | null>;
+  setMemberTier(
+    target: import("@icp-sdk/core/principal").Principal,
+    tier: MembershipTierLevel,
+  ): Promise<boolean>;
   upgradeMemberTier(tier: MembershipTierLevel): Promise<boolean>;
-  getMyReferralCode(): Promise<string>;
-  resolveReferralCode(code: string): Promise<string | null>;
+  getMyReferralCode(): Promise<string | null>;
+  resolveReferralCode(
+    code: string,
+  ): Promise<import("@icp-sdk/core/principal").Principal | null>;
   listAllMemberTiers(): Promise<MemberTierRecord[]>;
   setCommissionRate(
     tier: MembershipTierLevel,
-    level: bigint,
+    depthLevel: bigint,
     earningType: EarningType,
     basisPoints: bigint,
-    flatAmountCents: bigint,
+    flatAmountUnits: bigint,
   ): Promise<boolean>;
   deactivateCommissionRate(
     tier: MembershipTierLevel,
-    level: bigint,
+    depthLevel: bigint,
     earningType: EarningType,
   ): Promise<boolean>;
   getCommissionRate(
     tier: MembershipTierLevel,
-    level: bigint,
+    depthLevel: bigint,
     earningType: EarningType,
   ): Promise<CommissionRate | null>;
   getCommissionRates(): Promise<CommissionRate[]>;
   recordEarning(
-    memberId: string,
-    amountCents: number,
-    currency: string,
+    member: import("@icp-sdk/core/principal").Principal,
+    amountUnits: bigint,
     earningType: EarningType,
-    level: number,
-    sourceId: string,
     description: string,
-  ): Promise<bigint>;
-  processReferralChainBonus(
-    memberId: string,
-    amountCents: number,
-    earningType: EarningType,
     sourceId: string,
-  ): Promise<boolean>;
-  markEarningPaid(earnId: bigint): Promise<boolean>;
+  ): Promise<string>;
+  processReferralChainBonus(
+    referredMember: import("@icp-sdk/core/principal").Principal,
+    baseAmount: bigint,
+    earningType: EarningType,
+    description: string,
+  ): Promise<void>;
+  markEarningPaid(earnId: string): Promise<boolean>;
   getMyEarnings(): Promise<EarningRecord[]>;
   getMyEarningsSummary(): Promise<EarningsSummary>;
   getMyDownline(): Promise<DownlineMember[]>;
   getMyUplineChain(): Promise<MemberTierRecord[]>;
-  getMemberEarnings(memberId: string): Promise<EarningRecord[]>;
-  runPayCycle(memberId: string): Promise<bigint>;
-  createRoyaltyPool(
-    poolType: RoyaltyPoolType,
-    currency: string,
-    periodStart: bigint,
-    periodEnd: bigint,
+  getMemberEarnings(
+    member: import("@icp-sdk/core/principal").Principal,
+  ): Promise<EarningRecord[]>;
+  runPayCycle(
+    member: import("@icp-sdk/core/principal").Principal,
   ): Promise<bigint>;
-  addToRoyaltyPool(poolId: bigint, amountCents: bigint): Promise<boolean>;
-  distributeRoyaltyPool(poolId: bigint, minTierLevel: bigint): Promise<boolean>;
-  getRoyaltyPool(poolId: bigint): Promise<RoyaltyPool | null>;
+  createRoyaltyPool(poolType: RoyaltyPoolType, period: string): Promise<string>;
+  addToRoyaltyPool(poolId: string, amount: bigint): Promise<boolean>;
+  distributeRoyaltyPool(poolId: string, minTierLevel: bigint): Promise<boolean>;
+  getRoyaltyPool(poolId: string): Promise<RoyaltyPool | null>;
   listRoyaltyPools(): Promise<RoyaltyPool[]>;
   getMyRoyaltyDistributions(): Promise<RoyaltyDistribution[]>;
-  addToFSUPool(amountCents: bigint): Promise<boolean>;
+  addToFSUPool(amount: bigint, description: string): Promise<void>;
   getFSUPoolStatus(): Promise<FSUPoolStatus>;
   getMyFSURecord(): Promise<FSURecord | null>;
-  distributeFSU(totalFSU: bigint, description: string): Promise<boolean>;
+  distributeFSU(totalFSU: bigint, description: string): Promise<void>;
   redeemFSU(amount: bigint, description: string): Promise<boolean>;
   getMyFSUTransactions(): Promise<FSUTransaction[]>;
 
@@ -451,4 +386,72 @@ export interface ExtendedBackend extends backendInterface {
   getMyTickets(): Promise<Ticket[]>;
   listEventTickets(eventId: bigint): Promise<Ticket[]>;
   adminListAllTickets(): Promise<Ticket[]>;
+
+  // Cross-tenant admin queries (PaaS Phase F2)
+  // These return all records across all tenants for super-admin oversight.
+  // Regular list functions (listOrgs, listCampaigns, listThreads, listUsers)
+  // now auto-scope to the caller's tenant — admins use these variants instead.
+  listAllOrgsAdmin(): Promise<Array<import("@/backend").Organization>>;
+  listAllCampaignsAdmin(): Promise<Array<import("@/backend").Campaign>>;
+  listAllThreadsAdmin(): Promise<Array<import("@/backend").ForumThread>>;
+  listAllUsersAdmin(): Promise<Array<import("@/backend").UserSummary>>;
+
+  // ── Crowdfunding / FinFracFran™ ──────────────────────────────────────────
+  // Config
+  setCrowdfundingConfig(
+    defaultFSUContributionBps: bigint,
+    creatorFSUBonus: bigint,
+    milestoneAchievementBonusBps: bigint,
+  ): Promise<void>;
+  getCrowdfundingConfig(): Promise<CrowdfundingConfig>;
+
+  // Admin
+  approveCrowdfundingCampaign(campaignId: string): Promise<boolean>;
+  rejectCrowdfundingCampaign(campaignId: string): Promise<boolean>;
+  adminListAllCrowdfundingCampaigns(): Promise<CrowdfundingCampaign[]>;
+  adminListCrowdfundingPledges(
+    campaignId: string,
+  ): Promise<CrowdfundingPledge[]>;
+
+  // CRUD
+  createCrowdfundingCampaign(
+    title: string,
+    description: string,
+    category: CrowdfundingCategory,
+    fundingModel: CrowdfundingFundingModel,
+    goalCents: bigint,
+    currency: string,
+    deadline: bigint,
+    coverImageUrl: string,
+    rewardTiers: CrowdfundingRewardTier[],
+    milestones: CrowdfundingMilestone[],
+    fsuContributionBps: bigint | null,
+  ): Promise<string>;
+  updateCrowdfundingCampaign(
+    campaignId: string,
+    title: string,
+    description: string,
+    coverImageUrl: string,
+  ): Promise<boolean>;
+  getCrowdfundingCampaign(
+    campaignId: string,
+  ): Promise<CrowdfundingCampaign | null>;
+  listCrowdfundingCampaigns(): Promise<CrowdfundingCampaign[]>;
+  listCrowdfundingCampaignsByCategory(
+    category: CrowdfundingCategory,
+  ): Promise<CrowdfundingCampaign[]>;
+  listMyCrowdfundingCampaigns(): Promise<CrowdfundingCampaign[]>;
+  finalizeCrowdfundingCampaign(campaignId: string): Promise<boolean>;
+
+  // Pledges
+  pledgeToCrowdfundingCampaign(
+    campaignId: string,
+    amountCents: bigint,
+    rewardTierId: string | null,
+    referrerCode: string | null,
+  ): Promise<string>;
+  getMyPledges(): Promise<CrowdfundingPledge[]>;
+  getCampaignPledges(campaignId: string): Promise<CrowdfundingPledge[]>;
+  getCrowdfundingPledge(pledgeId: string): Promise<CrowdfundingPledge | null>;
+  refundPledge(pledgeId: string): Promise<boolean>;
 }

@@ -15,6 +15,9 @@ import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
 import { CampaignHubPage } from "@/pages/CampaignHubPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
 import { CartPage } from "@/pages/CartPage";
+import { CrowdfundingCreatePage } from "@/pages/CrowdfundingCreatePage";
+import { CrowdfundingDetailPage } from "@/pages/CrowdfundingDetailPage";
+import { CrowdfundingPage } from "@/pages/CrowdfundingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DocsPage } from "@/pages/DocsPage";
 import { EventDetailPage } from "@/pages/EventDetailPage";
@@ -199,6 +202,28 @@ const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/join",
   component: ReferralLandingPage,
+});
+
+const crowdfundingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/crowdfunding",
+  component: CrowdfundingPage,
+});
+
+const crowdfundingCreateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/crowdfunding/create",
+  component: () => (
+    <ProtectedRoute>
+      <CrowdfundingCreatePage />
+    </ProtectedRoute>
+  ),
+});
+
+const crowdfundingDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/crowdfunding/$id",
+  component: CrowdfundingDetailPage,
 });
 
 const campaignHubRoute = createRoute({
@@ -403,6 +428,9 @@ const routeTree = rootRoute.addChildren([
   eventDetailRoute2,
   myTicketsRoute,
   joinRoute,
+  crowdfundingRoute,
+  crowdfundingCreateRoute,
+  crowdfundingDetailRoute,
 ]);
 
 // ── Router ──

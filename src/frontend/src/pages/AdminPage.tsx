@@ -33,10 +33,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
 import type {
+  CrowdfundingCampaign,
+  CrowdfundingConfig,
+  CrowdfundingPledge,
   ExtendedBackend,
+  FSUPoolStatus,
   PlatformAnalytics,
   Tenant,
 } from "@/types/appTypes";
+
+// Helper: cast backend to ExtendedBackend for admin cross-tenant calls
+function asAdmin(
+  backend: ReturnType<typeof useBackend>,
+): ExtendedBackend | null {
+  return backend as unknown as ExtendedBackend | null;
+}
 import { TenantStatus, TenantTier } from "@/types/appTypes";
 import {
   Activity,
@@ -45,6 +56,7 @@ import {
   Building,
   Building2,
   CheckCircle,
+  Coins,
   FileText,
   HelpCircle,
   Loader2,
@@ -2971,6 +2983,792 @@ function MLMAdminTab() {
   );
 }
 
+// ── Crowdfunding Admin Tab ────────────────────────────────────────────────────
+function CrowdfundingAdminTab() {
+  const backend = useBackend();
+  const ext = backend as unknown as ExtendedBackend;
+
+  // FinFracFran™ Config state
+  const [config, setConfig] = useState<CrowdfundingConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [cfgFSUBps, setCfgFSUBps] = useState("500");
+  const [cfgCreatorBonus, setCfgCreatorBonus] = useState("100");
+  const [cfgMilestoneBps, setCfgMilestoneBps] = useState("200");
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  // Campaign list state
+  const [campaigns, setCampaigns] = useState<CrowdfundingCampaign[]>([]);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
+    null,
+  );
+
+  // Pledge analytics state
+  const [pledges, setPledges] = useState<CrowdfundingPledge[]>([]);
+  const [pledgesLoading, setPledgesLoading] = useState(false);
+
+  // FSU Pool state
+  const [fsuStatus, setFsuStatus] = useState<FSUPoolStatus | null>(null);
+  const [fsuLoading, setFsuLoading] = useState(true);
+  const [fsuFundAmt, setFsuFundAmt] = useState("");
+  const [fsuFundDesc, setFsuFundDesc] = useState("");
+  const [fsuFunding, setFsuFunding] = useState(false);
+  const [fsuDistUnits, setFsuDistUnits] = useState("");
+  const [fsuDistDesc, setFsuDistDesc] = useState("");
+  const [fsuDistributing, setFsuDistributing] = useState(false);
+
+  const loadConfig = useCallback(async () => {
+    if (!backend) return;
+    setConfigLoading(true);
+    try {
+      const cfg = await ext.getCrowdfundingConfig();
+      setConfig(cfg);
+      setCfgFSUBps(String(Number(cfg.defaultFSUContributionBps ?? 500n) / 100));
+      setCfgCreatorBonus(String(Number(cfg.creatorFSUBonus ?? 100n)));
+      setCfgMilestoneBps(
+        String(Number(cfg.milestoneAchievementBonusBps ?? 200n) / 100),
+      );
+    } catch {
+      toast.error("Failed to load crowdfunding config");
+    } finally {
+      setConfigLoading(false);
+    }
+  }, [backend, ext]);
+
+  const loadCampaigns = useCallback(async () => {
+    if (!backend) return;
+    setCampaignsLoading(true);
+    try {
+      const data = await ext.adminListAllCrowdfundingCampaigns();
+      setCampaigns(data);
+    } catch {
+      toast.error("Failed to load campaigns");
+    } finally {
+      setCampaignsLoading(false);
+    }
+  }, [backend, ext]);
+
+  const loadFSUStatus = useCallback(async () => {
+    if (!backend) return;
+    setFsuLoading(true);
+    try {
+      const status = await ext.getFSUPoolStatus();
+      setFsuStatus(status);
+    } catch {
+      toast.error("Failed to load FSU pool status");
+    } finally {
+      setFsuLoading(false);
+    }
+  }, [backend, ext]);
+
+  useEffect(() => {
+    loadConfig();
+    loadCampaigns();
+    loadFSUStatus();
+  }, [loadConfig, loadCampaigns, loadFSUStatus]);
+
+  // Load pledges when a campaign is selected
+  useEffect(() => {
+    if (!selectedCampaignId || !backend) return;
+    setPledgesLoading(true);
+    ext
+      .adminListCrowdfundingPledges(selectedCampaignId)
+      .then(setPledges)
+      .catch(() => toast.error("Failed to load pledges"))
+      .finally(() => setPledgesLoading(false));
+  }, [selectedCampaignId, backend, ext]);
+
+  async function handleSaveConfig() {
+    if (!backend) return;
+    setSavingConfig(true);
+    try {
+      await ext.setCrowdfundingConfig(
+        BigInt(Math.round(Number.parseFloat(cfgFSUBps) * 100)),
+        BigInt(Math.round(Number.parseFloat(cfgCreatorBonus))),
+        BigInt(Math.round(Number.parseFloat(cfgMilestoneBps) * 100)),
+      );
+      toast.success("Config saved");
+      await loadConfig();
+    } catch {
+      toast.error("Failed to save config");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function handleApprove(id: string) {
+    if (!backend) return;
+    setActionLoading(`approve-${id}`);
+    try {
+      const res = await ext.approveCrowdfundingCampaign(id);
+      if (!res) throw new Error("Approval failed");
+      toast.success("Campaign approved");
+      await loadCampaigns();
+    } catch {
+      toast.error("Failed to approve campaign");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReject(id: string) {
+    if (!backend) return;
+    setActionLoading(`reject-${id}`);
+    try {
+      const res = await ext.rejectCrowdfundingCampaign(id);
+      if (!res) throw new Error("Rejection failed");
+      toast.success("Campaign rejected");
+      await loadCampaigns();
+    } catch {
+      toast.error("Failed to reject campaign");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleFinalize(id: string) {
+    if (!backend) return;
+    setActionLoading(`finalize-${id}`);
+    try {
+      const res = await ext.finalizeCrowdfundingCampaign(id);
+      if (!res) throw new Error("Finalization failed");
+      toast.success("Campaign finalized");
+      await loadCampaigns();
+    } catch {
+      toast.error("Failed to finalize campaign");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleFundFSU() {
+    if (!backend || !fsuFundAmt) return;
+    setFsuFunding(true);
+    try {
+      await ext.addToFSUPool(
+        BigInt(Math.round(Number.parseFloat(fsuFundAmt) * 100)),
+        fsuFundDesc || "Admin FSU pool funding",
+      );
+      toast.success("FSU pool funded");
+      setFsuFundAmt("");
+      setFsuFundDesc("");
+      await loadFSUStatus();
+    } catch {
+      toast.error("Failed to fund FSU pool");
+    } finally {
+      setFsuFunding(false);
+    }
+  }
+
+  async function handleDistributeFSU() {
+    if (!backend || !fsuDistUnits) return;
+    setFsuDistributing(true);
+    try {
+      await ext.distributeFSU(
+        BigInt(Math.round(Number.parseFloat(fsuDistUnits))),
+        fsuDistDesc || "Admin distribution",
+      );
+      toast.success("FSU distributed");
+      setFsuDistUnits("");
+      setFsuDistDesc("");
+      await loadFSUStatus();
+    } catch {
+      toast.error("Failed to distribute FSU");
+    } finally {
+      setFsuDistributing(false);
+    }
+  }
+
+  function getCampaignStatus(c: CrowdfundingCampaign): string {
+    return Object.keys(c.status ?? {})[0] ?? "pending";
+  }
+
+  function getCampaignCategory(c: CrowdfundingCampaign): string {
+    return Object.keys(c.category ?? {})[0] ?? "civic";
+  }
+
+  function formatMoney(cents: bigint): string {
+    return `$${(Number(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function truncatePrincipal(p: { toString(): string } | string): string {
+    const s = typeof p === "string" ? p : p.toString();
+    if (s.length <= 16) return s;
+    return `${s.slice(0, 8)}…${s.slice(-6)}`;
+  }
+
+  const statusBadgeClass: Record<string, string> = {
+    pending: "bg-amber-500/20 text-amber-300",
+    active: "bg-green-500/20 text-green-300",
+    funded: "bg-emerald-500/20 text-emerald-300",
+    failed: "bg-red-500/20 text-red-300",
+    cancelled: "bg-slate-600/30 text-slate-400",
+  };
+
+  // ── Pledge detail view ────────────────────────────────────────────────────
+  if (selectedCampaignId) {
+    const campaign = campaigns.find((c) => c.id === selectedCampaignId);
+    const totalRaised = pledges.reduce((sum, p) => sum + p.amountCents, 0n);
+    const totalFSU = pledges.reduce((sum, p) => sum + p.fsuEarned, 0n);
+
+    return (
+      <div className="space-y-6" data-ocid="admin.crowdfunding.pledges.view">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedCampaignId(null);
+              setPledges([]);
+            }}
+            className="text-xs h-7"
+            data-ocid="admin.crowdfunding.pledges.back"
+          >
+            ← Back to Campaigns
+          </Button>
+          <h3 className="text-sm font-semibold text-foreground truncate">
+            {campaign?.title ?? selectedCampaignId}
+          </h3>
+        </div>
+
+        {/* Summary cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Total Pledges</p>
+              <p className="text-2xl font-bold text-foreground font-display">
+                {pledges.length}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Total Raised</p>
+              <p className="text-2xl font-bold text-emerald-600 font-display">
+                {formatMoney(totalRaised)}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">
+                Total FSU Distributed
+              </p>
+              <p className="text-2xl font-bold text-amber-600 font-display">
+                {Number(totalFSU).toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Coins size={14} className="text-amber-500" />
+              Pledge Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {pledgesLoading ? (
+              <div
+                className="p-4"
+                data-ocid="admin.crowdfunding.pledges.loading_state"
+              >
+                <TableSkeleton rows={4} cols={6} />
+              </div>
+            ) : pledges.length === 0 ? (
+              <div
+                className="text-center py-10 text-muted-foreground text-sm"
+                data-ocid="admin.crowdfunding.pledges.empty_state"
+              >
+                No pledges yet for this campaign.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Backer</TableHead>
+                    <TableHead className="text-xs text-right">Amount</TableHead>
+                    <TableHead className="text-xs text-right">
+                      FSU Earned
+                    </TableHead>
+                    <TableHead className="text-xs">Reward Tier</TableHead>
+                    <TableHead className="text-xs">Referral Code</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pledges.map((p) => (
+                    <TableRow
+                      key={p.id}
+                      data-ocid={`admin.crowdfunding.pledge.item.${p.id}`}
+                    >
+                      <TableCell className="text-xs font-mono">
+                        {truncatePrincipal(p.backer)}
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-medium">
+                        {formatMoney(p.amountCents)}
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-amber-600 font-medium">
+                        {Number(p.fsuEarned).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {p.rewardTierId ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {p.referrerCode ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs ${statusBadgeClass[p.status] ?? "bg-muted text-muted-foreground"}`}
+                        >
+                          {p.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(p.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Main tab view ─────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-6" data-ocid="admin.crowdfunding.tab">
+      {/* 1. FinFracFran™ Config */}
+      <Card className="border border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Coins size={14} className="text-amber-500" />
+            FinFracFran™ Contribution Settings
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Configure how each pledge contributes to the FSU fractal pool and
+            creator bonuses
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {configLoading ? (
+            <div data-ocid="admin.crowdfunding.config.loading_state">
+              <TableSkeleton rows={1} cols={3} />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Current values */}
+              {config && (
+                <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Default FSU Contribution
+                    </p>
+                    <p className="text-sm font-semibold text-amber-600">
+                      {(Number(config.defaultFSUContributionBps) / 100).toFixed(
+                        2,
+                      )}
+                      %
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Creator Launch Bonus
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600">
+                      {Number(config.creatorFSUBonus).toLocaleString()} FSU
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Milestone Bonus
+                    </p>
+                    <p className="text-sm font-semibold text-primary">
+                      {(
+                        Number(config.milestoneAchievementBonusBps) / 100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  </div>
+                </div>
+              )}
+              {/* Edit form */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Default FSU Contribution (%)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={cfgFSUBps}
+                    onChange={(e) => setCfgFSUBps(e.target.value)}
+                    className="h-8 text-xs"
+                    data-ocid="admin.crowdfunding.config.fsu_bps.input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Creator Launch Bonus (FSU units)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={cfgCreatorBonus}
+                    onChange={(e) => setCfgCreatorBonus(e.target.value)}
+                    className="h-8 text-xs"
+                    data-ocid="admin.crowdfunding.config.creator_bonus.input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Milestone Achievement Bonus (%)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={cfgMilestoneBps}
+                    onChange={(e) => setCfgMilestoneBps(e.target.value)}
+                    className="h-8 text-xs"
+                    data-ocid="admin.crowdfunding.config.milestone_bps.input"
+                  />
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleSaveConfig}
+                disabled={savingConfig}
+                className="h-8 text-xs"
+                data-ocid="admin.crowdfunding.config.save.button"
+              >
+                {savingConfig ? (
+                  <Loader2 size={12} className="animate-spin mr-1" />
+                ) : null}
+                Save Config
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2. Campaign Review Queue */}
+      <Card className="border border-border">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Target size={14} className="text-primary" />
+              Campaign Review Queue
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Approve, reject, or finalize crowdfunding campaigns across all
+              tenants
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadCampaigns}
+            disabled={campaignsLoading}
+            className="h-7 text-xs"
+            data-ocid="admin.crowdfunding.campaigns.refresh"
+          >
+            {campaignsLoading ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {campaignsLoading ? (
+            <div
+              className="p-4"
+              data-ocid="admin.crowdfunding.campaigns.loading_state"
+            >
+              <TableSkeleton rows={4} cols={6} />
+            </div>
+          ) : campaigns.length === 0 ? (
+            <div
+              className="text-center py-12 text-muted-foreground text-sm"
+              data-ocid="admin.crowdfunding.campaigns.empty_state"
+            >
+              <Coins size={32} className="mx-auto mb-3 opacity-30" />
+              No campaigns yet
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Campaign Title</TableHead>
+                  <TableHead className="text-xs">Creator</TableHead>
+                  <TableHead className="text-xs">Category</TableHead>
+                  <TableHead className="text-xs text-right">Goal</TableHead>
+                  <TableHead className="text-xs text-right">Raised</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Deadline</TableHead>
+                  <TableHead className="text-xs text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {campaigns.map((c) => {
+                  const status = getCampaignStatus(c);
+                  const category = getCampaignCategory(c);
+                  return (
+                    <TableRow
+                      key={c.id}
+                      className="cursor-pointer hover:bg-muted/30"
+                      onClick={() => setSelectedCampaignId(c.id)}
+                      data-ocid={`admin.crowdfunding.campaign.item.${c.id}`}
+                    >
+                      <TableCell className="text-xs font-medium max-w-[180px] truncate">
+                        {c.title}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {truncatePrincipal(c.creator)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary capitalize">
+                          {category}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-right">
+                        {formatMoney(c.goalCents)}
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-medium text-emerald-600">
+                        {formatMoney(c.raisedCents)}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs ${statusBadgeClass[status] ?? "bg-muted text-muted-foreground"}`}
+                        >
+                          {status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(
+                          Number(c.deadline) / 1_000_000,
+                        ).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {/* Stop row click from propagating when clicking action buttons */}
+                        <div
+                          className="flex gap-1 justify-end"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          {status === "pending" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionLoading === `approve-${c.id}`}
+                                onClick={() => handleApprove(c.id)}
+                                className="h-6 px-2 text-[10px] border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+                                data-ocid={`admin.crowdfunding.approve.${c.id}`}
+                              >
+                                {actionLoading === `approve-${c.id}` ? (
+                                  <Loader2 size={10} className="animate-spin" />
+                                ) : (
+                                  "Approve"
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionLoading === `reject-${c.id}`}
+                                onClick={() => handleReject(c.id)}
+                                className="h-6 px-2 text-[10px] border-red-500/40 text-red-600 hover:bg-red-500/10"
+                                data-ocid={`admin.crowdfunding.reject.${c.id}`}
+                              >
+                                {actionLoading === `reject-${c.id}` ? (
+                                  <Loader2 size={10} className="animate-spin" />
+                                ) : (
+                                  "Reject"
+                                )}
+                              </Button>
+                            </>
+                          )}
+                          {status === "active" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoading === `finalize-${c.id}`}
+                              onClick={() => handleFinalize(c.id)}
+                              className="h-6 px-2 text-[10px] border-primary/40 text-primary hover:bg-primary/10"
+                              data-ocid={`admin.crowdfunding.finalize.${c.id}`}
+                            >
+                              {actionLoading === `finalize-${c.id}` ? (
+                                <Loader2 size={10} className="animate-spin" />
+                              ) : (
+                                "Finalize"
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 3. FSU Pool Management */}
+      <Card className="border border-border">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp size={14} className="text-amber-500" />
+              FSU Pool Management
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Fund and distribute FinFracFran™ Franchise Share Units
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadFSUStatus}
+            disabled={fsuLoading}
+            className="h-7 text-xs"
+            data-ocid="admin.crowdfunding.fsu.refresh"
+          >
+            {fsuLoading ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Pool status cards */}
+          {fsuStatus ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg bg-muted/30 border border-border p-3">
+                <p className="text-xs text-muted-foreground">Pool Size</p>
+                <p className="text-lg font-bold text-amber-600 font-display">
+                  ${(Number(fsuStatus.poolSizeUnits ?? 0) / 100).toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted/30 border border-border p-3">
+                <p className="text-xs text-muted-foreground">FSU Value</p>
+                <p className="text-lg font-bold text-primary font-display">
+                  ${(Number(fsuStatus.valuePerUnitCents ?? 0) / 100).toFixed(4)}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted/30 border border-border p-3">
+                <p className="text-xs text-muted-foreground">Outstanding FSU</p>
+                <p className="text-lg font-bold text-foreground font-display">
+                  {Number(fsuStatus.totalOutstandingFSU ?? 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted/30 border border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  Next Distribution
+                </p>
+                <p className="text-sm font-semibold text-foreground">
+                  {fsuStatus.nextDistributionLabel ?? "—"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="text-xs text-muted-foreground"
+              data-ocid="admin.crowdfunding.fsu.loading_state"
+            >
+              Loading FSU status…
+            </div>
+          )}
+
+          {/* Fund & Distribute actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Fund FSU Pool ($)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Amount in $"
+                  value={fsuFundAmt}
+                  onChange={(e) => setFsuFundAmt(e.target.value)}
+                  className="h-8 text-xs flex-1"
+                  data-ocid="admin.crowdfunding.fsu_fund.input"
+                />
+                <Input
+                  placeholder="Description (optional)"
+                  value={fsuFundDesc}
+                  onChange={(e) => setFsuFundDesc(e.target.value)}
+                  className="h-8 text-xs flex-1"
+                  data-ocid="admin.crowdfunding.fsu_fund_desc.input"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleFundFSU}
+                  disabled={fsuFunding || !fsuFundAmt}
+                  className="h-8 text-xs bg-amber-600 hover:bg-amber-700 whitespace-nowrap"
+                  data-ocid="admin.crowdfunding.fsu_fund.button"
+                >
+                  {fsuFunding ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    "Fund Pool"
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Distribute FSU Units</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="Units"
+                  value={fsuDistUnits}
+                  onChange={(e) => setFsuDistUnits(e.target.value)}
+                  className="h-8 text-xs w-28"
+                  data-ocid="admin.crowdfunding.fsu_dist_units.input"
+                />
+                <Input
+                  placeholder="Description"
+                  value={fsuDistDesc}
+                  onChange={(e) => setFsuDistDesc(e.target.value)}
+                  className="h-8 text-xs flex-1"
+                  data-ocid="admin.crowdfunding.fsu_dist_desc.input"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleDistributeFSU}
+                  disabled={fsuDistributing || !fsuDistUnits}
+                  className="h-8 text-xs bg-rose-600 hover:bg-rose-700 whitespace-nowrap"
+                  data-ocid="admin.crowdfunding.fsu_distribute.button"
+                >
+                  {fsuDistributing ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    "Distribute"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main AdminPage ────────────────────────────────────────────────────────────
 export function AdminPage() {
   const { user } = useAuth();
@@ -2985,10 +3783,14 @@ export function AdminPage() {
       if (!backend) return;
       setLoading(true);
       try {
+        const admin = asAdmin(backend);
+        // Use admin cross-tenant variants so the super-admin sees all data
+        // across every tenant (PaaS Phase F2). Falls back to scoped methods
+        // if the new backend functions are not yet deployed.
         const [orgData, campaignData, threadData] = await Promise.all([
-          backend.listOrgs(),
-          backend.listCampaigns(),
-          backend.listThreads(),
+          admin?.listAllOrgsAdmin?.() ?? backend.listOrgs(),
+          admin?.listAllCampaignsAdmin?.() ?? backend.listCampaigns(),
+          admin?.listAllThreadsAdmin?.() ?? backend.listThreads(),
         ]);
         setOrgs(orgData);
         setCampaigns(campaignData);
@@ -3107,6 +3909,14 @@ export function AdminPage() {
               <TrendingUp size={13} />
               MLM
             </TabsTrigger>
+            <TabsTrigger
+              value="crowdfunding"
+              className="text-xs gap-1.5"
+              data-ocid="admin.crowdfunding.tab_trigger"
+            >
+              <Coins size={13} />
+              Crowdfunding
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -3153,6 +3963,9 @@ export function AdminPage() {
           </TabsContent>
           <TabsContent value="mlm">
             <MLMAdminTab />
+          </TabsContent>
+          <TabsContent value="crowdfunding">
+            <CrowdfundingAdminTab />
           </TabsContent>
         </Tabs>
       </div>

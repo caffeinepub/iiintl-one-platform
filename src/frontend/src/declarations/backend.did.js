@@ -12,6 +12,77 @@ export const TransactionType = IDL.Variant({
   'sent' : IDL.Null,
   'received' : IDL.Null,
 });
+export const CrowdfundingStatus = IDL.Variant({
+  'active' : IDL.Null,
+  'cancelled' : IDL.Null,
+  'pending' : IDL.Null,
+  'funded' : IDL.Null,
+  'failed' : IDL.Null,
+});
+export const CrowdfundingRewardTier = IDL.Record({
+  'id' : IDL.Text,
+  'title' : IDL.Text,
+  'description' : IDL.Text,
+  'maxBackers' : IDL.Opt(IDL.Nat),
+  'backerCount' : IDL.Nat,
+  'minPledgeCents' : IDL.Nat,
+});
+export const CrowdfundingFundingModel = IDL.Variant({
+  'allOrNothing' : IDL.Null,
+  'keepWhatYouRaise' : IDL.Null,
+});
+export const CrowdfundingCategory = IDL.Variant({
+  'research' : IDL.Null,
+  'civic' : IDL.Null,
+  'education' : IDL.Null,
+  'community' : IDL.Null,
+  'crisisResponse' : IDL.Null,
+  'humanitarian' : IDL.Null,
+  'youth' : IDL.Null,
+});
+export const CrowdfundingMilestone = IDL.Record({
+  'id' : IDL.Text,
+  'title' : IDL.Text,
+  'achievedAt' : IDL.Opt(IDL.Int),
+  'bonusFSUAmount' : IDL.Nat,
+  'description' : IDL.Text,
+  'targetCents' : IDL.Nat,
+});
+export const CrowdfundingCampaign = IDL.Record({
+  'id' : IDL.Text,
+  'status' : CrowdfundingStatus,
+  'coverImageUrl' : IDL.Text,
+  'title' : IDL.Text,
+  'creator' : IDL.Principal,
+  'rewardTiers' : IDL.Vec(CrowdfundingRewardTier),
+  'fundingModel' : CrowdfundingFundingModel,
+  'approvedByAdmin' : IDL.Bool,
+  'createdAt' : IDL.Int,
+  'description' : IDL.Text,
+  'deadline' : IDL.Int,
+  'tenantId' : IDL.Text,
+  'goalCents' : IDL.Nat,
+  'updatedAt' : IDL.Int,
+  'fsuContributionBps' : IDL.Nat,
+  'backerCount' : IDL.Nat,
+  'currency' : IDL.Text,
+  'totalFSUDistributed' : IDL.Nat,
+  'category' : CrowdfundingCategory,
+  'raisedCents' : IDL.Nat,
+  'milestones' : IDL.Vec(CrowdfundingMilestone),
+});
+export const CrowdfundingPledge = IDL.Record({
+  'id' : IDL.Text,
+  'status' : IDL.Text,
+  'referrerCode' : IDL.Opt(IDL.Text),
+  'receiptCode' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'backer' : IDL.Principal,
+  'campaignId' : IDL.Text,
+  'amountCents' : IDL.Nat,
+  'rewardTierId' : IDL.Opt(IDL.Text),
+  'fsuEarned' : IDL.Nat,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -23,6 +94,12 @@ export const CampaignType = IDL.Variant({
   'fundraiser' : IDL.Null,
   'petition' : IDL.Null,
 });
+export const RoyaltyPoolType = IDL.Variant({
+  'event' : IDL.Null,
+  'leadership' : IDL.Null,
+  'global' : IDL.Null,
+  'finFracFran' : IDL.Null,
+});
 export const ForumCategory = IDL.Variant({
   'resources' : IDL.Null,
   'general' : IDL.Null,
@@ -30,6 +107,23 @@ export const ForumCategory = IDL.Variant({
   'campaigns' : IDL.Null,
   'activism' : IDL.Null,
   'announcements' : IDL.Null,
+});
+export const MembershipTierLevel = IDL.Variant({
+  'free' : IDL.Null,
+  'founder' : IDL.Null,
+  'executive' : IDL.Null,
+  'affiliate' : IDL.Null,
+  'ambassador' : IDL.Null,
+  'partner' : IDL.Null,
+  'associate' : IDL.Null,
+});
+export const EarningType = IDL.Variant({
+  'eventCommission' : IDL.Null,
+  'activityBonus' : IDL.Null,
+  'directReferral' : IDL.Null,
+  'levelOverride' : IDL.Null,
+  'royaltyPool' : IDL.Null,
+  'finFracFran' : IDL.Null,
 });
 export const UserProfile = IDL.Record({
   'bio' : IDL.Text,
@@ -59,6 +153,25 @@ export const Campaign = IDL.Record({
   'campaignType' : CampaignType,
   'startDate' : IDL.Int,
 });
+export const CommissionRate = IDL.Record({
+  'basisPoints' : IDL.Nat,
+  'tier' : MembershipTierLevel,
+  'flatAmountUnits' : IDL.Nat,
+  'isActive' : IDL.Bool,
+  'earningType' : EarningType,
+  'depthLevel' : IDL.Nat,
+});
+export const CrowdfundingConfig = IDL.Record({
+  'defaultFSUContributionBps' : IDL.Nat,
+  'milestoneAchievementBonusBps' : IDL.Nat,
+  'creatorFSUBonus' : IDL.Nat,
+});
+export const FSUPoolStatus = IDL.Record({
+  'totalOutstandingFSU' : IDL.Nat,
+  'valuePerUnitCents' : IDL.Nat,
+  'poolSizeUnits' : IDL.Nat,
+  'nextDistributionLabel' : IDL.Text,
+});
 export const WalletType = IDL.Variant({
   'internetIdentity' : IDL.Null,
   'plug' : IDL.Null,
@@ -70,6 +183,68 @@ export const Wallet = IDL.Record({
   'address' : IDL.Text,
   'balanceICP' : IDL.Float64,
   'walletLabel' : IDL.Text,
+});
+export const EarningStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'paid' : IDL.Null,
+  'processing' : IDL.Null,
+});
+export const EarningRecord = IDL.Record({
+  'id' : IDL.Text,
+  'member' : IDL.Principal,
+  'status' : EarningStatus,
+  'createdAt' : IDL.Int,
+  'description' : IDL.Text,
+  'sourceId' : IDL.Text,
+  'earningType' : EarningType,
+  'amountUnits' : IDL.Nat,
+  'depthLevel' : IDL.Nat,
+});
+export const MemberTierRecord = IDL.Record({
+  'principal' : IDL.Principal,
+  'referralCode' : IDL.Text,
+  'joinedAt' : IDL.Int,
+  'tier' : MembershipTierLevel,
+  'upgradedAt' : IDL.Int,
+  'sponsorPrincipal' : IDL.Opt(IDL.Principal),
+  'sponsorCode' : IDL.Opt(IDL.Text),
+});
+export const DownlineMember = IDL.Record({
+  'principal' : IDL.Principal,
+  'referralCode' : IDL.Text,
+  'joinedAt' : IDL.Int,
+  'tier' : MembershipTierLevel,
+  'directReferralCount' : IDL.Nat,
+});
+export const EarningsSummary = IDL.Record({
+  'eventCommission' : IDL.Nat,
+  'activityBonus' : IDL.Nat,
+  'totalPaid' : IDL.Nat,
+  'totalLifetime' : IDL.Nat,
+  'directReferral' : IDL.Nat,
+  'levelOverride' : IDL.Nat,
+  'totalPending' : IDL.Nat,
+  'royaltyPool' : IDL.Nat,
+  'finFracFran' : IDL.Nat,
+});
+export const FSURecord = IDL.Record({
+  'member' : IDL.Principal,
+  'balance' : IDL.Nat,
+  'lifetimeEarned' : IDL.Nat,
+});
+export const FSUTxType = IDL.Variant({
+  'redeemed' : IDL.Null,
+  'transferred' : IDL.Null,
+  'earned' : IDL.Null,
+});
+export const FSUTransaction = IDL.Record({
+  'id' : IDL.Text,
+  'member' : IDL.Principal,
+  'valuePerUnitCents' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'description' : IDL.Text,
+  'txType' : FSUTxType,
+  'amount' : IDL.Nat,
 });
 export const OrgStatus = IDL.Variant({
   'active' : IDL.Null,
@@ -104,6 +279,14 @@ export const ForumReply = IDL.Record({
   'createdBy' : IDL.Principal,
   'isModeratorReply' : IDL.Bool,
   'threadId' : IDL.Nat,
+});
+export const RoyaltyPool = IDL.Record({
+  'id' : IDL.Text,
+  'isDistributed' : IDL.Bool,
+  'period' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'totalUnits' : IDL.Nat,
+  'poolType' : RoyaltyPoolType,
 });
 export const ThreadStatus = IDL.Variant({
   'open' : IDL.Null,
@@ -150,11 +333,24 @@ export const UserSummary = IDL.Record({
 
 export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
+  'addToFSUPool' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'addToRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'addTransaction' : IDL.Func(
       [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
       [],
       [],
     ),
+  'adminListAllCrowdfundingCampaigns' : IDL.Func(
+      [],
+      [IDL.Vec(CrowdfundingCampaign)],
+      ['query'],
+    ),
+  'adminListCrowdfundingPledges' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(CrowdfundingPledge)],
+      ['query'],
+    ),
+  'approveCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -173,19 +369,50 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'createCrowdfundingCampaign' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        CrowdfundingCategory,
+        CrowdfundingFundingModel,
+        IDL.Nat,
+        IDL.Text,
+        IDL.Int,
+        IDL.Text,
+        IDL.Vec(CrowdfundingRewardTier),
+        IDL.Vec(CrowdfundingMilestone),
+        IDL.Opt(IDL.Nat),
+      ],
+      [IDL.Text],
+      [],
+    ),
   'createOrg' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
       [IDL.Text],
       [],
     ),
+  'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
   'createThread' : IDL.Func(
       [IDL.Text, IDL.Text, ForumCategory, IDL.Opt(IDL.Text), IDL.Vec(IDL.Text)],
       [IDL.Nat],
       [],
     ),
+  'deactivateCommissionRate' : IDL.Func(
+      [MembershipTierLevel, IDL.Nat, EarningType],
+      [IDL.Bool],
+      [],
+    ),
+  'distributeFSU' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+  'distributeRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+  'finalizeCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCampaign' : IDL.Func([IDL.Text], [IDL.Opt(Campaign)], ['query']),
+  'getCampaignPledges' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(CrowdfundingPledge)],
+      ['query'],
+    ),
   'getCampaignProgress' : IDL.Func(
       [IDL.Text],
       [IDL.Opt(IDL.Record({ 'goal' : IDL.Nat, 'progress' : IDL.Nat }))],
@@ -196,11 +423,54 @@ export const idlService = IDL.Service({
       [IDL.Opt(IDL.Nat)],
       ['query'],
     ),
+  'getCommissionRate' : IDL.Func(
+      [MembershipTierLevel, IDL.Nat, EarningType],
+      [IDL.Opt(CommissionRate)],
+      ['query'],
+    ),
+  'getCommissionRates' : IDL.Func([], [IDL.Vec(CommissionRate)], ['query']),
+  'getCrowdfundingCampaign' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(CrowdfundingCampaign)],
+      ['query'],
+    ),
+  'getCrowdfundingConfig' : IDL.Func([], [CrowdfundingConfig], ['query']),
+  'getCrowdfundingPledge' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(CrowdfundingPledge)],
+      ['query'],
+    ),
+  'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
   'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
+  'getMemberEarnings' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Vec(EarningRecord)],
+      ['query'],
+    ),
+  'getMemberTierRecord' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(MemberTierRecord)],
+      ['query'],
+    ),
+  'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
+  'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
+  'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
+  'getMyFSURecord' : IDL.Func([], [IDL.Opt(FSURecord)], ['query']),
+  'getMyFSUTransactions' : IDL.Func([], [IDL.Vec(FSUTransaction)], ['query']),
+  'getMyPledges' : IDL.Func([], [IDL.Vec(CrowdfundingPledge)], ['query']),
+  'getMyReferralCode' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+  'getMyRoyaltyDistributions' : IDL.Func(
+      [],
+      [IDL.Vec(EarningRecord)],
+      ['query'],
+    ),
+  'getMyTierRecord' : IDL.Func([], [IDL.Opt(MemberTierRecord)], ['query']),
+  'getMyUplineChain' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
   'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
   'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
   'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
   'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
+  'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
   'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
   'getTransactionHistory' : IDL.Func(
       [IDL.Opt(IDL.Text)],
@@ -215,6 +485,7 @@ export const idlService = IDL.Service({
     ),
   'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
@@ -223,9 +494,26 @@ export const idlService = IDL.Service({
   'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
   'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
   'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
+  'listCrowdfundingCampaigns' : IDL.Func(
+      [],
+      [IDL.Vec(CrowdfundingCampaign)],
+      ['query'],
+    ),
+  'listCrowdfundingCampaignsByCategory' : IDL.Func(
+      [CrowdfundingCategory],
+      [IDL.Vec(CrowdfundingCampaign)],
+      ['query'],
+    ),
+  'listMyCrowdfundingCampaigns' : IDL.Func(
+      [],
+      [IDL.Vec(CrowdfundingCampaign)],
+      ['query'],
+    ),
   'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
   'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
   'listThreadsByCategory' : IDL.Func(
       [ForumCategory],
@@ -235,10 +523,46 @@ export const idlService = IDL.Service({
   'listThreadsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(ForumThread)], ['query']),
   'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
   'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'pledgeToCrowdfundingCampaign' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+      [IDL.Text],
+      [],
+    ),
+  'processReferralChainBonus' : IDL.Func(
+      [IDL.Principal, IDL.Nat, EarningType, IDL.Text],
+      [],
+      [],
+    ),
+  'recordEarning' : IDL.Func(
+      [IDL.Principal, IDL.Nat, EarningType, IDL.Text, IDL.Text],
+      [IDL.Text],
+      [],
+    ),
+  'redeemFSU' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
+  'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+  'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'resolveReferralCode' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(IDL.Principal)],
+      ['query'],
+    ),
+  'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'setCommissionRate' : IDL.Func(
+      [MembershipTierLevel, IDL.Nat, EarningType, IDL.Nat, IDL.Nat],
+      [IDL.Bool],
+      [],
+    ),
+  'setCrowdfundingConfig' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
+  'setMemberTier' : IDL.Func(
+      [IDL.Principal, MembershipTierLevel],
+      [IDL.Bool],
+      [],
+    ),
   'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
   'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
@@ -255,11 +579,17 @@ export const idlService = IDL.Service({
       [IDL.Bool],
       [],
     ),
+  'updateCrowdfundingCampaign' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Bool],
+      [],
+    ),
   'updateOrg' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
       [IDL.Bool],
       [],
     ),
+  'upgradeMemberTier' : IDL.Func([MembershipTierLevel], [IDL.Bool], []),
 });
 
 export const idlInitArgs = [];
@@ -268,6 +598,77 @@ export const idlFactory = ({ IDL }) => {
   const TransactionType = IDL.Variant({
     'sent' : IDL.Null,
     'received' : IDL.Null,
+  });
+  const CrowdfundingStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'cancelled' : IDL.Null,
+    'pending' : IDL.Null,
+    'funded' : IDL.Null,
+    'failed' : IDL.Null,
+  });
+  const CrowdfundingRewardTier = IDL.Record({
+    'id' : IDL.Text,
+    'title' : IDL.Text,
+    'description' : IDL.Text,
+    'maxBackers' : IDL.Opt(IDL.Nat),
+    'backerCount' : IDL.Nat,
+    'minPledgeCents' : IDL.Nat,
+  });
+  const CrowdfundingFundingModel = IDL.Variant({
+    'allOrNothing' : IDL.Null,
+    'keepWhatYouRaise' : IDL.Null,
+  });
+  const CrowdfundingCategory = IDL.Variant({
+    'research' : IDL.Null,
+    'civic' : IDL.Null,
+    'education' : IDL.Null,
+    'community' : IDL.Null,
+    'crisisResponse' : IDL.Null,
+    'humanitarian' : IDL.Null,
+    'youth' : IDL.Null,
+  });
+  const CrowdfundingMilestone = IDL.Record({
+    'id' : IDL.Text,
+    'title' : IDL.Text,
+    'achievedAt' : IDL.Opt(IDL.Int),
+    'bonusFSUAmount' : IDL.Nat,
+    'description' : IDL.Text,
+    'targetCents' : IDL.Nat,
+  });
+  const CrowdfundingCampaign = IDL.Record({
+    'id' : IDL.Text,
+    'status' : CrowdfundingStatus,
+    'coverImageUrl' : IDL.Text,
+    'title' : IDL.Text,
+    'creator' : IDL.Principal,
+    'rewardTiers' : IDL.Vec(CrowdfundingRewardTier),
+    'fundingModel' : CrowdfundingFundingModel,
+    'approvedByAdmin' : IDL.Bool,
+    'createdAt' : IDL.Int,
+    'description' : IDL.Text,
+    'deadline' : IDL.Int,
+    'tenantId' : IDL.Text,
+    'goalCents' : IDL.Nat,
+    'updatedAt' : IDL.Int,
+    'fsuContributionBps' : IDL.Nat,
+    'backerCount' : IDL.Nat,
+    'currency' : IDL.Text,
+    'totalFSUDistributed' : IDL.Nat,
+    'category' : CrowdfundingCategory,
+    'raisedCents' : IDL.Nat,
+    'milestones' : IDL.Vec(CrowdfundingMilestone),
+  });
+  const CrowdfundingPledge = IDL.Record({
+    'id' : IDL.Text,
+    'status' : IDL.Text,
+    'referrerCode' : IDL.Opt(IDL.Text),
+    'receiptCode' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'backer' : IDL.Principal,
+    'campaignId' : IDL.Text,
+    'amountCents' : IDL.Nat,
+    'rewardTierId' : IDL.Opt(IDL.Text),
+    'fsuEarned' : IDL.Nat,
   });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
@@ -280,6 +681,12 @@ export const idlFactory = ({ IDL }) => {
     'fundraiser' : IDL.Null,
     'petition' : IDL.Null,
   });
+  const RoyaltyPoolType = IDL.Variant({
+    'event' : IDL.Null,
+    'leadership' : IDL.Null,
+    'global' : IDL.Null,
+    'finFracFran' : IDL.Null,
+  });
   const ForumCategory = IDL.Variant({
     'resources' : IDL.Null,
     'general' : IDL.Null,
@@ -287,6 +694,23 @@ export const idlFactory = ({ IDL }) => {
     'campaigns' : IDL.Null,
     'activism' : IDL.Null,
     'announcements' : IDL.Null,
+  });
+  const MembershipTierLevel = IDL.Variant({
+    'free' : IDL.Null,
+    'founder' : IDL.Null,
+    'executive' : IDL.Null,
+    'affiliate' : IDL.Null,
+    'ambassador' : IDL.Null,
+    'partner' : IDL.Null,
+    'associate' : IDL.Null,
+  });
+  const EarningType = IDL.Variant({
+    'eventCommission' : IDL.Null,
+    'activityBonus' : IDL.Null,
+    'directReferral' : IDL.Null,
+    'levelOverride' : IDL.Null,
+    'royaltyPool' : IDL.Null,
+    'finFracFran' : IDL.Null,
   });
   const UserProfile = IDL.Record({
     'bio' : IDL.Text,
@@ -316,6 +740,25 @@ export const idlFactory = ({ IDL }) => {
     'campaignType' : CampaignType,
     'startDate' : IDL.Int,
   });
+  const CommissionRate = IDL.Record({
+    'basisPoints' : IDL.Nat,
+    'tier' : MembershipTierLevel,
+    'flatAmountUnits' : IDL.Nat,
+    'isActive' : IDL.Bool,
+    'earningType' : EarningType,
+    'depthLevel' : IDL.Nat,
+  });
+  const CrowdfundingConfig = IDL.Record({
+    'defaultFSUContributionBps' : IDL.Nat,
+    'milestoneAchievementBonusBps' : IDL.Nat,
+    'creatorFSUBonus' : IDL.Nat,
+  });
+  const FSUPoolStatus = IDL.Record({
+    'totalOutstandingFSU' : IDL.Nat,
+    'valuePerUnitCents' : IDL.Nat,
+    'poolSizeUnits' : IDL.Nat,
+    'nextDistributionLabel' : IDL.Text,
+  });
   const WalletType = IDL.Variant({
     'internetIdentity' : IDL.Null,
     'plug' : IDL.Null,
@@ -327,6 +770,68 @@ export const idlFactory = ({ IDL }) => {
     'address' : IDL.Text,
     'balanceICP' : IDL.Float64,
     'walletLabel' : IDL.Text,
+  });
+  const EarningStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'paid' : IDL.Null,
+    'processing' : IDL.Null,
+  });
+  const EarningRecord = IDL.Record({
+    'id' : IDL.Text,
+    'member' : IDL.Principal,
+    'status' : EarningStatus,
+    'createdAt' : IDL.Int,
+    'description' : IDL.Text,
+    'sourceId' : IDL.Text,
+    'earningType' : EarningType,
+    'amountUnits' : IDL.Nat,
+    'depthLevel' : IDL.Nat,
+  });
+  const MemberTierRecord = IDL.Record({
+    'principal' : IDL.Principal,
+    'referralCode' : IDL.Text,
+    'joinedAt' : IDL.Int,
+    'tier' : MembershipTierLevel,
+    'upgradedAt' : IDL.Int,
+    'sponsorPrincipal' : IDL.Opt(IDL.Principal),
+    'sponsorCode' : IDL.Opt(IDL.Text),
+  });
+  const DownlineMember = IDL.Record({
+    'principal' : IDL.Principal,
+    'referralCode' : IDL.Text,
+    'joinedAt' : IDL.Int,
+    'tier' : MembershipTierLevel,
+    'directReferralCount' : IDL.Nat,
+  });
+  const EarningsSummary = IDL.Record({
+    'eventCommission' : IDL.Nat,
+    'activityBonus' : IDL.Nat,
+    'totalPaid' : IDL.Nat,
+    'totalLifetime' : IDL.Nat,
+    'directReferral' : IDL.Nat,
+    'levelOverride' : IDL.Nat,
+    'totalPending' : IDL.Nat,
+    'royaltyPool' : IDL.Nat,
+    'finFracFran' : IDL.Nat,
+  });
+  const FSURecord = IDL.Record({
+    'member' : IDL.Principal,
+    'balance' : IDL.Nat,
+    'lifetimeEarned' : IDL.Nat,
+  });
+  const FSUTxType = IDL.Variant({
+    'redeemed' : IDL.Null,
+    'transferred' : IDL.Null,
+    'earned' : IDL.Null,
+  });
+  const FSUTransaction = IDL.Record({
+    'id' : IDL.Text,
+    'member' : IDL.Principal,
+    'valuePerUnitCents' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'description' : IDL.Text,
+    'txType' : FSUTxType,
+    'amount' : IDL.Nat,
   });
   const OrgStatus = IDL.Variant({ 'active' : IDL.Null, 'archived' : IDL.Null });
   const OrgMemberRole = IDL.Variant({
@@ -358,6 +863,14 @@ export const idlFactory = ({ IDL }) => {
     'createdBy' : IDL.Principal,
     'isModeratorReply' : IDL.Bool,
     'threadId' : IDL.Nat,
+  });
+  const RoyaltyPool = IDL.Record({
+    'id' : IDL.Text,
+    'isDistributed' : IDL.Bool,
+    'period' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'totalUnits' : IDL.Nat,
+    'poolType' : RoyaltyPoolType,
   });
   const ThreadStatus = IDL.Variant({
     'open' : IDL.Null,
@@ -404,11 +917,24 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     '_initializeAccessControl' : IDL.Func([], [], []),
+    'addToFSUPool' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+    'addToRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
     'addTransaction' : IDL.Func(
         [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
         [],
         [],
       ),
+    'adminListAllCrowdfundingCampaigns' : IDL.Func(
+        [],
+        [IDL.Vec(CrowdfundingCampaign)],
+        ['query'],
+      ),
+    'adminListCrowdfundingPledges' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(CrowdfundingPledge)],
+        ['query'],
+      ),
+    'approveCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
@@ -427,11 +953,29 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'createCrowdfundingCampaign' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          CrowdfundingCategory,
+          CrowdfundingFundingModel,
+          IDL.Nat,
+          IDL.Text,
+          IDL.Int,
+          IDL.Text,
+          IDL.Vec(CrowdfundingRewardTier),
+          IDL.Vec(CrowdfundingMilestone),
+          IDL.Opt(IDL.Nat),
+        ],
+        [IDL.Text],
+        [],
+      ),
     'createOrg' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
         [IDL.Text],
         [],
       ),
+    'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
     'createThread' : IDL.Func(
         [
           IDL.Text,
@@ -443,9 +987,22 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'deactivateCommissionRate' : IDL.Func(
+        [MembershipTierLevel, IDL.Nat, EarningType],
+        [IDL.Bool],
+        [],
+      ),
+    'distributeFSU' : IDL.Func([IDL.Nat, IDL.Text], [], []),
+    'distributeRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+    'finalizeCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCampaign' : IDL.Func([IDL.Text], [IDL.Opt(Campaign)], ['query']),
+    'getCampaignPledges' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(CrowdfundingPledge)],
+        ['query'],
+      ),
     'getCampaignProgress' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(IDL.Record({ 'goal' : IDL.Nat, 'progress' : IDL.Nat }))],
@@ -456,11 +1013,54 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Nat)],
         ['query'],
       ),
+    'getCommissionRate' : IDL.Func(
+        [MembershipTierLevel, IDL.Nat, EarningType],
+        [IDL.Opt(CommissionRate)],
+        ['query'],
+      ),
+    'getCommissionRates' : IDL.Func([], [IDL.Vec(CommissionRate)], ['query']),
+    'getCrowdfundingCampaign' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(CrowdfundingCampaign)],
+        ['query'],
+      ),
+    'getCrowdfundingConfig' : IDL.Func([], [CrowdfundingConfig], ['query']),
+    'getCrowdfundingPledge' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(CrowdfundingPledge)],
+        ['query'],
+      ),
+    'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
     'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
+    'getMemberEarnings' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Vec(EarningRecord)],
+        ['query'],
+      ),
+    'getMemberTierRecord' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(MemberTierRecord)],
+        ['query'],
+      ),
+    'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
+    'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
+    'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
+    'getMyFSURecord' : IDL.Func([], [IDL.Opt(FSURecord)], ['query']),
+    'getMyFSUTransactions' : IDL.Func([], [IDL.Vec(FSUTransaction)], ['query']),
+    'getMyPledges' : IDL.Func([], [IDL.Vec(CrowdfundingPledge)], ['query']),
+    'getMyReferralCode' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+    'getMyRoyaltyDistributions' : IDL.Func(
+        [],
+        [IDL.Vec(EarningRecord)],
+        ['query'],
+      ),
+    'getMyTierRecord' : IDL.Func([], [IDL.Opt(MemberTierRecord)], ['query']),
+    'getMyUplineChain' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
     'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
     'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
     'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
     'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
+    'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
     'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
     'getTransactionHistory' : IDL.Func(
         [IDL.Opt(IDL.Text)],
@@ -475,6 +1075,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
@@ -483,9 +1084,26 @@ export const idlFactory = ({ IDL }) => {
     'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
     'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
     'listCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listCampaignsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(Campaign)], ['query']),
+    'listCrowdfundingCampaigns' : IDL.Func(
+        [],
+        [IDL.Vec(CrowdfundingCampaign)],
+        ['query'],
+      ),
+    'listCrowdfundingCampaignsByCategory' : IDL.Func(
+        [CrowdfundingCategory],
+        [IDL.Vec(CrowdfundingCampaign)],
+        ['query'],
+      ),
+    'listMyCrowdfundingCampaigns' : IDL.Func(
+        [],
+        [IDL.Vec(CrowdfundingCampaign)],
+        ['query'],
+      ),
     'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
     'listThreads' : IDL.Func([], [IDL.Vec(ForumThread)], ['query']),
     'listThreadsByCategory' : IDL.Func(
         [ForumCategory],
@@ -499,10 +1117,46 @@ export const idlFactory = ({ IDL }) => {
       ),
     'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
     'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'pledgeToCrowdfundingCampaign' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+        [IDL.Text],
+        [],
+      ),
+    'processReferralChainBonus' : IDL.Func(
+        [IDL.Principal, IDL.Nat, EarningType, IDL.Text],
+        [],
+        [],
+      ),
+    'recordEarning' : IDL.Func(
+        [IDL.Principal, IDL.Nat, EarningType, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
+    'redeemFSU' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
+    'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
+    'resolveReferralCode' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Principal)],
+        ['query'],
+      ),
+    'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'setCommissionRate' : IDL.Func(
+        [MembershipTierLevel, IDL.Nat, EarningType, IDL.Nat, IDL.Nat],
+        [IDL.Bool],
+        [],
+      ),
+    'setCrowdfundingConfig' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Nat], [], []),
+    'setMemberTier' : IDL.Func(
+        [IDL.Principal, MembershipTierLevel],
+        [IDL.Bool],
+        [],
+      ),
     'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
     'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
@@ -519,11 +1173,17 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         [],
       ),
+    'updateCrowdfundingCampaign' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Bool],
+        [],
+      ),
     'updateOrg' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Int],
         [IDL.Bool],
         [],
       ),
+    'upgradeMemberTier' : IDL.Func([MembershipTierLevel], [IDL.Bool], []),
   });
 };
 
