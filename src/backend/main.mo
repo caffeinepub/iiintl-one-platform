@@ -7,8 +7,8 @@ import Array "mo:core/Array";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Float "mo:core/Float";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
+import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
+import AccessControl "mo:caffeineai-authorization/access-control";
 
 
 

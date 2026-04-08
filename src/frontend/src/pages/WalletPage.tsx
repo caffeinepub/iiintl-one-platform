@@ -1,5 +1,5 @@
-import { WalletType } from "@/backend.d";
-import { TransactionType } from "@/backend.d";
+import { WalletType } from "@/backend";
+import { TransactionType } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

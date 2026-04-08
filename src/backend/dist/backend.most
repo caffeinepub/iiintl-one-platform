@@ -1,0 +1,180 @@
+// Version: 1.0.0
+type CampaignStatus__144160907 = {#active; #archived; #completed; #draft};
+type CampaignType__750479379 = {#action; #awareness; #fundraiser; #petition};
+type Campaign__370329394 =
+  {
+    campaignType : CampaignType__750479379;
+    createdAt : Int;
+    createdBy : Principal;
+    description : Text;
+    endDate : Int;
+    goal : Nat;
+    id : Text;
+    orgId : Text;
+    progress : Nat;
+    startDate : Int;
+    status : CampaignStatus__144160907;
+    supporterCount : Nat;
+    tags : [Text];
+    title : Text
+  };
+type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type ForumCategory__993514995 =
+  {#activism; #announcements; #campaigns; #general; #regional; #resources};
+type ForumReply__954910620 =
+  {
+    body : Text;
+    createdAt : Int;
+    createdBy : Principal;
+    id : Nat;
+    isModeratorReply : Bool;
+    threadId : Nat
+  };
+type ForumThread__828182490 =
+  {
+    body : Text;
+    category : ForumCategory__993514995;
+    createdAt : Int;
+    createdBy : Principal;
+    id : Nat;
+    isPinned : Bool;
+    orgId : ?Text;
+    replyCount : Nat;
+    status : ThreadStatus__267185935;
+    tags : [Text];
+    title : Text;
+    viewCount : Nat
+  };
+type Internal__667636161<T> =
+  {children : [var ?Node__92254746<T>]; data : Data__159895909<T>};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__520550824<T> = {data : Data__159895909<T>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type Node__92254746<T> =
+  {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type OrgMemberRole__1006871682 = {#admin; #member};
+type OrgMember__251168767 =
+  {joinedAt : Int; role : OrgMemberRole__1006871682; userId : Text};
+type OrgStatus__842647271 = {#active; #archived};
+type Organization__103960640 =
+  {
+    createdAt : Int;
+    createdBy : Principal;
+    description : Text;
+    foundedYear : Int;
+    id : Text;
+    members : [OrgMember__251168767];
+    name : Text;
+    orgType : Text;
+    region : Text;
+    status : OrgStatus__842647271;
+    website : Text
+  };
+type Role__931309261 = {#admin; #guest; #member; #moderator};
+type Set__532252804<T> = Set__710576254<T>;
+type Set__710576254<T> =
+  {var root : Node__92254746<T>; var size : Nat__490723111};
+type ThreadStatus__267185935 = {#archived; #locked; #open};
+type TransactionType__767491300 = {#received; #sent};
+type Transaction__865268250 =
+  {
+    amountICP : Float;
+    description : Text;
+    id : Nat;
+    timestamp : Int;
+    txType : TransactionType__767491300;
+    walletAddress : Text
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+type User__831686142 =
+  {
+    avatarUrl : Text;
+    bio : Text;
+    displayName : Text;
+    email : Text;
+    id : Text;
+    isActive : Bool;
+    joinedAt : Int;
+    role : Role__931309261
+  };
+type WalletType__701049132 = {#internetIdentity; #plug; #stoic};
+type Wallet__442667382 =
+  {
+    address : Text;
+    balanceICP : Float;
+    linkedAt : Int;
+    walletLabel : Text;
+    walletType : WalletType__701049132
+  };
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable campaignSupporters :
+    {
+      var root : Node__46230540<Text, Set__532252804<Principal>>;
+      var size : Nat__490723111
+    };
+  stable campaigns :
+    {
+      var root : Node__46230540<Text, Campaign__370329394>;
+      var size : Nat__490723111
+    };
+  stable forumReplies :
+    {
+      var root : Node__46230540<Nat, ForumReply__954910620>;
+      var size : Nat__490723111
+    };
+  stable forumThreads :
+    {
+      var root : Node__46230540<Nat, ForumThread__828182490>;
+      var size : Nat__490723111
+    };
+  stable var nextReplyId : Nat;
+  stable var nextThreadId : Nat;
+  stable var nextTransactionId : Nat;
+  stable organizations :
+    {
+      var root : Node__46230540<Text, Organization__103960640>;
+      var size : Nat__490723111
+    };
+  stable principalToUserId :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable threadReplies :
+    {
+      var root : Node__46230540<Nat, Set__532252804<Nat>>;
+      var size : Nat__490723111
+    };
+  stable userLanguages :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable userTransactions :
+    {
+      var root :
+        Node__46230540<Principal, Map__605269027<Nat, Transaction__865268250>>;
+      var size : Nat__490723111
+    };
+  stable userWallets :
+    {
+      var root :
+        Node__46230540<Principal, Map__605269027<Text, Wallet__442667382>>;
+      var size : Nat__490723111
+    };
+  stable users :
+    {
+      var root : Node__46230540<Text, User__831686142>;
+      var size : Nat__490723111
+    }
+};

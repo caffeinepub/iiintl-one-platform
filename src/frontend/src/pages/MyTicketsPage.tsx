@@ -1,7 +1,7 @@
-import type { Ticket, TicketTierType } from "@/backend.d";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
+import type { Ticket, TicketTierType } from "@/types/appTypes";
 import { Ticket as TicketIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";

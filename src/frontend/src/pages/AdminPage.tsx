@@ -1,7 +1,5 @@
-import type { PlatformAnalytics, Tenant } from "@/backend.d";
-import { TenantStatus, TenantTier } from "@/backend.d";
-import type { Campaign, ForumThread, Organization } from "@/backend.d";
-import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend.d";
+import type { Campaign, ForumThread, Organization } from "@/backend";
+import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +32,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
+import type {
+  ExtendedBackend,
+  PlatformAnalytics,
+  Tenant,
+} from "@/types/appTypes";
+import { TenantStatus, TenantTier } from "@/types/appTypes";
 import {
   Activity,
   BarChart2,

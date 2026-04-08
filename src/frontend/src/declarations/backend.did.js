@@ -132,9 +132,24 @@ export const Transaction = IDL.Record({
   'txType' : TransactionType,
   'amountICP' : IDL.Float64,
 });
+export const Role = IDL.Variant({
+  'member' : IDL.Null,
+  'admin' : IDL.Null,
+  'moderator' : IDL.Null,
+  'guest' : IDL.Null,
+});
+export const UserSummary = IDL.Record({
+  'id' : IDL.Text,
+  'bio' : IDL.Text,
+  'displayName' : IDL.Text,
+  'joinedAt' : IDL.Int,
+  'role' : Role,
+  'isActive' : IDL.Bool,
+  'avatarUrl' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  '_initializeAccessControl' : IDL.Func([], [], []),
   'addTransaction' : IDL.Func(
       [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
       [],
@@ -184,6 +199,7 @@ export const idlService = IDL.Service({
   'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
   'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
   'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
+  'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
   'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
   'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
   'getTransactionHistory' : IDL.Func(
@@ -217,11 +233,13 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'listThreadsByOrg' : IDL.Func([IDL.Text], [IDL.Vec(ForumThread)], ['query']),
+  'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
   'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
   'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
       [
@@ -368,9 +386,24 @@ export const idlFactory = ({ IDL }) => {
     'txType' : TransactionType,
     'amountICP' : IDL.Float64,
   });
+  const Role = IDL.Variant({
+    'member' : IDL.Null,
+    'admin' : IDL.Null,
+    'moderator' : IDL.Null,
+    'guest' : IDL.Null,
+  });
+  const UserSummary = IDL.Record({
+    'id' : IDL.Text,
+    'bio' : IDL.Text,
+    'displayName' : IDL.Text,
+    'joinedAt' : IDL.Int,
+    'role' : Role,
+    'isActive' : IDL.Bool,
+    'avatarUrl' : IDL.Text,
+  });
   
   return IDL.Service({
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    '_initializeAccessControl' : IDL.Func([], [], []),
     'addTransaction' : IDL.Func(
         [IDL.Text, IDL.Float64, IDL.Text, TransactionType],
         [],
@@ -426,6 +459,7 @@ export const idlFactory = ({ IDL }) => {
     'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
     'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
     'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
+    'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
     'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
     'getThread' : IDL.Func([IDL.Nat], [IDL.Opt(ForumThread)], ['query']),
     'getTransactionHistory' : IDL.Func(
@@ -463,11 +497,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(ForumThread)],
         ['query'],
       ),
+    'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
     'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
     'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
         [

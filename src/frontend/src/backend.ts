@@ -131,6 +131,15 @@ export interface Wallet {
     balanceICP: number;
     walletLabel: string;
 }
+export interface UserSummary {
+    id: string;
+    bio: string;
+    displayName: string;
+    joinedAt: bigint;
+    role: Role;
+    isActive: boolean;
+    avatarUrl: string;
+}
 export interface Campaign {
     id: string;
     status: CampaignStatus;
@@ -166,15 +175,6 @@ export interface UserProfile {
     email: string;
     avatarUrl: string;
 }
-export interface UserSummary {
-    id: string;
-    displayName: string;
-    role: UserRole;
-    bio: string;
-    avatarUrl: string;
-    joinedAt: bigint;
-    isActive: boolean;
-}
 export enum CampaignStatus {
     active = "active",
     completed = "completed",
@@ -203,6 +203,12 @@ export enum OrgStatus {
     active = "active",
     archived = "archived"
 }
+export enum Role {
+    member = "member",
+    admin = "admin",
+    moderator = "moderator",
+    guest = "guest"
+}
 export enum ThreadStatus {
     open = "open",
     locked = "locked",
@@ -223,7 +229,7 @@ export enum WalletType {
     stoic = "stoic"
 }
 export interface backendInterface {
-    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    _initializeAccessControl(): Promise<void>;
     addTransaction(walletAddress: string, amount: number, description: string, txType: TransactionType): Promise<void>;
     archiveCampaign(id: string): Promise<boolean>;
     archiveOrg(orgId: string): Promise<boolean>;
@@ -243,6 +249,7 @@ export interface backendInterface {
     getLinkedWallets(): Promise<Array<Wallet>>;
     getOrg(orgId: string): Promise<Organization | null>;
     getOrgMembers(orgId: string): Promise<Array<OrgMember>>;
+    getPreferredLanguage(): Promise<string>;
     getReplies(threadId: bigint): Promise<Array<ForumReply>>;
     getThread(threadId: bigint): Promise<ForumThread | null>;
     getTransactionHistory(walletAddress: string | null): Promise<Array<Transaction>>;
@@ -261,13 +268,12 @@ export interface backendInterface {
     listCampaigns(): Promise<Array<Campaign>>;
     listCampaignsByOrg(orgId: string): Promise<Array<Campaign>>;
     listOrgs(): Promise<Array<Organization>>;
-    listUsers(): Promise<Array<UserSummary>>;
     listThreads(): Promise<Array<ForumThread>>;
     listThreadsByCategory(category: ForumCategory): Promise<Array<ForumThread>>;
     listThreadsByOrg(orgId: string): Promise<Array<ForumThread>>;
+    listUsers(): Promise<Array<UserSummary>>;
     lockThread(threadId: bigint): Promise<boolean>;
     pinThread(threadId: bigint): Promise<boolean>;
-    getPreferredLanguage(): Promise<string>;
     registerUser(displayName: string, email: string): Promise<string>;
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -275,66 +281,21 @@ export interface backendInterface {
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
-    createTenant(orgName: string, contactEmail: string, tier: string, paymentMethod: string): Promise<string>;
-    getTenant(tenantId: string): Promise<any | null>;
-    getMyTenant(): Promise<any | null>;
-    getMySubscription(): Promise<any | null>;
-    listAllTenants(): Promise<Array<any>>;
-    updateTenant(orgName: string, contactEmail: string, customDomain: string | null): Promise<boolean>;
-    suspendTenant(tenantId: string): Promise<boolean>;
-    reactivateTenant(tenantId: string): Promise<boolean>;
-    upgradeTenant(newTier: string): Promise<boolean>;
-    cancelTenant(): Promise<boolean>;
-    addTenantMember(memberPrincipal: string, role: string): Promise<boolean>;
-    removeTenantMember(memberPrincipal: string): Promise<boolean>;
-    listTenantMembers(): Promise<Array<any>>;
-    getTenantMemberCount(): Promise<bigint>;
-    updateTenantBranding(brandName: string, logoUrl: string, primaryColor: string, welcomeMessage: string): Promise<boolean>;
-    getTenantBranding(tenantId: bigint): Promise<any | null>;
-    getMyTenantBranding(): Promise<any | null>;
-    checkTenantAccess(): Promise<any>;
-    getTenantUsage(): Promise<any | null>;
-    recordPayment(amountCents: bigint, currency: string, description: string, periodStart: bigint, periodEnd: bigint): Promise<bigint>;
-    listBillingHistory(): Promise<Array<any>>;
-    getLatestBillingRecord(): Promise<any | null>;
-    listTenantBillingHistory(tenantId: bigint): Promise<Array<any>>;
-    getTenantStats(): Promise<any | null>;
-    getPlatformAnalytics(): Promise<any | null>;
-    initMemberMLM(sponsorCode: string | null): Promise<string>;
-    getMyTierRecord(): Promise<any | null>;
-    getMyEarningsSummary(): Promise<any>;
-    getMyEarnings(): Promise<any[]>;
-    getMyReferralCode(): Promise<string | null>;
-    getMyDownline(): Promise<any[]>;
-    getMyUplineChain(): Promise<any[]>;
-    getFSUPoolStatus(): Promise<any>;
-    getMyFSURecord(): Promise<any | null>;
-    redeemFSU(fsuAmount: bigint, description: string): Promise<bigint>;
-    getMyFSUTransactions(): Promise<any[]>;
-    listRoyaltyPools(): Promise<any[]>;
-    getMyRoyaltyDistributions(): Promise<any[]>;
-    upgradeMemberTier(tier: string): Promise<void>;
-    listMLMEvents(): Promise<any[]>;
-    createMLMEvent(title: string, description: string, location: string, eventDate: bigint, currency: string, imageUrl: string | null): Promise<bigint>;
-    getMLMEvent(eventId: bigint): Promise<any | null>;
-    listEventTicketTiers(eventId: bigint): Promise<any[]>;
-    purchaseTicket(eventId: bigint, tierId: bigint, referrerCode: string | null): Promise<bigint>;
-    getMyTickets(): Promise<any[]>;
 }
-import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, ThreadStatus as _ThreadStatus, Transaction as _Transaction, TransactionType as _TransactionType, UserProfile as _UserProfile, UserRole as _UserRole, Wallet as _Wallet, WalletType as _WalletType } from "./declarations/backend.did.d.ts";
+import type { Campaign as _Campaign, CampaignStatus as _CampaignStatus, CampaignType as _CampaignType, ForumCategory as _ForumCategory, ForumThread as _ForumThread, OrgMember as _OrgMember, OrgMemberRole as _OrgMemberRole, OrgStatus as _OrgStatus, Organization as _Organization, Role as _Role, ThreadStatus as _ThreadStatus, Transaction as _Transaction, TransactionType as _TransactionType, UserProfile as _UserProfile, UserRole as _UserRole, UserSummary as _UserSummary, Wallet as _Wallet, WalletType as _WalletType } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
-    async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
+    async _initializeAccessControl(): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor._initializeAccessControlWithSecret(arg0);
+                const result = await this.actor._initializeAccessControl();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            const result = await this.actor._initializeAccessControl();
             return result;
         }
     }
@@ -563,6 +524,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getOrgMembers(arg0);
             return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPreferredLanguage(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPreferredLanguage();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPreferredLanguage();
+            return result;
         }
     }
     async getReplies(arg0: bigint): Promise<Array<ForumReply>> {
@@ -817,20 +792,6 @@ export class Backend implements backendInterface {
             return from_candid_vec_n50(this._uploadFile, this._downloadFile, result);
         }
     }
-    async listUsers(): Promise<Array<UserSummary>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listUsers();
-                return result as Array<UserSummary>;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listUsers();
-            return result as Array<UserSummary>;
-        }
-    }
     async listThreads(): Promise<Array<ForumThread>> {
         if (this.processError) {
             try {
@@ -871,6 +832,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.listThreadsByOrg(arg0);
             return from_candid_vec_n54(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async listUsers(): Promise<Array<UserSummary>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.listUsers();
+                return from_candid_vec_n55(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.listUsers();
+            return from_candid_vec_n55(this._uploadFile, this._downloadFile, result);
         }
     }
     async lockThread(arg0: bigint): Promise<boolean> {
@@ -943,20 +918,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getPreferredLanguage(): Promise<string> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getPreferredLanguage();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getPreferredLanguage();
-            return result;
-        }
-    }
     async setPreferredLanguage(arg0: string): Promise<void> {
         if (this.processError) {
             try {
@@ -1013,168 +974,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createTenant(arg0: string, arg1: string, arg2: import("@\/backend.d").TenantTier, arg3: import("@\/backend.d").PaymentMethod): Promise<string> {
-        const result = await (this.actor as any).createTenant(arg0, arg1, { [arg2]: null }, { [arg3]: null });
-        return result as string;
-    }
-    async getTenant(arg0: string): Promise<import("@\/backend.d").Tenant | null> {
-        const result = await (this.actor as any).getTenant(arg0);
-        return result.length > 0 ? result[0] as import("@\/backend.d").Tenant : null;
-    }
-    async getMyTenant(): Promise<import("@\/backend.d").Tenant | null> {
-        const result = await (this.actor as any).getMyTenant();
-        return result.length > 0 ? result[0] as import("@\/backend.d").Tenant : null;
-    }
-    async getMySubscription(): Promise<import("@\/backend.d").TenantSubscription | null> {
-        const result = await (this.actor as any).getMySubscription();
-        return result.length > 0 ? result[0] as import("@\/backend.d").TenantSubscription : null;
-    }
-    async listAllTenants(): Promise<Array<import("@\/backend.d").Tenant>> {
-        const result = await (this.actor as any).listAllTenants();
-        return result as Array<import("@\/backend.d").Tenant>;
-    }
-    async updateTenant(arg0: string, arg1: string, arg2: string | null): Promise<boolean> {
-        const result = await (this.actor as any).updateTenant(arg0, arg1, arg2 ? [arg2] : []);
-        return result as boolean;
-    }
-    async suspendTenant(arg0: string): Promise<boolean> {
-        const result = await (this.actor as any).suspendTenant(arg0);
-        return result as boolean;
-    }
-    async reactivateTenant(arg0: string): Promise<boolean> {
-        const result = await (this.actor as any).reactivateTenant(arg0);
-        return result as boolean;
-    }
-    async upgradeTenant(arg0: import("@\/backend.d").TenantTier): Promise<boolean> {
-        const result = await (this.actor as any).upgradeTenant({ [arg0]: null });
-        return result as boolean;
-    }
-    async cancelTenant(): Promise<boolean> {
-        const result = await (this.actor as any).cancelTenant();
-        return result as boolean;
-    }
-
-    async addTenantMember(arg0: string, arg1: string): Promise<boolean> {
-        const result = await (this.actor as any).addTenantMember(arg0, arg1);
-        return result as boolean;
-    }
-    async removeTenantMember(arg0: string): Promise<boolean> {
-        const result = await (this.actor as any).removeTenantMember(arg0);
-        return result as boolean;
-    }
-    async listTenantMembers(): Promise<Array<any>> {
-        const result = await (this.actor as any).listTenantMembers();
-        return result as Array<any>;
-    }
-    async getTenantMemberCount(): Promise<bigint> {
-        const result = await (this.actor as any).getTenantMemberCount();
-        return result as bigint;
-    }
-    async updateTenantBranding(arg0: string, arg1: string, arg2: string, arg3: string): Promise<boolean> {
-        const result = await (this.actor as any).updateTenantBranding(arg0, arg1, arg2, arg3);
-        return result as boolean;
-    }
-    async getTenantBranding(arg0: bigint): Promise<any | null> {
-        const result = await (this.actor as any).getTenantBranding(arg0);
-        return result.length > 0 ? result[0] : null;
-    }
-    async getMyTenantBranding(): Promise<any | null> {
-        const result = await (this.actor as any).getMyTenantBranding();
-        return result.length > 0 ? result[0] : null;
-    }
-    async checkTenantAccess(): Promise<any> {
-        const result = await (this.actor as any).checkTenantAccess();
-        return result;
-    }
-    async getTenantUsage(): Promise<any | null> {
-        const result = await (this.actor as any).getTenantUsage();
-        return result.length > 0 ? result[0] : null;
-    }
-    async recordPayment(arg0: bigint, arg1: string, arg2: string, arg3: bigint, arg4: bigint): Promise<bigint> {
-        const result = await (this.actor as any).recordPayment(arg0, arg1, arg2, arg3, arg4);
-        return result as bigint;
-    }
-    async listBillingHistory(): Promise<Array<any>> {
-        const result = await (this.actor as any).listBillingHistory();
-        return result as Array<any>;
-    }
-    async getLatestBillingRecord(): Promise<any | null> {
-        const result = await (this.actor as any).getLatestBillingRecord();
-        return result.length > 0 ? result[0] : null;
-    }
-    async listTenantBillingHistory(arg0: bigint): Promise<Array<any>> {
-        const result = await (this.actor as any).listTenantBillingHistory(arg0);
-        return result as Array<any>;
-    }
-    async getTenantStats(): Promise<any | null> {
-        const result = await (this.actor as any).getTenantStats();
-        return result.length > 0 ? result[0] : null;
-    }
-    async getPlatformAnalytics(): Promise<any | null> {
-        const result = await (this.actor as any).getPlatformAnalytics();
-        return result.length > 0 ? result[0] : null;
-    }
-    // MLM stub methods
-    async initMemberMLM(sponsorCode: string | null): Promise<string> {
-        try { const r = await (this.actor as any).initMemberMLM(sponsorCode ? [sponsorCode] : []); return r; } catch { return "enrolled"; }
-    }
-    async getMyTierRecord(): Promise<any | null> {
-        try { const r = await (this.actor as any).getMyTierRecord(); return r.length > 0 ? r[0] : null; } catch { return null; }
-    }
-    async getMyEarningsSummary(): Promise<any> {
-        try { return await (this.actor as any).getMyEarningsSummary(); } catch { return { totalCents: 0n, pendingCents: 0n, paidCents: 0n, directReferralCents: 0n, levelOverrideCents: 0n, royaltyPoolCents: 0n, eventCommissionCents: 0n, finFracFranCents: 0n, activityBonusCents: 0n }; }
-    }
-    async getMyEarnings(): Promise<any[]> {
-        try { return await (this.actor as any).getMyEarnings(); } catch { return []; }
-    }
-    async getMyReferralCode(): Promise<string | null> {
-        try { const r = await (this.actor as any).getMyReferralCode(); return r.length > 0 ? r[0] : null; } catch { return null; }
-    }
-    async getMyDownline(): Promise<any[]> {
-        try { return await (this.actor as any).getMyDownline(); } catch { return []; }
-    }
-    async getMyUplineChain(): Promise<any[]> {
-        try { return await (this.actor as any).getMyUplineChain(); } catch { return []; }
-    }
-    async getFSUPoolStatus(): Promise<any> {
-        try { return await (this.actor as any).getFSUPoolStatus(); } catch { return { poolSizeCents: 0n, fsuValueCentsEach: 0n, totalFSUOutstanding: 0n, nextDistributionLabel: "TBD" }; }
-    }
-    async getMyFSURecord(): Promise<any | null> {
-        try { const r = await (this.actor as any).getMyFSURecord(); return r.length > 0 ? r[0] : null; } catch { return null; }
-    }
-    async redeemFSU(fsuAmount: bigint, description: string): Promise<bigint> {
-        try { return await (this.actor as any).redeemFSU(fsuAmount, description); } catch { return 0n; }
-    }
-    async getMyFSUTransactions(): Promise<any[]> {
-        try { return await (this.actor as any).getMyFSUTransactions(); } catch { return []; }
-    }
-    async listRoyaltyPools(): Promise<any[]> {
-        try { return await (this.actor as any).listRoyaltyPools(); } catch { return []; }
-    }
-    async getMyRoyaltyDistributions(): Promise<any[]> {
-        try { return await (this.actor as any).getMyRoyaltyDistributions(); } catch { return []; }
-    }
-    async upgradeMemberTier(tier: string): Promise<void> {
-        try { await (this.actor as any).upgradeMemberTier({ [tier]: null }); } catch { /* noop */ }
-    }
-    async listMLMEvents(): Promise<any[]> {
-        try { return await (this.actor as any).listMLMEvents(); } catch { return []; }
-    }
-    async createMLMEvent(title: string, description: string, location: string, eventDate: bigint, currency: string, imageUrl: string | null): Promise<bigint> {
-        try { return await (this.actor as any).createMLMEvent(title, description, location, eventDate, currency, imageUrl ? [imageUrl] : []); } catch { return 0n; }
-    }
-    async getMLMEvent(eventId: bigint): Promise<any | null> {
-        try { const r = await (this.actor as any).getMLMEvent(eventId); return r.length > 0 ? r[0] : null; } catch { return null; }
-    }
-    async listEventTicketTiers(eventId: bigint): Promise<any[]> {
-        try { return await (this.actor as any).listEventTicketTiers(eventId); } catch { return []; }
-    }
-    async purchaseTicket(eventId: bigint, tierId: bigint, referrerCode: string | null): Promise<bigint> {
-        try { return await (this.actor as any).purchaseTicket(eventId, tierId, referrerCode ? [referrerCode] : []); } catch { return 0n; }
-    }
-    async getMyTickets(): Promise<any[]> {
-        try { return await (this.actor as any).getMyTickets(); } catch { return []; }
-    }
 }
 function from_candid_CampaignStatus_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CampaignStatus): CampaignStatus {
     return from_candid_variant_n17(_uploadFile, _downloadFile, value);
@@ -1203,6 +1002,9 @@ function from_candid_OrgStatus_n30(_uploadFile: (file: ExternalBlob) => Promise<
 function from_candid_Organization_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Organization): Organization {
     return from_candid_record_n29(_uploadFile, _downloadFile, value);
 }
+function from_candid_Role_n58(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Role): Role {
+    return from_candid_variant_n59(_uploadFile, _downloadFile, value);
+}
 function from_candid_ThreadStatus_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ThreadStatus): ThreadStatus {
     return from_candid_variant_n41(_uploadFile, _downloadFile, value);
 }
@@ -1214,6 +1016,9 @@ function from_candid_Transaction_n46(_uploadFile: (file: ExternalBlob) => Promis
 }
 function from_candid_UserRole_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n12(_uploadFile, _downloadFile, value);
+}
+function from_candid_UserSummary_n56(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserSummary): UserSummary {
+    return from_candid_record_n57(_uploadFile, _downloadFile, value);
 }
 function from_candid_WalletType_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _WalletType): WalletType {
     return from_candid_variant_n26(_uploadFile, _downloadFile, value);
@@ -1437,6 +1242,33 @@ function from_candid_record_n47(_uploadFile: (file: ExternalBlob) => Promise<Uin
         amountICP: value.amountICP
     };
 }
+function from_candid_record_n57(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    bio: string;
+    displayName: string;
+    joinedAt: bigint;
+    role: _Role;
+    isActive: boolean;
+    avatarUrl: string;
+}): {
+    id: string;
+    bio: string;
+    displayName: string;
+    joinedAt: bigint;
+    role: Role;
+    isActive: boolean;
+    avatarUrl: string;
+} {
+    return {
+        id: value.id,
+        bio: value.bio,
+        displayName: value.displayName,
+        joinedAt: value.joinedAt,
+        role: from_candid_Role_n58(_uploadFile, _downloadFile, value.role),
+        isActive: value.isActive,
+        avatarUrl: value.avatarUrl
+    };
+}
 function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
@@ -1522,6 +1354,17 @@ function from_candid_variant_n49(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): TransactionType {
     return "sent" in value ? TransactionType.sent : "received" in value ? TransactionType.received : value;
 }
+function from_candid_variant_n59(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    member: null;
+} | {
+    admin: null;
+} | {
+    moderator: null;
+} | {
+    guest: null;
+}): Role {
+    return "member" in value ? Role.member : "admin" in value ? Role.admin : "moderator" in value ? Role.moderator : "guest" in value ? Role.guest : value;
+}
 function from_candid_vec_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Wallet>): Array<Wallet> {
     return value.map((x)=>from_candid_Wallet_n23(_uploadFile, _downloadFile, x));
 }
@@ -1539,6 +1382,9 @@ function from_candid_vec_n53(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 }
 function from_candid_vec_n54(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_ForumThread>): Array<ForumThread> {
     return value.map((x)=>from_candid_ForumThread_n38(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n55(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserSummary>): Array<UserSummary> {
+    return value.map((x)=>from_candid_UserSummary_n56(_uploadFile, _downloadFile, x));
 }
 function to_candid_CampaignType_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: CampaignType): _CampaignType {
     return to_candid_variant_n6(_uploadFile, _downloadFile, value);

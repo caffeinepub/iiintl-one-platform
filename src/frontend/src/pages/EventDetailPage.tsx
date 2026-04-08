@@ -1,4 +1,3 @@
-import type { MLMEvent, TicketTier, TicketTierType } from "@/backend.d";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBackend } from "@/hooks/useBackend";
+import type { MLMEvent, TicketTier, TicketTierType } from "@/types/appTypes";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   Calendar,

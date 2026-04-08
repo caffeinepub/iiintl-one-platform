@@ -1,4 +1,3 @@
-import type { EventStatus, MLMEvent } from "@/backend.d";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
+import type { EventStatus, MLMEvent } from "@/types/appTypes";
 import { Link } from "@tanstack/react-router";
 import {
   Calendar,

@@ -1,15 +1,3 @@
-import type {
-  DownlineMember,
-  EarningRecord,
-  EarningsSummary,
-  FSUPoolStatus,
-  FSURecord,
-  FSUTransaction,
-  MemberTierRecord,
-  MembershipTierLevel,
-  RoyaltyDistribution,
-  RoyaltyPool,
-} from "@/backend.d";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +30,18 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useBackend } from "@/hooks/useBackend";
+import type {
+  DownlineMember,
+  EarningRecord,
+  EarningsSummary,
+  FSUPoolStatus,
+  FSURecord,
+  FSUTransaction,
+  MemberTierRecord,
+  MembershipTierLevel,
+  RoyaltyDistribution,
+  RoyaltyPool,
+} from "@/types/appTypes";
 import {
   Award,
   CheckCircle,

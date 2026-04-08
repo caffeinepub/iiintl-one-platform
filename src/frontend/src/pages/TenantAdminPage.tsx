@@ -1,13 +1,3 @@
-import type {
-  BillingRecord,
-  BillingStatus,
-  Tenant,
-  TenantBranding,
-  TenantMember,
-  TenantSubscription,
-  TenantUsage,
-} from "@/backend.d";
-import { PaymentMethod, TenantStatus, TenantTier } from "@/backend.d";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +38,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBackend } from "@/hooks/useBackend";
+import type {
+  BillingRecord,
+  BillingStatus,
+  Tenant,
+  TenantBranding,
+  TenantMember,
+  TenantSubscription,
+  TenantUsage,
+} from "@/types/appTypes";
+import { PaymentMethod, TenantStatus, TenantTier } from "@/types/appTypes";
 import {
   AlertTriangle,
   Ban,

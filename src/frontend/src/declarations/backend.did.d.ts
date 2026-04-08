@@ -84,6 +84,10 @@ export interface Organization {
   'description' : string,
   'website' : string,
 }
+export type Role = { 'member' : null } |
+  { 'admin' : null } |
+  { 'moderator' : null } |
+  { 'guest' : null };
 export type ThreadStatus = { 'open' : null } |
   { 'locked' : null } |
   { 'archived' : null };
@@ -106,6 +110,15 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface UserSummary {
+  'id' : string,
+  'bio' : string,
+  'displayName' : string,
+  'joinedAt' : bigint,
+  'role' : Role,
+  'isActive' : boolean,
+  'avatarUrl' : string,
+}
 export interface Wallet {
   'linkedAt' : bigint,
   'walletType' : WalletType,
@@ -117,7 +130,7 @@ export type WalletType = { 'internetIdentity' : null } |
   { 'plug' : null } |
   { 'stoic' : null };
 export interface _SERVICE {
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addTransaction' : ActorMethod<
     [string, number, string, TransactionType],
     undefined
@@ -158,6 +171,7 @@ export interface _SERVICE {
   'getLinkedWallets' : ActorMethod<[], Array<Wallet>>,
   'getOrg' : ActorMethod<[string], [] | [Organization]>,
   'getOrgMembers' : ActorMethod<[string], Array<OrgMember>>,
+  'getPreferredLanguage' : ActorMethod<[], string>,
   'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
   'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
   'getTransactionHistory' : ActorMethod<[[] | [string]], Array<Transaction>>,
@@ -179,11 +193,13 @@ export interface _SERVICE {
   'listThreads' : ActorMethod<[], Array<ForumThread>>,
   'listThreadsByCategory' : ActorMethod<[ForumCategory], Array<ForumThread>>,
   'listThreadsByOrg' : ActorMethod<[string], Array<ForumThread>>,
+  'listUsers' : ActorMethod<[], Array<UserSummary>>,
   'lockThread' : ActorMethod<[bigint], boolean>,
   'pinThread' : ActorMethod<[bigint], boolean>,
   'registerUser' : ActorMethod<[string, string], string>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'setPreferredLanguage' : ActorMethod<[string], undefined>,
   'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
     [

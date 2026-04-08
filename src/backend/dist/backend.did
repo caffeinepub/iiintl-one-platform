@@ -1,0 +1,222 @@
+type WalletType = 
+ variant {
+   internetIdentity;
+   plug;
+   stoic;
+ };
+type Wallet = 
+ record {
+   address: text;
+   balanceICP: float64;
+   linkedAt: int;
+   walletLabel: text;
+   walletType: WalletType;
+ };
+type UserSummary = 
+ record {
+   avatarUrl: text;
+   bio: text;
+   displayName: text;
+   id: text;
+   isActive: bool;
+   joinedAt: int;
+   role: Role;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = 
+ record {
+   avatarUrl: text;
+   bio: text;
+   displayName: text;
+   email: text;
+ };
+type TransactionType = 
+ variant {
+   received;
+   sent;
+ };
+type Transaction = 
+ record {
+   amountICP: float64;
+   description: text;
+   id: nat;
+   timestamp: int;
+   txType: TransactionType;
+   walletAddress: text;
+ };
+type ThreadStatus = 
+ variant {
+   archived;
+   locked;
+   open;
+ };
+type Role = 
+ variant {
+   admin;
+   guest;
+   member;
+   moderator;
+ };
+type Organization = 
+ record {
+   createdAt: int;
+   createdBy: principal;
+   description: text;
+   foundedYear: int;
+   id: text;
+   members: vec OrgMember;
+   name: text;
+   orgType: text;
+   region: text;
+   status: OrgStatus;
+   website: text;
+ };
+type OrgStatus = 
+ variant {
+   active;
+   archived;
+ };
+type OrgMemberRole = 
+ variant {
+   admin;
+   member;
+ };
+type OrgMember = 
+ record {
+   joinedAt: int;
+   role: OrgMemberRole;
+   userId: text;
+ };
+type ForumThread = 
+ record {
+   body: text;
+   category: ForumCategory;
+   createdAt: int;
+   createdBy: principal;
+   id: nat;
+   isPinned: bool;
+   orgId: opt text;
+   replyCount: nat;
+   status: ThreadStatus;
+   tags: vec text;
+   title: text;
+   viewCount: nat;
+ };
+type ForumReply = 
+ record {
+   body: text;
+   createdAt: int;
+   createdBy: principal;
+   id: nat;
+   isModeratorReply: bool;
+   threadId: nat;
+ };
+type ForumCategory = 
+ variant {
+   activism;
+   announcements;
+   campaigns;
+   general;
+   regional;
+   resources;
+ };
+type CampaignType = 
+ variant {
+   action;
+   awareness;
+   fundraiser;
+   petition;
+ };
+type CampaignStatus = 
+ variant {
+   active;
+   archived;
+   completed;
+   draft;
+ };
+type Campaign = 
+ record {
+   campaignType: CampaignType;
+   createdAt: int;
+   createdBy: principal;
+   description: text;
+   endDate: int;
+   goal: nat;
+   id: text;
+   orgId: text;
+   progress: nat;
+   startDate: int;
+   status: CampaignStatus;
+   supporterCount: nat;
+   tags: vec text;
+   title: text;
+ };
+service : {
+  _initializeAccessControl: () -> ();
+  addTransaction: (walletAddress: text, amount: float64, description: 
+   text, txType: TransactionType) -> ();
+  archiveCampaign: (id: text) -> (bool);
+  archiveOrg: (orgId: text) -> (bool);
+  archiveThread: (threadId: nat) -> (bool);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  createCampaign: (title: text, description: text, campaignType:
+   CampaignType, orgId: text, goal: nat, startDate: int, endDate: int, tags:
+   vec text) -> (text);
+  createOrg: (name: text, description: text, region: text, orgType: text,
+   website: text, foundedYear: int) -> (text);
+  createThread: (title: text, body: text, category: ForumCategory, orgId:
+   opt text, tags: vec text) -> (nat);
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getCampaign: (id: text) -> (opt Campaign) query;
+  getCampaignProgress: (campaignId: text) ->
+   (opt record {
+          goal: nat;
+          progress: nat;
+        }) query;
+  getCampaignSupporterCount: (campaignId: text) -> (opt nat) query;
+  getLinkedWallets: () -> (vec Wallet) query;
+  getOrg: (orgId: text) -> (opt Organization) query;
+  getOrgMembers: (orgId: text) -> (vec OrgMember) query;
+  getPreferredLanguage: () -> (text) query;
+  getReplies: (threadId: nat) -> (vec ForumReply) query;
+  getThread: (threadId: nat) -> (opt ForumThread) query;
+  getTransactionHistory: (walletAddress: opt text) -> (vec Transaction) query;
+  getUserOrgs: (userId: text) -> (vec Organization) query;
+  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  getWalletBalance: (address: text) -> (float64) query;
+  incrementThreadView: (threadId: nat) -> (bool);
+  isCallerAdmin: () -> (bool) query;
+  joinCampaign: (campaignId: text) -> (bool);
+  joinOrg: (orgId: text) -> (bool);
+  leaveCampaign: (campaignId: text) -> (bool);
+  leaveOrg: (orgId: text) -> (bool);
+  linkWallet: (walletType: WalletType, address: text, walletLabel: text) ->
+   ();
+  listActiveCampaigns: () -> (vec Campaign) query;
+  listActiveOrgs: () -> (vec Organization) query;
+  listCampaigns: () -> (vec Campaign) query;
+  listCampaignsByOrg: (orgId: text) -> (vec Campaign) query;
+  listOrgs: () -> (vec Organization) query;
+  listThreads: () -> (vec ForumThread) query;
+  listThreadsByCategory: (category: ForumCategory) -> (vec ForumThread) query;
+  listThreadsByOrg: (orgId: text) -> (vec ForumThread) query;
+  listUsers: () -> (vec UserSummary) query;
+  lockThread: (threadId: nat) -> (bool);
+  pinThread: (threadId: nat) -> (bool);
+  registerUser: (displayName: text, email: text) -> (text);
+  replyToThread: (threadId: nat, body: text) -> (nat);
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  setPreferredLanguage: (lang: text) -> ();
+  unlinkWallet: (address: text) -> ();
+  updateCampaign: (id: text, title: text, description: text, campaignType:
+   CampaignType, goal: nat, startDate: int, endDate: int, tags: vec text) ->
+   (bool);
+  updateOrg: (orgId: text, name: text, description: text, region: text,
+   orgType: text, website: text, foundedYear: int) -> (bool);
+}
