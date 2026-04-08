@@ -2416,6 +2416,109 @@ actor {
     };
   };
 
+  // =========================================================================
+  // === NOTIFICATIONS MODULE ================================================
+  // =========================================================================
+
+  public type NotificationType = {
+    #info;
+    #warning;
+    #success;
+    #error;
+  };
+
+  public type Notification = {
+    id : Text;
+    recipient : Principal;
+    title : Text;
+    message : Text;
+    notifType : NotificationType;
+    isRead : Bool;
+    createdAt : Int;
+  };
+
+  let notifications = Map.empty<Text, Notification>();
+  let recipientNotifIndex = Map.empty<Principal, [Text]>();
+  var nextNotificationId : Nat = 1;
+
+  private func _createNotification(
+    recipient : Principal,
+    title : Text,
+    message : Text,
+    notifType : NotificationType,
+  ) {
+    let notifId = "notif-" # nextNotificationId.toText();
+    nextNotificationId += 1;
+    let notif : Notification = {
+      id = notifId;
+      recipient;
+      title;
+      message;
+      notifType;
+      isRead = false;
+      createdAt = Time.now();
+    };
+    notifications.add(notifId, notif);
+    let existing = switch (recipientNotifIndex.get(recipient)) {
+      case (null) { [] };
+      case (?ids) { ids };
+    };
+    recipientNotifIndex.add(recipient, existing.concat([notifId]));
+  };
+
+  public query ({ caller }) func getMyNotifications() : async [Notification] {
+    let ids = switch (recipientNotifIndex.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id) { notifications.get(id) });
+  };
+
+  public shared ({ caller }) func markNotificationRead(notifId : Text) : async Bool {
+    switch (notifications.get(notifId)) {
+      case (null) { false };
+      case (?n) {
+        if (n.recipient != caller) { Runtime.trap("Unauthorized") };
+        notifications.add(notifId, { n with isRead = true });
+        true;
+      };
+    };
+  };
+
+  // =========================================================================
+  // === TRIAL AUTO-EXPIRY AUTOMATION ========================================
+  // =========================================================================
+
+  // Last time the heartbeat ran the expiry check (nanoseconds, 0 = never)
+  var lastExpiryCheck : Int = 0;
+
+  // 24 hours in nanoseconds
+  let _24hNs : Int = 86_400_000_000_000;
+
+  // Heartbeat: runs every consensus round; fires expiry logic once per 24h
+  system func heartbeat() : async () {
+    let now = Time.now();
+    if (now - lastExpiryCheck >= _24hNs) {
+      lastExpiryCheck := now;
+      // Inline expiry logic (same as checkAndExpireTrials, no caller needed)
+      for ((tenantId, tenant) in tenants.entries()) {
+        switch (tenant.status) {
+          case (#trial) {
+            switch (tenant.trialEndsAt) {
+              case (null) {};
+              case (?endsAt) {
+                if (endsAt < now) {
+                  tenants.add(tenantId, { tenant with status = #suspended; updatedAt = now });
+                };
+              };
+            };
+          };
+          case (_) {};
+        };
+      };
+    };
+  };
+
   // --- Trial Auto-Expiry Functions ---
 
   /// Admin-only. Iterates all tenants and suspends any that are in #trial
@@ -2468,5 +2571,90 @@ actor {
       let bEnd = switch (b.trialEndsAt) { case (?v) v; case (null) 0 };
       Int.compare(aEnd, bEnd);
     });
+  };
+
+  /// Sends in-platform notifications to tenant owners based on days remaining
+  /// in their trial (7, 3, 1 days) and for already-expired trials.
+  /// Returns a summary of how many notifications were sent.
+  public shared ({ caller }) func sendTrialExpiryNotifications() : async Text {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let now = Time.now();
+    var sentCount = 0;
+    for ((_tenantId, tenant) in tenants.entries()) {
+      switch (tenant.status) {
+        case (#trial) {
+          switch (tenant.trialEndsAt) {
+            case (null) {};
+            case (?endsAt) {
+              let diffNs : Int = endsAt - now;
+              let dayNs : Int = 86_400_000_000_000;
+              let daysLeft : Int = diffNs / dayNs;
+              if (daysLeft <= 0) {
+                _createNotification(
+                  tenant.ownerPrincipal,
+                  "Trial Expired — Account Suspended",
+                  "Your trial period has ended and your account has been suspended. Please upgrade to restore access.",
+                  #warning,
+                );
+                sentCount += 1;
+              } else if (daysLeft == 1) {
+                _createNotification(
+                  tenant.ownerPrincipal,
+                  "Trial Ending Tomorrow",
+                  "Your IIIntl trial ends tomorrow. Upgrade immediately to maintain access.",
+                  #warning,
+                );
+                sentCount += 1;
+              } else if (daysLeft == 3) {
+                _createNotification(
+                  tenant.ownerPrincipal,
+                  "Trial Ending in 3 Days",
+                  "Your IIIntl trial ends in 3 days. Upgrade now to avoid suspension.",
+                  #warning,
+                );
+                sentCount += 1;
+              } else if (daysLeft == 7) {
+                _createNotification(
+                  tenant.ownerPrincipal,
+                  "Trial Ending in 7 Days",
+                  "Your IIIntl trial ends in 7 days. Upgrade now to keep your data and access.",
+                  #warning,
+                );
+                sentCount += 1;
+              };
+            };
+          };
+        };
+        case (_) {};
+      };
+    };
+    "Sent " # sentCount.toText() # " trial expiry notifications";
+  };
+
+  /// Returns the timestamp of the last heartbeat expiry check and
+  /// a human-readable string showing how long until the next check fires.
+  public query func getTrialAutomationStatus() : async { lastCheck : Int; nextCheckIn : Text } {
+    let now = Time.now();
+    let dayNs : Int = 86_400_000_000_000;
+    let hourNs : Int = 3_600_000_000_000;
+    let minuteNs : Int = 60_000_000_000;
+
+    let nextCheckIn : Text = if (lastExpiryCheck == 0) {
+      "Next check in ~24h (never run)"
+    } else {
+      let elapsed : Int = now - lastExpiryCheck;
+      let remaining : Int = dayNs - elapsed;
+      if (remaining <= 0) {
+        "Check due now"
+      } else {
+        let hours : Int = remaining / hourNs;
+        let mins : Int = (remaining - hours * hourNs) / minuteNs;
+        "Next check in " # hours.toText() # "h " # mins.toText() # "m"
+      };
+    };
+
+    { lastCheck = lastExpiryCheck; nextCheckIn };
   };
 };

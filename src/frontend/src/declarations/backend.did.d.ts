@@ -225,6 +225,19 @@ export type MembershipTierLevel = { 'free' : null } |
   { 'ambassador' : null } |
   { 'partner' : null } |
   { 'associate' : null };
+export interface Notification {
+  'id' : string,
+  'title' : string,
+  'notifType' : NotificationType,
+  'createdAt' : bigint,
+  'recipient' : Principal,
+  'isRead' : boolean,
+  'message' : string,
+}
+export type NotificationType = { 'warning' : null } |
+  { 'info' : null } |
+  { 'error' : null } |
+  { 'success' : null };
 export interface OrgMember {
   'userId' : string,
   'joinedAt' : bigint,
@@ -457,6 +470,7 @@ export interface _SERVICE {
   'getMyEarningsSummary' : ActorMethod<[], EarningsSummary>,
   'getMyFSURecord' : ActorMethod<[], [] | [FSURecord]>,
   'getMyFSUTransactions' : ActorMethod<[], Array<FSUTransaction>>,
+  'getMyNotifications' : ActorMethod<[], Array<Notification>>,
   'getMyPledges' : ActorMethod<[], Array<CrowdfundingPledge>>,
   'getMyReferralCode' : ActorMethod<[], [] | [string]>,
   'getMyRoyaltyDistributions' : ActorMethod<[], Array<EarningRecord>>,
@@ -472,6 +486,14 @@ export interface _SERVICE {
   'getTenantBranding' : ActorMethod<[string], [] | [TenantBranding]>,
   'getThread' : ActorMethod<[bigint], [] | [ForumThread]>,
   'getTransactionHistory' : ActorMethod<[[] | [string]], Array<Transaction>>,
+  /**
+   * / Returns the timestamp of the last heartbeat expiry check and
+   * / a human-readable string showing how long until the next check fires.
+   */
+  'getTrialAutomationStatus' : ActorMethod<
+    [],
+    { 'lastCheck' : bigint, 'nextCheckIn' : string }
+  >,
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWalletBalance' : ActorMethod<[string], number>,
@@ -505,6 +527,7 @@ export interface _SERVICE {
   'listUsers' : ActorMethod<[], Array<UserSummary>>,
   'lockThread' : ActorMethod<[bigint], boolean>,
   'markEarningPaid' : ActorMethod<[string], boolean>,
+  'markNotificationRead' : ActorMethod<[string], boolean>,
   'pinThread' : ActorMethod<[bigint], boolean>,
   'pledgeToCrowdfundingCampaign' : ActorMethod<
     [string, bigint, [] | [string], [] | [string]],
@@ -528,6 +551,12 @@ export interface _SERVICE {
   'resolveReferralCode' : ActorMethod<[string], [] | [Principal]>,
   'runPayCycle' : ActorMethod<[Principal], bigint>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  /**
+   * / Sends in-platform notifications to tenant owners based on days remaining
+   * / in their trial (7, 3, 1 days) and for already-expired trials.
+   * / Returns a summary of how many notifications were sent.
+   */
+  'sendTrialExpiryNotifications' : ActorMethod<[], string>,
   'setCommissionRate' : ActorMethod<
     [MembershipTierLevel, bigint, EarningType, bigint, bigint],
     boolean

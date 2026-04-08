@@ -157,6 +157,23 @@ type OrgMember =
    role: OrgMemberRole;
    userId: text;
  };
+type NotificationType = 
+ variant {
+   error;
+   info;
+   success;
+   warning;
+ };
+type Notification = 
+ record {
+   createdAt: int;
+   id: text;
+   isRead: bool;
+   message: text;
+   notifType: NotificationType;
+   recipient: principal;
+   title: text;
+ };
 type MembershipTierLevel = 
  variant {
    affiliate;
@@ -493,6 +510,7 @@ service : {
   getMyEarningsSummary: () -> (EarningsSummary) query;
   getMyFSURecord: () -> (opt FSURecord) query;
   getMyFSUTransactions: () -> (vec FSUTransaction) query;
+  getMyNotifications: () -> (vec Notification) query;
   getMyPledges: () -> (vec CrowdfundingPledge) query;
   getMyReferralCode: () -> (opt text) query;
   getMyRoyaltyDistributions: () -> (vec EarningRecord) query;
@@ -508,6 +526,13 @@ service : {
   getTenantBranding: (tenantId: text) -> (opt TenantBranding) query;
   getThread: (threadId: nat) -> (opt ForumThread) query;
   getTransactionHistory: (walletAddress: opt text) -> (vec Transaction) query;
+  /// Returns the timestamp of the last heartbeat expiry check and
+  /// a human-readable string showing how long until the next check fires.
+  getTrialAutomationStatus: () ->
+   (record {
+      lastCheck: int;
+      nextCheckIn: text;
+    }) query;
   getUserOrgs: (userId: text) -> (vec Organization) query;
   getUserProfile: (user: principal) -> (opt UserProfile) query;
   getWalletBalance: (address: text) -> (float64) query;
@@ -540,6 +565,7 @@ service : {
   listUsers: () -> (vec UserSummary) query;
   lockThread: (threadId: nat) -> (bool);
   markEarningPaid: (earnId: text) -> (bool);
+  markNotificationRead: (notifId: text) -> (bool);
   pinThread: (threadId: nat) -> (bool);
   pledgeToCrowdfundingCampaign: (campaignId: text, amountCents: nat,
    rewardTierId: opt text, referrerCode: opt text) -> (text);
@@ -557,6 +583,10 @@ service : {
   resolveReferralCode: (code: text) -> (opt principal) query;
   runPayCycle: (member: principal) -> (nat);
   saveCallerUserProfile: (profile: UserProfile) -> ();
+  /// Sends in-platform notifications to tenant owners based on days remaining
+  /// in their trial (7, 3, 1 days) and for already-expired trials.
+  /// Returns a summary of how many notifications were sent.
+  sendTrialExpiryNotifications: () -> (text);
   setCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
    earningType: EarningType, basisPoints: nat, flatAmountUnits: nat) ->
    (bool);

@@ -283,6 +283,21 @@ export const FSUTransaction = IDL.Record({
   'txType' : FSUTxType,
   'amount' : IDL.Nat,
 });
+export const NotificationType = IDL.Variant({
+  'warning' : IDL.Null,
+  'info' : IDL.Null,
+  'error' : IDL.Null,
+  'success' : IDL.Null,
+});
+export const Notification = IDL.Record({
+  'id' : IDL.Text,
+  'title' : IDL.Text,
+  'notifType' : NotificationType,
+  'createdAt' : IDL.Int,
+  'recipient' : IDL.Principal,
+  'isRead' : IDL.Bool,
+  'message' : IDL.Text,
+});
 export const OrgStatus = IDL.Variant({
   'active' : IDL.Null,
   'archived' : IDL.Null,
@@ -530,6 +545,7 @@ export const idlService = IDL.Service({
   'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
   'getMyFSURecord' : IDL.Func([], [IDL.Opt(FSURecord)], ['query']),
   'getMyFSUTransactions' : IDL.Func([], [IDL.Vec(FSUTransaction)], ['query']),
+  'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getMyPledges' : IDL.Func([], [IDL.Vec(CrowdfundingPledge)], ['query']),
   'getMyReferralCode' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getMyRoyaltyDistributions' : IDL.Func(
@@ -555,6 +571,11 @@ export const idlService = IDL.Service({
   'getTransactionHistory' : IDL.Func(
       [IDL.Opt(IDL.Text)],
       [IDL.Vec(Transaction)],
+      ['query'],
+    ),
+  'getTrialAutomationStatus' : IDL.Func(
+      [],
+      [IDL.Record({ 'lastCheck' : IDL.Int, 'nextCheckIn' : IDL.Text })],
       ['query'],
     ),
   'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
@@ -615,6 +636,7 @@ export const idlService = IDL.Service({
   'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
   'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'pledgeToCrowdfundingCampaign' : IDL.Func(
       [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
@@ -645,6 +667,7 @@ export const idlService = IDL.Service({
     ),
   'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'sendTrialExpiryNotifications' : IDL.Func([], [IDL.Text], []),
   'setCommissionRate' : IDL.Func(
       [MembershipTierLevel, IDL.Nat, EarningType, IDL.Nat, IDL.Nat],
       [IDL.Bool],
@@ -969,6 +992,21 @@ export const idlFactory = ({ IDL }) => {
     'txType' : FSUTxType,
     'amount' : IDL.Nat,
   });
+  const NotificationType = IDL.Variant({
+    'warning' : IDL.Null,
+    'info' : IDL.Null,
+    'error' : IDL.Null,
+    'success' : IDL.Null,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Text,
+    'title' : IDL.Text,
+    'notifType' : NotificationType,
+    'createdAt' : IDL.Int,
+    'recipient' : IDL.Principal,
+    'isRead' : IDL.Bool,
+    'message' : IDL.Text,
+  });
   const OrgStatus = IDL.Variant({ 'active' : IDL.Null, 'archived' : IDL.Null });
   const OrgMemberRole = IDL.Variant({
     'member' : IDL.Null,
@@ -1219,6 +1257,7 @@ export const idlFactory = ({ IDL }) => {
     'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
     'getMyFSURecord' : IDL.Func([], [IDL.Opt(FSURecord)], ['query']),
     'getMyFSUTransactions' : IDL.Func([], [IDL.Vec(FSUTransaction)], ['query']),
+    'getMyNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getMyPledges' : IDL.Func([], [IDL.Vec(CrowdfundingPledge)], ['query']),
     'getMyReferralCode' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getMyRoyaltyDistributions' : IDL.Func(
@@ -1244,6 +1283,11 @@ export const idlFactory = ({ IDL }) => {
     'getTransactionHistory' : IDL.Func(
         [IDL.Opt(IDL.Text)],
         [IDL.Vec(Transaction)],
+        ['query'],
+      ),
+    'getTrialAutomationStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'lastCheck' : IDL.Int, 'nextCheckIn' : IDL.Text })],
         ['query'],
       ),
     'getUserOrgs' : IDL.Func([IDL.Text], [IDL.Vec(Organization)], ['query']),
@@ -1308,6 +1352,7 @@ export const idlFactory = ({ IDL }) => {
     'listUsers' : IDL.Func([], [IDL.Vec(UserSummary)], ['query']),
     'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'pledgeToCrowdfundingCampaign' : IDL.Func(
         [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
@@ -1338,6 +1383,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'sendTrialExpiryNotifications' : IDL.Func([], [IDL.Text], []),
     'setCommissionRate' : IDL.Func(
         [MembershipTierLevel, IDL.Nat, EarningType, IDL.Nat, IDL.Nat],
         [IDL.Bool],

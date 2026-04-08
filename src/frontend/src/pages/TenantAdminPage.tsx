@@ -137,9 +137,8 @@ function OnboardingCard({ onCreated }: { onCreated: () => void }) {
     try {
       await backend.createTenant(
         orgName.trim(),
-        contactEmail.trim(),
-        tier,
-        paymentMethod,
+        tier as unknown as import("@/backend").TenantTier,
+        null,
       );
       toast.success("Tenant created successfully!");
       onCreated();
@@ -364,7 +363,7 @@ function UsageTab({ tenantId: _tenantId }: { tenantId: string }) {
 }
 
 // ─── Members Tab ──────────────────────────────────────────────────────────────
-function MembersTab({ tenantId: _tenantId }: { tenantId: string }) {
+function MembersTab({ tenantId }: { tenantId: string }) {
   const backend = useBackend();
   const [members, setMembers] = useState<TenantMember[]>([]);
   const [count, setCount] = useState<bigint>(0n);
@@ -379,18 +378,17 @@ function MembersTab({ tenantId: _tenantId }: { tenantId: string }) {
     setLoading(true);
     try {
       const [m, c] = await Promise.all([
-        backend.listTenantMembers(),
+        backend.listTenantMembers(tenantId),
         backend.getTenantMemberCount(),
       ]);
-      setMembers(m);
+      setMembers(m as unknown as TenantMember[]);
       setCount(c);
     } catch {
       toast.error("Failed to load members");
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backend]);
+  }, [backend, tenantId]);
 
   useEffect(() => {
     loadMembers();
@@ -400,7 +398,11 @@ function MembersTab({ tenantId: _tenantId }: { tenantId: string }) {
     if (!backend || !newPrincipal.trim()) return;
     setAddLoading(true);
     try {
-      await backend.addTenantMember(newPrincipal.trim(), newRole);
+      await backend.addTenantMember(
+        tenantId,
+        newPrincipal.trim() as unknown as never,
+        newRole,
+      );
       toast.success("Member added");
       setNewPrincipal("");
       await loadMembers();
@@ -415,7 +417,10 @@ function MembersTab({ tenantId: _tenantId }: { tenantId: string }) {
     if (!backend) return;
     setRemoveLoading(principalStr);
     try {
-      await backend.removeTenantMember(principalStr);
+      await backend.removeTenantMember(
+        tenantId,
+        principalStr as unknown as import("@icp-sdk/core/principal").Principal,
+      );
       toast.success("Member removed");
       await loadMembers();
     } catch {
@@ -556,7 +561,7 @@ function MembersTab({ tenantId: _tenantId }: { tenantId: string }) {
 }
 
 // ─── Branding Tab ─────────────────────────────────────────────────────────────
-function BrandingTab({ tenantId: _tenantId }: { tenantId: string }) {
+function BrandingTab({ tenantId }: { tenantId: string }) {
   const backend = useBackend();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -573,7 +578,11 @@ function BrandingTab({ tenantId: _tenantId }: { tenantId: string }) {
       .getMyTenantBranding()
       .then((b) => {
         if (b) {
-          setBrandName(b.brandName);
+          setBrandName(
+            (b as unknown as { brandName?: string }).brandName ??
+              b.orgName ??
+              "",
+          );
           setLogoUrl(b.logoUrl);
           setPrimaryColor(b.primaryColor || "#6366f1");
           setWelcomeMessage(b.welcomeMessage);
@@ -589,9 +598,10 @@ function BrandingTab({ tenantId: _tenantId }: { tenantId: string }) {
     setSaving(true);
     try {
       await backend.updateTenantBranding(
-        brandName,
+        tenantId,
         logoUrl,
         primaryColor,
+        brandName,
         welcomeMessage,
       );
       toast.success("Branding saved successfully");
@@ -757,7 +767,7 @@ function BrandingTab({ tenantId: _tenantId }: { tenantId: string }) {
 }
 
 // ─── Billing Tab ──────────────────────────────────────────────────────────────
-function BillingTab({ tenantId: _tenantId }: { tenantId: string }) {
+function BillingTab({ tenantId }: { tenantId: string }) {
   const backend = useBackend();
   const [records, setRecords] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -766,15 +776,15 @@ function BillingTab({ tenantId: _tenantId }: { tenantId: string }) {
     if (!backend) return;
     setLoading(true);
     try {
-      const r = await backend.listBillingHistory();
-      setRecords(r);
+      const r = await backend.listBillingHistory(tenantId);
+      setRecords(r as unknown as BillingRecord[]);
     } catch {
       toast.error("Failed to load billing history");
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backend]);
+  }, [backend, tenantId]);
 
   useEffect(() => {
     loadBilling();
@@ -925,7 +935,7 @@ function SettingsTab({
     if (!backend) return;
     setCancelLoading(true);
     try {
-      await backend.cancelTenant();
+      await backend.cancelTenant(tenant.id);
       toast.success("Subscription cancelled");
       setCancelOpen(false);
       onRefresh();
@@ -1332,7 +1342,7 @@ export function TenantAdminPage() {
         backend.getMyTenant(),
         backend.getMySubscription(),
       ]);
-      setTenant(t);
+      setTenant(t as unknown as Tenant);
       setSubscription(s);
     } catch {
       toast.error("Failed to load tenant data");

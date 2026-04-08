@@ -1,6 +1,6 @@
-import type { backendInterface } from "@/backend";
 import type { TransactionType, WalletType } from "@/backend";
 import type { Transaction, Wallet } from "@/backend";
+import type { ExtendedBackend } from "@/types/appTypes";
 import {
   createContext,
   useCallback,
@@ -54,7 +54,7 @@ interface WalletContextType {
   ) => Promise<void>;
   refreshWallets: () => Promise<void>;
   totalBalanceICP: number;
-  _setActor: (actor: backendInterface | null) => void;
+  _setActor: (actor: ExtendedBackend | null) => void;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -64,9 +64,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeCurrency, setActiveCurrency] = useState<Currency>("ICP");
   const [isLoading, setIsLoading] = useState(false);
-  const actorRef = useRef<backendInterface | null>(null);
+  const actorRef = useRef<ExtendedBackend | null>(null);
 
-  const _setActor = useCallback((actor: backendInterface | null) => {
+  const _setActor = useCallback((actor: ExtendedBackend | null) => {
     actorRef.current = actor;
   }, []);
 

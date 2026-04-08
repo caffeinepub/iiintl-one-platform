@@ -29,6 +29,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/context/I18nContext";
 import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
+import type { ExtendedBackend } from "@/types/appTypes";
 import { Link } from "@tanstack/react-router";
 import {
   Archive,
@@ -151,7 +152,7 @@ function CreateThreadDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onCreated: () => void;
-  backend: backendInterface | null;
+  backend: ExtendedBackend | null;
 }) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>("");

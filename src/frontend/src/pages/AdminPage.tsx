@@ -1,5 +1,6 @@
 import type { Campaign, ForumThread, Organization } from "@/backend";
 import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend";
+import type { Tenant } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,6 @@ import type {
   ExtendedBackend,
   FSUPoolStatus,
   PlatformAnalytics,
-  Tenant,
 } from "@/types/appTypes";
 
 // Helper: cast backend to ExtendedBackend for admin cross-tenant calls
@@ -1477,6 +1477,17 @@ function TenantsTab() {
   const [expiringTrials, setExpiringTrials] = useState<Tenant[]>([]);
   const [expiringLoading, setExpiringLoading] = useState(true);
 
+  // Auto-timer status state
+  const [timerStatus, setTimerStatus] = useState<{
+    lastCheck: bigint;
+    nextCheckIn: string;
+  } | null>(null);
+  const [timerStatusLoading, setTimerStatusLoading] = useState(true);
+
+  // Send notifications state
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifMessage, setNotifMessage] = useState<string | null>(null);
+
   const loadExpiringTrials = useCallback(async () => {
     if (!backend) return;
     setExpiringLoading(true);
@@ -1491,6 +1502,20 @@ function TenantsTab() {
     }
   }, [backend]);
 
+  const loadTimerStatus = useCallback(async () => {
+    if (!backend) return;
+    setTimerStatusLoading(true);
+    try {
+      const eb = backend as unknown as ExtendedBackend;
+      const status = await eb.getTrialAutomationStatus();
+      setTimerStatus(status);
+    } catch {
+      setTimerStatus(null);
+    } finally {
+      setTimerStatusLoading(false);
+    }
+  }, [backend]);
+
   useEffect(() => {
     if (!backend) return;
     setLoading(true);
@@ -1500,7 +1525,8 @@ function TenantsTab() {
       .catch(() => {})
       .finally(() => setLoading(false));
     loadExpiringTrials();
-  }, [backend, loadExpiringTrials]);
+    loadTimerStatus();
+  }, [backend, loadExpiringTrials, loadTimerStatus]);
 
   async function handleRunExpiryCheck() {
     if (!backend) return;
@@ -1523,6 +1549,24 @@ function TenantsTab() {
       );
     } finally {
       setExpiryRunning(false);
+    }
+  }
+
+  async function handleSendNotifications() {
+    if (!backend) return;
+    setNotifSending(true);
+    setNotifMessage(null);
+    try {
+      const eb = backend as unknown as ExtendedBackend;
+      const msg = await eb.sendTrialExpiryNotifications();
+      setNotifMessage(msg);
+      toast.success(msg || "Trial expiry notifications sent");
+    } catch (err) {
+      const errMsg =
+        err instanceof Error ? err.message : "Failed to send notifications";
+      toast.error(errMsg);
+    } finally {
+      setNotifSending(false);
     }
   }
 
@@ -1594,24 +1638,76 @@ function TenantsTab() {
               <Clock size={15} className="text-primary" />
               Trial Expiry Automation
             </CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs"
-              disabled={expiryRunning}
-              onClick={handleRunExpiryCheck}
-              data-ocid="admin.tenants.run_expiry_check.button"
-            >
-              {expiryRunning ? (
-                <Loader2 size={12} className="mr-1.5 animate-spin" />
-              ) : (
-                <Clock size={12} className="mr-1.5" />
-              )}
-              {expiryRunning ? "Running…" : "Run Expiry Check"}
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={notifSending}
+                onClick={handleSendNotifications}
+                data-ocid="admin.tenants.send_notifications.button"
+              >
+                {notifSending ? (
+                  <Loader2 size={12} className="mr-1.5 animate-spin" />
+                ) : (
+                  <Radio size={12} className="mr-1.5" />
+                )}
+                {notifSending ? "Sending…" : "Send Trial Notifications"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={expiryRunning}
+                onClick={handleRunExpiryCheck}
+                data-ocid="admin.tenants.run_expiry_check.button"
+              >
+                {expiryRunning ? (
+                  <Loader2 size={12} className="mr-1.5 animate-spin" />
+                ) : (
+                  <Clock size={12} className="mr-1.5" />
+                )}
+                {expiryRunning ? "Running…" : "Run Expiry Check"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Auto-timer status card */}
+          <div
+            className="flex items-center gap-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5"
+            data-ocid="admin.tenants.timer_status_card"
+          >
+            {timerStatusLoading ? (
+              <span className="text-xs text-muted-foreground">
+                Auto-timer: Active — checking…
+              </span>
+            ) : (
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span className="text-xs font-medium text-emerald-500">
+                    Auto-timer: Active
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground pl-3.5">
+                  Next check: {timerStatus?.nextCheckIn ?? "in ~24h"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Notifications result banner */}
+          {notifMessage && (
+            <div
+              className="flex items-center gap-2 rounded-md bg-sky-500/10 border border-sky-500/30 px-3 py-2 text-sm text-sky-400"
+              data-ocid="admin.tenants.notif_result_banner"
+            >
+              <CheckCircle size={14} className="shrink-0" />
+              {notifMessage}
+            </div>
+          )}
+
           {/* Result / error banners */}
           {expiryResult && (
             <div
@@ -1669,7 +1765,7 @@ function TenantsTab() {
                     data-ocid={`admin.tenants.expiring_item.${idx + 1}`}
                   >
                     <span className="font-medium truncate min-w-0">
-                      {t.orgName}
+                      {t.name}
                     </span>
                     <span className="font-mono text-muted-foreground shrink-0">
                       {t.ownerPrincipal.toString().slice(0, 10)}…
@@ -1728,9 +1824,7 @@ function TenantsTab() {
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {tenant.id.slice(0, 8)}...
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {tenant.orgName}
-                  </TableCell>
+                  <TableCell className="font-medium">{tenant.name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {tenant.ownerPrincipal.toString().slice(0, 12)}...
                   </TableCell>

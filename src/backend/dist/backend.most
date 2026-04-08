@@ -204,6 +204,17 @@ type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
 type Node__92254746<T> =
   {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type NotificationType__754463539 = {#error; #info; #success; #warning};
+type Notification__879889657 =
+  {
+    createdAt : Int;
+    id : Text;
+    isRead : Bool;
+    message : Text;
+    notifType : NotificationType__754463539;
+    recipient : Principal;
+    title : Text
+  };
 type OrgMemberRole__1006871682 = {#admin; #member};
 type OrgMember__251168767 =
   {joinedAt : Int; role : OrgMemberRole__1006871682; userId : Text};
@@ -303,6 +314,7 @@ type Wallet__442667382 =
     walletType : WalletType__701049132
   };
 actor {
+  stable _24hNs : Int;
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -374,6 +386,7 @@ actor {
       var root : Node__46230540<Text, FSUTransaction__823757434>;
       var size : Nat__490723111
     };
+  stable var lastExpiryCheck : Int;
   stable memberEarningsIndex :
     {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
   stable memberFSUTxIndex :
@@ -388,11 +401,17 @@ actor {
   stable var nextCrowdfundingPledgeId : Nat;
   stable var nextEarningId : Nat;
   stable var nextFSUTxId : Nat;
+  stable var nextNotificationId : Nat;
   stable var nextReplyId : Nat;
   stable var nextRoyaltyPoolId : Nat;
   stable var nextTenantId : Nat;
   stable var nextThreadId : Nat;
   stable var nextTransactionId : Nat;
+  stable notifications :
+    {
+      var root : Node__46230540<Text, Notification__879889657>;
+      var size : Nat__490723111
+    };
   stable organizations :
     {
       var root : Node__46230540<Text, Organization__103960640>;
@@ -402,6 +421,8 @@ actor {
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
   stable principalToUserId :
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable recipientNotifIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
   stable referralCodeIndex :
     {var root : Node__46230540<Text, Principal>; var size : Nat__490723111};
   stable royaltyPools :

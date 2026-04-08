@@ -229,6 +229,15 @@ export interface ForumThread {
     category: ForumCategory;
     isPinned: boolean;
 }
+export interface Notification {
+    id: string;
+    title: string;
+    notifType: NotificationType;
+    createdAt: bigint;
+    recipient: Principal;
+    isRead: boolean;
+    message: string;
+}
 export interface TenantBranding {
     orgName: string;
     primaryColor: string;
@@ -329,6 +338,12 @@ export enum MembershipTierLevel {
     ambassador = "ambassador",
     partner = "partner",
     associate = "associate"
+}
+export enum NotificationType {
+    warning = "warning",
+    info = "info",
+    error = "error",
+    success = "success"
 }
 export enum OrgMemberRole {
     member = "member",
@@ -442,6 +457,7 @@ export interface backendInterface {
     getMyEarningsSummary(): Promise<EarningsSummary>;
     getMyFSURecord(): Promise<FSURecord | null>;
     getMyFSUTransactions(): Promise<Array<FSUTransaction>>;
+    getMyNotifications(): Promise<Array<Notification>>;
     getMyPledges(): Promise<Array<CrowdfundingPledge>>;
     getMyReferralCode(): Promise<string | null>;
     getMyRoyaltyDistributions(): Promise<Array<EarningRecord>>;
@@ -457,6 +473,14 @@ export interface backendInterface {
     getTenantBranding(tenantId: string): Promise<TenantBranding | null>;
     getThread(threadId: bigint): Promise<ForumThread | null>;
     getTransactionHistory(walletAddress: string | null): Promise<Array<Transaction>>;
+    /**
+     * / Returns the timestamp of the last heartbeat expiry check and
+     * / a human-readable string showing how long until the next check fires.
+     */
+    getTrialAutomationStatus(): Promise<{
+        lastCheck: bigint;
+        nextCheckIn: string;
+    }>;
     getUserOrgs(userId: string): Promise<Array<Organization>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWalletBalance(address: string): Promise<number>;
@@ -487,6 +511,7 @@ export interface backendInterface {
     listUsers(): Promise<Array<UserSummary>>;
     lockThread(threadId: bigint): Promise<boolean>;
     markEarningPaid(earnId: string): Promise<boolean>;
+    markNotificationRead(notifId: string): Promise<boolean>;
     pinThread(threadId: bigint): Promise<boolean>;
     pledgeToCrowdfundingCampaign(campaignId: string, amountCents: bigint, rewardTierId: string | null, referrerCode: string | null): Promise<string>;
     processReferralChainBonus(referredMember: Principal, baseAmount: bigint, earningType: EarningType, description: string): Promise<void>;
@@ -501,6 +526,12 @@ export interface backendInterface {
     resolveReferralCode(code: string): Promise<Principal | null>;
     runPayCycle(member: Principal): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    /**
+     * / Sends in-platform notifications to tenant owners based on days remaining
+     * / in their trial (7, 3, 1 days) and for already-expired trials.
+     * / Returns a summary of how many notifications were sent.
+     */
+    sendTrialExpiryNotifications(): Promise<string>;
     setCommissionRate(tier: MembershipTierLevel, depthLevel: bigint, earningType: EarningType, basisPoints: bigint, flatAmountUnits: bigint): Promise<boolean>;
     setCrowdfundingConfig(defaultFSUContributionBps: bigint, creatorFSUBonus: bigint, milestoneAchievementBonusBps: bigint): Promise<void>;
     setMemberTier(target: Principal, tier: MembershipTierLevel): Promise<boolean>;

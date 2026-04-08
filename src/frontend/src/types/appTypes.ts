@@ -233,34 +233,170 @@ export interface Ticket {
 // These types are now generated from the backend DID — re-exported at the top of this file.
 
 // ── Extended Backend Interface ────────────────────────────────────────────────
-// Augments the generated backendInterface with Tenant, MLM, Events, and Crowdfunding methods.
+// Superset of backendInterface — adds Tenant, MLM, Events, and legacy methods.
+// useBackend() returns this type. Do NOT make this extend backendInterface directly
+// because the stale Tenant/TenantBranding/BillingRecord types would cause
+// structural conflicts. All usages are safe via runtime cast (as unknown as ExtendedBackend).
 
-export interface ExtendedBackend extends backendInterface {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface ExtendedBackend {
+  // ── Base backendInterface passthrough (structurally compatible subset) ──
+  // All methods on the generated Backend class are available at runtime.
+  // Declare only those that pages reference directly on an ExtendedBackend variable.
+  isCallerAdmin(): Promise<boolean>;
+  registerUser(displayName: string, email: string): Promise<string>;
+  getCallerUserProfile(): Promise<import("@/backend").UserProfile | null>;
+  saveCallerUserProfile(
+    profile: import("@/backend").UserProfile,
+  ): Promise<void>;
+  getCallerUserRole(): Promise<import("@/backend").UserRole>;
+  assignCallerUserRole(
+    user: Principal,
+    role: import("@/backend").UserRole,
+  ): Promise<void>;
+  getPreferredLanguage(): Promise<string>;
+  setPreferredLanguage(lang: string): Promise<void>;
+  createOrg(
+    name: string,
+    description: string,
+    region: string,
+    orgType: string,
+    website: string,
+    foundedYear: bigint,
+  ): Promise<string>;
+  updateOrg(
+    orgId: string,
+    name: string,
+    description: string,
+    region: string,
+    orgType: string,
+    website: string,
+    foundedYear: bigint,
+  ): Promise<boolean>;
+  archiveOrg(orgId: string): Promise<boolean>;
+  listOrgs(): Promise<import("@/backend").Organization[]>;
+  listActiveOrgs(): Promise<import("@/backend").Organization[]>;
+  getOrg(orgId: string): Promise<import("@/backend").Organization | null>;
+  getOrgMembers(orgId: string): Promise<import("@/backend").OrgMember[]>;
+  joinOrg(orgId: string): Promise<boolean>;
+  leaveOrg(orgId: string): Promise<boolean>;
+  getUserOrgs(userId: string): Promise<import("@/backend").Organization[]>;
+  listUsers(): Promise<import("@/backend").UserSummary[]>;
+  getUserProfile(
+    user: Principal,
+  ): Promise<import("@/backend").UserProfile | null>;
+  createCampaign(
+    title: string,
+    description: string,
+    campaignType: import("@/backend").CampaignType,
+    orgId: string,
+    goal: bigint,
+    startDate: bigint,
+    endDate: bigint,
+    tags: string[],
+  ): Promise<string>;
+  updateCampaign(
+    id: string,
+    title: string,
+    description: string,
+    campaignType: import("@/backend").CampaignType,
+    goal: bigint,
+    startDate: bigint,
+    endDate: bigint,
+    tags: string[],
+  ): Promise<boolean>;
+  archiveCampaign(id: string): Promise<boolean>;
+  listCampaigns(): Promise<import("@/backend").Campaign[]>;
+  listActiveCampaigns(): Promise<import("@/backend").Campaign[]>;
+  listCampaignsByOrg(orgId: string): Promise<import("@/backend").Campaign[]>;
+  getCampaign(id: string): Promise<import("@/backend").Campaign | null>;
+  joinCampaign(campaignId: string): Promise<boolean>;
+  leaveCampaign(campaignId: string): Promise<boolean>;
+  getCampaignProgress(
+    campaignId: string,
+  ): Promise<{ goal: bigint; progress: bigint } | null>;
+  getCampaignSupporterCount(campaignId: string): Promise<bigint | null>;
+  createThread(
+    title: string,
+    body: string,
+    category: import("@/backend").ForumCategory,
+    orgId: string | null,
+    tags: string[],
+  ): Promise<bigint>;
+  listThreads(): Promise<import("@/backend").ForumThread[]>;
+  listThreadsByCategory(
+    category: import("@/backend").ForumCategory,
+  ): Promise<import("@/backend").ForumThread[]>;
+  listThreadsByOrg(orgId: string): Promise<import("@/backend").ForumThread[]>;
+  getThread(threadId: bigint): Promise<import("@/backend").ForumThread | null>;
+  replyToThread(threadId: bigint, body: string): Promise<bigint>;
+  getReplies(threadId: bigint): Promise<import("@/backend").ForumReply[]>;
+  pinThread(threadId: bigint): Promise<boolean>;
+  lockThread(threadId: bigint): Promise<boolean>;
+  archiveThread(threadId: bigint): Promise<boolean>;
+  incrementThreadView(threadId: bigint): Promise<boolean>;
+  linkWallet(
+    walletType: import("@/backend").WalletType,
+    address: string,
+    walletLabel: string,
+  ): Promise<void>;
+  unlinkWallet(address: string): Promise<void>;
+  getLinkedWallets(): Promise<import("@/backend").Wallet[]>;
+  getWalletBalance(address: string): Promise<number>;
+  addTransaction(
+    walletAddress: string,
+    amount: number,
+    description: string,
+    txType: import("@/backend").TransactionType,
+  ): Promise<void>;
+  getTransactionHistory(
+    walletAddress: string | null,
+  ): Promise<import("@/backend").Transaction[]>;
+  // Trial automation
+  checkAndExpireTrials(): Promise<{ checked: bigint; expired: bigint }>;
+  getExpiringTrials(daysFromNow: bigint): Promise<import("@/backend").Tenant[]>;
+  sendTrialExpiryNotifications(): Promise<string>;
+  getTrialAutomationStatus(): Promise<{
+    lastCheck: bigint;
+    nextCheckIn: string;
+  }>;
+  // Notifications
+  getMyNotifications(): Promise<import("@/backend").Notification[]>;
+  markNotificationRead(notifId: string): Promise<boolean>;
   // Tenant / PaaS
   createTenant(
-    orgName: string,
-    contactEmail: string,
-    tier?: TenantTier,
-    paymentMethod?: PaymentMethod,
+    name: string,
+    tier: import("@/backend").TenantTier,
+    trialDays: bigint | null,
   ): Promise<string>;
-  getMyTenant(): Promise<Tenant | null>;
-  getTenant(id: string): Promise<Tenant | null>;
-  listAllTenants(): Promise<Tenant[]>;
-  updateTenant(
-    orgName: string,
-    contactEmail: string,
-    customDomain: string | null,
-  ): Promise<boolean>;
+  getMyTenant(): Promise<import("@/backend").Tenant | null>;
+  getTenant(id: string): Promise<import("@/backend").Tenant | null>;
+  listTenants(): Promise<import("@/backend").Tenant[]>;
+  listAllTenants(): Promise<import("@/backend").Tenant[]>;
   suspendTenant(id: string): Promise<boolean>;
   reactivateTenant(id: string): Promise<boolean>;
+  cancelTenant(tenantId: string): Promise<boolean>;
+  addTenantMember(
+    tenantId: string,
+    member: Principal,
+    role: string,
+  ): Promise<boolean>;
+  removeTenantMember(tenantId: string, member: Principal): Promise<boolean>;
+  listTenantMembers(
+    tenantId: string,
+  ): Promise<import("@/backend").TenantMember[]>;
+  addBillingRecord(
+    tenantId: string,
+    amountCents: bigint,
+    description: string,
+    status: string,
+  ): Promise<string>;
+  listBillingHistory(
+    tenantId: string,
+  ): Promise<import("@/backend").BillingRecord[]>;
   upgradeTenant(tier: TenantTier): Promise<boolean>;
-  cancelTenant(): Promise<boolean>;
   getMySubscription(): Promise<TenantSubscription | null>;
-  addTenantMember(memberPrincipal: string, role: string): Promise<boolean>;
-  removeTenantMember(memberPrincipal: string): Promise<boolean>;
-  listTenantMembers(): Promise<TenantMember[]>;
   getTenantMemberCount(): Promise<bigint>;
-  checkTenantAccess(): Promise<TenantAccessResult>;
   getTenantUsage(): Promise<TenantUsage | null>;
   recordPayment(
     amountCents: number,
@@ -268,127 +404,28 @@ export interface ExtendedBackend extends backendInterface {
     paymentMethod: PaymentMethod,
     description: string,
   ): Promise<bigint>;
-  listBillingHistory(): Promise<BillingRecord[]>;
   getLatestBillingRecord(): Promise<BillingRecord | null>;
-  listTenantBillingHistory(tenantId: string): Promise<BillingRecord[]>;
+  listTenantBillingHistory(
+    tenantId: string,
+  ): Promise<import("@/backend").BillingRecord[]>;
   updateTenantBranding(
-    brandName: string,
+    tenantId: string,
     logoUrl: string,
     primaryColor: string,
+    orgName: string,
     welcomeMessage: string,
   ): Promise<boolean>;
-  getTenantBranding(tenantId: string): Promise<TenantBranding | null>;
-  getMyTenantBranding(): Promise<TenantBranding | null>;
+  getTenantBranding(
+    tenantId: string,
+  ): Promise<import("@/backend").TenantBranding | null>;
+  getMyTenantBranding(): Promise<import("@/backend").TenantBranding | null>;
+  updateTenant(
+    orgName: string,
+    contactEmail: string,
+    customDomain: string | null,
+  ): Promise<boolean>;
   getTenantStats(): Promise<TenantStats | null>;
   getPlatformAnalytics(): Promise<PlatformAnalytics>;
-  checkAndExpireTrials(): Promise<{ expired: bigint; checked: bigint }>;
-  getExpiringTrials(daysFromNow: bigint): Promise<Tenant[]>;
-
-  // MLM - Tiers & Referrals
-  initMemberMLM(sponsorCode: string | null): Promise<string>;
-  getMyTierRecord(): Promise<MemberTierRecord | null>;
-  getMemberTierRecord(
-    p: import("@icp-sdk/core/principal").Principal,
-  ): Promise<MemberTierRecord | null>;
-  setMemberTier(
-    target: import("@icp-sdk/core/principal").Principal,
-    tier: MembershipTierLevel,
-  ): Promise<boolean>;
-  upgradeMemberTier(tier: MembershipTierLevel): Promise<boolean>;
-  getMyReferralCode(): Promise<string | null>;
-  resolveReferralCode(
-    code: string,
-  ): Promise<import("@icp-sdk/core/principal").Principal | null>;
-  listAllMemberTiers(): Promise<MemberTierRecord[]>;
-  setCommissionRate(
-    tier: MembershipTierLevel,
-    depthLevel: bigint,
-    earningType: EarningType,
-    basisPoints: bigint,
-    flatAmountUnits: bigint,
-  ): Promise<boolean>;
-  deactivateCommissionRate(
-    tier: MembershipTierLevel,
-    depthLevel: bigint,
-    earningType: EarningType,
-  ): Promise<boolean>;
-  getCommissionRate(
-    tier: MembershipTierLevel,
-    depthLevel: bigint,
-    earningType: EarningType,
-  ): Promise<CommissionRate | null>;
-  getCommissionRates(): Promise<CommissionRate[]>;
-  recordEarning(
-    member: import("@icp-sdk/core/principal").Principal,
-    amountUnits: bigint,
-    earningType: EarningType,
-    description: string,
-    sourceId: string,
-  ): Promise<string>;
-  processReferralChainBonus(
-    referredMember: import("@icp-sdk/core/principal").Principal,
-    baseAmount: bigint,
-    earningType: EarningType,
-    description: string,
-  ): Promise<void>;
-  markEarningPaid(earnId: string): Promise<boolean>;
-  getMyEarnings(): Promise<EarningRecord[]>;
-  getMyEarningsSummary(): Promise<EarningsSummary>;
-  getMyDownline(): Promise<DownlineMember[]>;
-  getMyUplineChain(): Promise<MemberTierRecord[]>;
-  getMemberEarnings(
-    member: import("@icp-sdk/core/principal").Principal,
-  ): Promise<EarningRecord[]>;
-  runPayCycle(
-    member: import("@icp-sdk/core/principal").Principal,
-  ): Promise<bigint>;
-  createRoyaltyPool(poolType: RoyaltyPoolType, period: string): Promise<string>;
-  addToRoyaltyPool(poolId: string, amount: bigint): Promise<boolean>;
-  distributeRoyaltyPool(poolId: string, minTierLevel: bigint): Promise<boolean>;
-  getRoyaltyPool(poolId: string): Promise<RoyaltyPool | null>;
-  listRoyaltyPools(): Promise<RoyaltyPool[]>;
-  getMyRoyaltyDistributions(): Promise<RoyaltyDistribution[]>;
-  addToFSUPool(amount: bigint, description: string): Promise<void>;
-  getFSUPoolStatus(): Promise<FSUPoolStatus>;
-  getMyFSURecord(): Promise<FSURecord | null>;
-  distributeFSU(totalFSU: bigint, description: string): Promise<void>;
-  redeemFSU(amount: bigint, description: string): Promise<boolean>;
-  getMyFSUTransactions(): Promise<FSUTransaction[]>;
-
-  // Events & Ticketing — pages call listMLMEvents / createMLMEvent / getMLMEvent
-  createMLMEvent(
-    title: string,
-    description: string,
-    location: string,
-    eventDate: bigint,
-    currency: string,
-    imageUrl: string | null,
-  ): Promise<bigint>;
-  updateEventStatus(eventId: bigint, status: EventStatus): Promise<boolean>;
-  getMLMEvent(eventId: bigint): Promise<MLMEvent | null>;
-  listMLMEvents(): Promise<MLMEvent[]>;
-  listUpcomingEvents(): Promise<MLMEvent[]>;
-  createTicketTier(
-    eventId: bigint,
-    tierType: TicketTierType,
-    name: string,
-    priceCents: bigint,
-    currency: string,
-    capacity: bigint,
-    commissionBasisPoints: bigint,
-  ): Promise<bigint>;
-  getTicketTier(tierId: bigint): Promise<TicketTier | null>;
-  listEventTicketTiers(eventId: bigint): Promise<TicketTier[]>;
-  purchaseTicket(
-    eventId: bigint,
-    tierId: bigint,
-    referrerCode: string | null,
-  ): Promise<bigint>;
-  useTicket(ticketId: bigint): Promise<boolean>;
-  getMyTickets(): Promise<Ticket[]>;
-  listEventTickets(eventId: bigint): Promise<Ticket[]>;
-  adminListAllTickets(): Promise<Ticket[]>;
-
   // Cross-tenant admin queries (PaaS Phase F2)
   // These return all records across all tenants for super-admin oversight.
   // Regular list functions (listOrgs, listCampaigns, listThreads, listUsers)
@@ -456,4 +493,98 @@ export interface ExtendedBackend extends backendInterface {
   getCampaignPledges(campaignId: string): Promise<CrowdfundingPledge[]>;
   getCrowdfundingPledge(pledgeId: string): Promise<CrowdfundingPledge | null>;
   refundPledge(pledgeId: string): Promise<boolean>;
+
+  // ── MLM — Tiers, Referrals, Earnings, Royalty, FSU ──────────────────────
+  initMemberMLM(sponsorCode: string | null): Promise<string>;
+  getMyTierRecord(): Promise<MemberTierRecord | null>;
+  getMemberTierRecord(p: Principal): Promise<MemberTierRecord | null>;
+  setMemberTier(target: Principal, tier: MembershipTierLevel): Promise<boolean>;
+  upgradeMemberTier(tier: MembershipTierLevel): Promise<boolean>;
+  getMyReferralCode(): Promise<string | null>;
+  resolveReferralCode(code: string): Promise<Principal | null>;
+  listAllMemberTiers(): Promise<MemberTierRecord[]>;
+  setCommissionRate(
+    tier: MembershipTierLevel,
+    depthLevel: bigint,
+    earningType: EarningType,
+    basisPoints: bigint,
+    flatAmountUnits: bigint,
+  ): Promise<boolean>;
+  deactivateCommissionRate(
+    tier: MembershipTierLevel,
+    depthLevel: bigint,
+    earningType: EarningType,
+  ): Promise<boolean>;
+  getCommissionRate(
+    tier: MembershipTierLevel,
+    depthLevel: bigint,
+    earningType: EarningType,
+  ): Promise<CommissionRate | null>;
+  getCommissionRates(): Promise<CommissionRate[]>;
+  recordEarning(
+    member: Principal,
+    amountUnits: bigint,
+    earningType: EarningType,
+    description: string,
+    sourceId: string,
+  ): Promise<string>;
+  processReferralChainBonus(
+    referredMember: Principal,
+    baseAmount: bigint,
+    earningType: EarningType,
+    description: string,
+  ): Promise<void>;
+  markEarningPaid(earnId: string): Promise<boolean>;
+  getMyEarnings(): Promise<EarningRecord[]>;
+  getMyEarningsSummary(): Promise<EarningsSummary>;
+  getMyDownline(): Promise<DownlineMember[]>;
+  getMyUplineChain(): Promise<MemberTierRecord[]>;
+  getMemberEarnings(member: Principal): Promise<EarningRecord[]>;
+  runPayCycle(member: Principal): Promise<bigint>;
+  createRoyaltyPool(poolType: RoyaltyPoolType, period: string): Promise<string>;
+  addToRoyaltyPool(poolId: string, amount: bigint): Promise<boolean>;
+  distributeRoyaltyPool(poolId: string, minTierLevel: bigint): Promise<boolean>;
+  getRoyaltyPool(poolId: string): Promise<RoyaltyPool | null>;
+  listRoyaltyPools(): Promise<RoyaltyPool[]>;
+  getMyRoyaltyDistributions(): Promise<RoyaltyDistribution[]>;
+  addToFSUPool(amount: bigint, description: string): Promise<void>;
+  getFSUPoolStatus(): Promise<FSUPoolStatus>;
+  getMyFSURecord(): Promise<FSURecord | null>;
+  distributeFSU(totalFSU: bigint, description: string): Promise<void>;
+  redeemFSU(amount: bigint, description: string): Promise<boolean>;
+  getMyFSUTransactions(): Promise<FSUTransaction[]>;
+
+  // ── Events & Ticketing ────────────────────────────────────────────────────
+  createMLMEvent(
+    title: string,
+    description: string,
+    location: string,
+    eventDate: bigint,
+    currency: string,
+    imageUrl: string | null,
+  ): Promise<bigint>;
+  updateEventStatus(eventId: bigint, status: EventStatus): Promise<boolean>;
+  getMLMEvent(eventId: bigint): Promise<MLMEvent | null>;
+  listMLMEvents(): Promise<MLMEvent[]>;
+  listUpcomingEvents(): Promise<MLMEvent[]>;
+  createTicketTier(
+    eventId: bigint,
+    tierType: TicketTierType,
+    name: string,
+    priceCents: bigint,
+    currency: string,
+    capacity: bigint,
+    commissionBasisPoints: bigint,
+  ): Promise<bigint>;
+  getTicketTier(tierId: bigint): Promise<TicketTier | null>;
+  listEventTicketTiers(eventId: bigint): Promise<TicketTier[]>;
+  purchaseTicket(
+    eventId: bigint,
+    tierId: bigint,
+    referrerCode: string | null,
+  ): Promise<bigint>;
+  useTicket(ticketId: bigint): Promise<boolean>;
+  getMyTickets(): Promise<Ticket[]>;
+  listEventTickets(eventId: bigint): Promise<Ticket[]>;
+  adminListAllTickets(): Promise<Ticket[]>;
 }
