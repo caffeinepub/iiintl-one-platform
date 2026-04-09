@@ -36,6 +36,9 @@ import { PricingPage } from "@/pages/PricingPage";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
 import { ProductDetailPage } from "@/pages/ProductDetailPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { ProposalCreatePage } from "@/pages/ProposalCreatePage";
+import { ProposalDetailPage } from "@/pages/ProposalDetailPage";
+import { ProposalsPage } from "@/pages/ProposalsPage";
 import { ReferralLandingPage } from "@/pages/ReferralLandingPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ResourcesPage } from "@/pages/ResourcesPage";
@@ -44,6 +47,7 @@ import { StorePage } from "@/pages/StorePage";
 import { TenantAdminPage } from "@/pages/TenantAdminPage";
 import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
 import { VendorPage } from "@/pages/VendorPage";
+import { VotePage } from "@/pages/VotePage";
 import { WalletPage } from "@/pages/WalletPage";
 import {
   Outlet,
@@ -393,6 +397,47 @@ const termsRoute = createRoute({
   path: "/legal/terms",
   component: TermsOfServicePage,
 });
+
+// ── Governance routes ──
+const proposalsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/proposals",
+  component: () => (
+    <ProtectedRoute>
+      <ProposalsPage />
+    </ProtectedRoute>
+  ),
+});
+
+const proposalCreateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/proposals/create",
+  component: () => (
+    <ProtectedRoute>
+      <ProposalCreatePage />
+    </ProtectedRoute>
+  ),
+});
+
+const proposalDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/proposals/$id",
+  component: () => (
+    <ProtectedRoute>
+      <ProposalDetailPage />
+    </ProtectedRoute>
+  ),
+});
+
+const voteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vote/$id",
+  component: () => (
+    <ProtectedRoute>
+      <VotePage />
+    </ProtectedRoute>
+  ),
+});
 // ── Route tree ──
 const routeTree = rootRoute.addChildren([
   homeRoute,
@@ -431,6 +476,10 @@ const routeTree = rootRoute.addChildren([
   crowdfundingRoute,
   crowdfundingCreateRoute,
   crowdfundingDetailRoute,
+  proposalsRoute,
+  proposalCreateRoute,
+  proposalDetailRoute,
+  voteRoute,
 ]);
 
 // ── Router ──

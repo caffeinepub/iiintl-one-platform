@@ -1,5 +1,12 @@
 import type { Campaign, ForumThread, Organization } from "@/backend";
-import { CampaignStatus, OrgStatus, ThreadStatus } from "@/backend";
+import {
+  CampaignStatus,
+  OrgStatus,
+  ProposalStatus,
+  ProposalType,
+  ThreadStatus,
+} from "@/backend";
+import type { Proposal } from "@/backend";
 import type { Tenant } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
@@ -65,12 +72,14 @@ import {
   MessageSquare,
   Pin,
   Radio,
+  Scale,
   Shield,
   ShoppingBag,
   Target,
   Trash2,
   TrendingUp,
   Users,
+  Vote,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -4019,6 +4028,315 @@ function CrowdfundingAdminTab() {
   );
 }
 
+// ── Governance Admin Tab ─────────────────────────────────────────────────────
+const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  review: "In Review",
+  openVote: "Open Vote",
+  closed: "Closed",
+  enacted: "Enacted",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+const PROPOSAL_STATUS_COLORS: Record<string, string> = {
+  draft: "bg-slate-500/15 text-slate-400",
+  review: "bg-blue-500/15 text-blue-400",
+  openVote: "bg-emerald-500/15 text-emerald-400",
+  closed: "bg-orange-500/15 text-orange-400",
+  enacted: "bg-green-500/15 text-green-400",
+  rejected: "bg-red-500/15 text-red-400",
+  cancelled: "bg-muted text-muted-foreground",
+};
+
+const PROP_TYPE_LABELS: Record<string, string> = {
+  policy: "Policy",
+  resolution: "Resolution",
+  budget: "Budget",
+  amendment: "Amendment",
+  communityInitiative: "Community",
+};
+
+function GovernanceAdminTab() {
+  const backend = useBackend();
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [actioning, setActioning] = useState<bigint | null>(null);
+
+  const load = async () => {
+    if (!backend) return;
+    setLoading(true);
+    try {
+      const data = await backend.listProposals();
+      setProposals(data);
+    } catch {
+      toast.error("Failed to load proposals");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load stable within backend scope
+  useEffect(() => {
+    load();
+  }, [backend]);
+
+  async function adminAction(
+    pid: bigint,
+    fn: () => Promise<
+      { __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }
+    >,
+    msg: string,
+  ) {
+    setActioning(pid);
+    try {
+      const res = await fn();
+      if ("ok" in res) {
+        toast.success(msg);
+        load();
+      } else {
+        toast.error(res.err);
+      }
+    } catch {
+      toast.error("Action failed");
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  const filtered = proposals.filter(
+    (p) => statusFilter === "all" || String(p.status) === statusFilter,
+  );
+
+  const counts = {
+    total: proposals.length,
+    openVote: proposals.filter((p) => String(p.status) === "openVote").length,
+    enacted: proposals.filter((p) => String(p.status) === "enacted").length,
+    review: proposals.filter((p) => String(p.status) === "review").length,
+  };
+
+  return (
+    <div className="space-y-6" data-ocid="admin.governance.tab_content">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={Scale} label="Total Proposals" value={counts.total} />
+        <StatCard
+          icon={Vote}
+          label="Open Votes"
+          value={counts.openVote}
+          color="emerald-500"
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Enacted"
+          value={counts.enacted}
+          color="green-500"
+        />
+        <StatCard
+          icon={Clock}
+          label="Pending Review"
+          value={counts.review}
+          color="blue-500"
+        />
+      </div>
+
+      {/* Filters */}
+      <div
+        className="flex gap-2 flex-wrap"
+        data-ocid="admin.governance.status_filter"
+      >
+        {[
+          "all",
+          "draft",
+          "review",
+          "openVote",
+          "closed",
+          "enacted",
+          "cancelled",
+        ].map((s) => (
+          <button
+            type="button"
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+              statusFilter === s
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover:border-primary/30"
+            }`}
+            data-ocid={`admin.governance.filter_${s}`}
+          >
+            {s === "all" ? "All" : (PROPOSAL_STATUS_LABELS[s] ?? s)}
+          </button>
+        ))}
+      </div>
+
+      {/* Proposals table */}
+      {loading ? (
+        <TableSkeleton rows={5} cols={6} />
+      ) : filtered.length === 0 ? (
+        <div
+          className="text-center py-16 text-muted-foreground"
+          data-ocid="admin.governance.empty_state"
+        >
+          <Scale size={40} className="mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No proposals match this filter.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">ID</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Mechanism</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((p) => {
+                const statusKey = String(p.status);
+                const typeKey = String(p.proposalType);
+                const mechKey = String(p.mechanism);
+                const isActioning = actioning === p.id;
+                const mechLabel =
+                  {
+                    simpleMajority: "Simple",
+                    supermajority66: "Super 2/3",
+                    supermajority75: "Super 3/4",
+                    rankedChoice: "Ranked",
+                    liquidDelegation: "Delegation",
+                  }[mechKey] ?? mechKey;
+
+                return (
+                  <TableRow
+                    key={String(p.id)}
+                    data-ocid={`admin.governance.proposal_row_${String(p.id)}`}
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      #{String(p.id)}
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium text-sm max-w-xs truncate">
+                        {p.title}
+                      </p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {PROP_TYPE_LABELS[typeKey] ?? typeKey}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${PROPOSAL_STATUS_COLORS[statusKey] ?? ""}`}
+                      >
+                        {PROPOSAL_STATUS_LABELS[statusKey] ?? statusKey}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {mechLabel}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(
+                        Number(p.createdAt) / 1_000_000,
+                      ).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        {statusKey === "review" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-emerald-400 border-emerald-500/30"
+                            disabled={isActioning}
+                            onClick={() =>
+                              adminAction(
+                                p.id,
+                                () => backend!.openProposalForVoting(p.id),
+                                "Voting opened",
+                              )
+                            }
+                            data-ocid={`admin.governance.open_vote_${String(p.id)}`}
+                          >
+                            {isActioning ? (
+                              <Loader2 size={11} className="animate-spin" />
+                            ) : (
+                              "Open Vote"
+                            )}
+                          </Button>
+                        )}
+                        {statusKey === "openVote" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-orange-400 border-orange-500/30"
+                            disabled={isActioning}
+                            onClick={() =>
+                              adminAction(
+                                p.id,
+                                () => backend!.closeProposal(p.id),
+                                "Voting closed",
+                              )
+                            }
+                            data-ocid={`admin.governance.close_${String(p.id)}`}
+                          >
+                            Close
+                          </Button>
+                        )}
+                        {statusKey === "closed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-green-400 border-green-500/30"
+                            disabled={isActioning}
+                            onClick={() =>
+                              adminAction(
+                                p.id,
+                                () => backend!.enactProposal(p.id),
+                                "Enacted!",
+                              )
+                            }
+                            data-ocid={`admin.governance.enact_${String(p.id)}`}
+                          >
+                            Enact
+                          </Button>
+                        )}
+                        {(statusKey === "draft" ||
+                          statusKey === "review" ||
+                          statusKey === "closed") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-destructive"
+                            disabled={isActioning}
+                            onClick={() =>
+                              adminAction(
+                                p.id,
+                                () => backend!.cancelProposal(p.id),
+                                "Cancelled",
+                              )
+                            }
+                            data-ocid={`admin.governance.cancel_${String(p.id)}`}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main AdminPage ────────────────────────────────────────────────────────────
 export function AdminPage() {
   const { user } = useAuth();
@@ -4167,6 +4485,14 @@ export function AdminPage() {
               <Coins size={13} />
               Crowdfunding
             </TabsTrigger>
+            <TabsTrigger
+              value="governance"
+              className="text-xs gap-1.5"
+              data-ocid="admin.governance.tab"
+            >
+              <Scale size={13} />
+              Governance
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -4216,6 +4542,9 @@ export function AdminPage() {
           </TabsContent>
           <TabsContent value="crowdfunding">
             <CrowdfundingAdminTab />
+          </TabsContent>
+          <TabsContent value="governance">
+            <GovernanceAdminTab />
           </TabsContent>
         </Tabs>
       </div>

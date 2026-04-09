@@ -587,4 +587,87 @@ export interface ExtendedBackend {
   getMyTickets(): Promise<Ticket[]>;
   listEventTickets(eventId: bigint): Promise<Ticket[]>;
   adminListAllTickets(): Promise<Ticket[]>;
+
+  // ── Governance / Voting & Democracy Engine ───────────────────────────────
+  createProposal(
+    proposalType: import("@/backend").ProposalType,
+    title: string,
+    description: string,
+    mechanism: import("@/backend").VotingMechanism,
+    quorumPercent: bigint,
+    sponsorThreshold: bigint,
+    voteWindowHours: bigint,
+    orgId: string | null,
+    tags: string[],
+  ): Promise<{ __kind__: "ok"; ok: bigint } | { __kind__: "err"; err: string }>;
+  sponsorProposal(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  withdrawSponsor(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  openProposalForVoting(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  closeProposal(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  enactProposal(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  cancelProposal(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  castVote(
+    proposalId: bigint,
+    choice: import("@/backend").VoteChoice,
+    rankedChoices: import("@/backend").RankedChoiceEntry[],
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  delegateVote(
+    delegateTo: import("@icp-sdk/core/principal").Principal,
+    proposalId: bigint | null,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  revokeDelegation(
+    proposalId: bigint | null,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  getProposal(proposalId: bigint): Promise<import("@/backend").Proposal | null>;
+  listProposals(): Promise<import("@/backend").Proposal[]>;
+  listProposalsByStatus(
+    status: import("@/backend").ProposalStatus,
+  ): Promise<import("@/backend").Proposal[]>;
+  listProposalsByType(
+    proposalType: import("@/backend").ProposalType,
+  ): Promise<import("@/backend").Proposal[]>;
+  listActiveProposals(): Promise<import("@/backend").Proposal[]>;
+  getProposalSponsors(
+    proposalId: bigint,
+  ): Promise<import("@icp-sdk/core/principal").Principal[]>;
+  getVoteTally(
+    proposalId: bigint,
+  ): Promise<import("@/backend").VoteTally | null>;
+  getVotesByProposal(proposalId: bigint): Promise<import("@/backend").Vote[]>;
+  getMemberVote(
+    proposalId: bigint,
+    member: import("@icp-sdk/core/principal").Principal,
+  ): Promise<import("@/backend").Vote | null>;
+  getQuorumStatus(proposalId: bigint): Promise<{
+    totalVoters: bigint;
+    quorumPercent: bigint;
+    percentVoted: bigint;
+    quorumMet: boolean;
+    votesCast: bigint;
+  }>;
+  addDebateComment(
+    proposalId: bigint,
+    content: string,
+    parentCommentId: bigint | null,
+  ): Promise<{ __kind__: "ok"; ok: bigint } | { __kind__: "err"; err: string }>;
+  editDebateComment(
+    commentId: bigint,
+    newContent: string,
+  ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  getProposalComments(
+    proposalId: bigint,
+  ): Promise<import("@/backend").DebateComment[]>;
+  getMyDelegation(): Promise<import("@/backend").DelegationRecord | null>;
 }
