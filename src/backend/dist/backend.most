@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type BillingRecord__495027963 =
   {
     amountCents : Nat;
@@ -35,6 +35,34 @@ type CommissionRate__799861196 =
     flatAmountUnits : Nat;
     isActive : Bool;
     tier : MembershipTierLevel__427620915
+  };
+type CredentialStatus__75744160 =
+  {#active; #approved; #pending; #rejected; #revoked};
+type CredentialType__479108651 =
+  {
+    #activistCertification;
+    #custom;
+    #eventAttendee;
+    #expertiseBadge;
+    #orgRepresentative;
+    #verifiedHuman
+  };
+type Credential__739405662 =
+  {
+    approvedAt : ?Int;
+    credentialType : CredentialType__479108651;
+    description : Text;
+    expiresAt : ?Int;
+    id : Text;
+    isPublic : Bool;
+    issuedAt : Int;
+    issuedBy : Principal;
+    metadata : Text;
+    revokedAt : ?Int;
+    status : CredentialStatus__75744160;
+    subject : Principal;
+    title : Text;
+    updatedAt : Int
   };
 type CrowdfundingCampaign__122328023 =
   {
@@ -104,6 +132,27 @@ type CrowdfundingRewardTier__567043231 =
   };
 type CrowdfundingStatus__212397832 =
   {#active; #cancelled; #failed; #funded; #pending};
+type DAOTokenRecord__610190525 =
+  {
+    balance : Nat;
+    createdAt : Int;
+    lastAirdropAt : ?Int;
+    principal : Principal;
+    totalBurned : Nat;
+    totalEarned : Nat
+  };
+type DAOTokenTransaction__166540766 =
+  {
+    amount : Nat;
+    createdAt : Int;
+    from : ?Principal;
+    id : Nat;
+    note : Text;
+    to : Principal;
+    txType : DAOTokenTxType__933424418
+  };
+type DAOTokenTxType__933424418 =
+  {#airdrop; #burned; #earned; #transferred; #votingReward};
 type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
@@ -224,7 +273,8 @@ type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
 type Node__92254746<T> =
   {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
-type NotificationType__754463539 = {#error; #info; #success; #warning};
+type NotificationType__754463539 =
+  {#credentialApproved; #credentialIssued; #error; #info; #success; #warning};
 type Notification__879889657 =
   {
     createdAt : Int;
@@ -232,6 +282,17 @@ type Notification__879889657 =
     isRead : Bool;
     message : Text;
     notifType : NotificationType__754463539;
+    recipient : Principal;
+    title : Text
+  };
+type OldNotificationType__89303409 = {#error; #info; #success; #warning};
+type OldNotification__868316919 =
+  {
+    createdAt : Int;
+    id : Text;
+    isRead : Bool;
+    message : Text;
+    notifType : OldNotificationType__89303409;
     recipient : Principal;
     title : Text
   };
@@ -380,7 +441,7 @@ type Wallet__442667382 =
     walletLabel : Text;
     walletType : WalletType__701049132
   };
-actor {
+actor ({
   stable _24hNs : Int;
   stable accessControlState :
     {
@@ -406,11 +467,20 @@ actor {
       var root : Node__46230540<Text, Campaign__370329394>;
       var size : Nat__490723111
     };
+  stable claimedVotingRewards :
+    {var root : Node__46230540<Text, Bool>; var size : Nat__490723111};
   stable commissionRates :
     {
       var root : Node__46230540<Text, CommissionRate__799861196>;
       var size : Nat__490723111
     };
+  stable credentials :
+    {
+      var root : Node__46230540<Text, Credential__739405662>;
+      var size : Nat__490723111
+    };
+  stable credentialsBySubject :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
   stable crowdfundingCampaigns :
     {
       var root : Node__46230540<Text, CrowdfundingCampaign__122328023>;
@@ -427,6 +497,18 @@ actor {
       var root : Node__46230540<Text, CrowdfundingPledge__780171264>;
       var size : Nat__490723111
     };
+  stable daoTokenLedger :
+    {
+      var root : Node__46230540<Principal, DAOTokenRecord__610190525>;
+      var size : Nat__490723111
+    };
+  stable daoTokenTransactions :
+    {
+      var root : Node__46230540<Nat, DAOTokenTransaction__166540766>;
+      var size : Nat__490723111
+    };
+  stable var daoTotalSupply : Nat;
+  stable var daoTreasuryBalance : Nat;
   stable debateComments :
     {
       var root : Node__46230540<Nat, DebateComment__209204920>;
@@ -477,8 +559,213 @@ actor {
     {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
   stable var nextBillingId : Nat;
   stable var nextCommentId : Nat;
+  stable var nextCredentialCounter : Nat;
   stable var nextCrowdfundingCampaignId : Nat;
   stable var nextCrowdfundingPledgeId : Nat;
+  stable var nextDaoTxId : Nat;
+  stable var nextEarningId : Nat;
+  stable var nextFSUTxId : Nat;
+  stable var nextNotificationId : Nat;
+  stable var nextProposalId : Nat;
+  stable var nextReplyId : Nat;
+  stable var nextRoyaltyPoolId : Nat;
+  stable var nextTenantId : Nat;
+  stable var nextThreadId : Nat;
+  stable var nextTransactionId : Nat;
+  stable var nextVoteId : Nat;
+  in notifications : Map__605269027<Text, OldNotification__868316919>;
+  stable organizations :
+    {
+      var root : Node__46230540<Text, Organization__103960640>;
+      var size : Nat__490723111
+    };
+  stable ownerToTenantId :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable principalToUserId :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable proposalCommentIndex :
+    {var root : Node__46230540<Nat, [Nat]>; var size : Nat__490723111};
+  stable proposalSponsorIndex :
+    {var root : Node__46230540<Nat, [Principal]>; var size : Nat__490723111};
+  stable proposalVoteIndex :
+    {var root : Node__46230540<Nat, [Nat]>; var size : Nat__490723111};
+  stable proposals :
+    {
+      var root : Node__46230540<Nat, Proposal__521768281>;
+      var size : Nat__490723111
+    };
+  stable proposerIndex :
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
+  stable recipientNotifIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable referralCodeIndex :
+    {var root : Node__46230540<Text, Principal>; var size : Nat__490723111};
+  stable royaltyPools :
+    {
+      var root : Node__46230540<Text, RoyaltyPool__1040213925>;
+      var size : Nat__490723111
+    };
+  stable tenantMembers :
+    {
+      var root : Node__46230540<Text, [TenantMember__744698245]>;
+      var size : Nat__490723111
+    };
+  stable tenants :
+    {
+      var root : Node__46230540<Text, Tenant__828322903>;
+      var size : Nat__490723111
+    };
+  stable threadReplies :
+    {
+      var root : Node__46230540<Nat, Set__532252804<Nat>>;
+      var size : Nat__490723111
+    };
+  stable userLanguages :
+    {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable userTransactions :
+    {
+      var root :
+        Node__46230540<Principal, Map__605269027<Nat, Transaction__865268250>>;
+      var size : Nat__490723111
+    };
+  stable userWallets :
+    {
+      var root :
+        Node__46230540<Principal, Map__605269027<Text, Wallet__442667382>>;
+      var size : Nat__490723111
+    };
+  stable users :
+    {
+      var root : Node__46230540<Text, User__831686142>;
+      var size : Nat__490723111
+    };
+  stable votes :
+    {
+      var root : Node__46230540<Nat, Vote__1045594672>;
+      var size : Nat__490723111
+    }
+}, {
+  stable _24hNs : Int;
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable backerPledgeIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable billingRecords :
+    {
+      var root : Node__46230540<Text, BillingRecord__495027963>;
+      var size : Nat__490723111
+    };
+  stable campaignPledgeIndex :
+    {var root : Node__46230540<Text, [Text]>; var size : Nat__490723111};
+  stable campaignSupporters :
+    {
+      var root : Node__46230540<Text, Set__532252804<Principal>>;
+      var size : Nat__490723111
+    };
+  stable campaigns :
+    {
+      var root : Node__46230540<Text, Campaign__370329394>;
+      var size : Nat__490723111
+    };
+  stable claimedVotingRewards :
+    {var root : Node__46230540<Text, Bool>; var size : Nat__490723111};
+  stable commissionRates :
+    {
+      var root : Node__46230540<Text, CommissionRate__799861196>;
+      var size : Nat__490723111
+    };
+  stable credentials :
+    {
+      var root : Node__46230540<Text, Credential__739405662>;
+      var size : Nat__490723111
+    };
+  stable credentialsBySubject :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable crowdfundingCampaigns :
+    {
+      var root : Node__46230540<Text, CrowdfundingCampaign__122328023>;
+      var size : Nat__490723111
+    };
+  stable var crowdfundingConfig :
+    {
+      creatorFSUBonus : Nat;
+      defaultFSUContributionBps : Nat;
+      milestoneAchievementBonusBps : Nat
+    };
+  stable crowdfundingPledges :
+    {
+      var root : Node__46230540<Text, CrowdfundingPledge__780171264>;
+      var size : Nat__490723111
+    };
+  stable daoTokenLedger :
+    {
+      var root : Node__46230540<Principal, DAOTokenRecord__610190525>;
+      var size : Nat__490723111
+    };
+  stable daoTokenTransactions :
+    {
+      var root : Node__46230540<Nat, DAOTokenTransaction__166540766>;
+      var size : Nat__490723111
+    };
+  stable var daoTotalSupply : Nat;
+  stable var daoTreasuryBalance : Nat;
+  stable debateComments :
+    {
+      var root : Node__46230540<Nat, DebateComment__209204920>;
+      var size : Nat__490723111
+    };
+  stable delegations :
+    {
+      var root : Node__46230540<Principal, DelegationRecord__135374057>;
+      var size : Nat__490723111
+    };
+  stable earningRecords :
+    {
+      var root : Node__46230540<Text, EarningRecord__4576500>;
+      var size : Nat__490723111
+    };
+  stable forumReplies :
+    {
+      var root : Node__46230540<Nat, ForumReply__954910620>;
+      var size : Nat__490723111
+    };
+  stable forumThreads :
+    {
+      var root : Node__46230540<Nat, ForumThread__828182490>;
+      var size : Nat__490723111
+    };
+  stable var fsuPool : Nat;
+  stable fsuRecords :
+    {
+      var root : Node__46230540<Principal, FSURecord__1012355602>;
+      var size : Nat__490723111
+    };
+  stable fsuTransactions :
+    {
+      var root : Node__46230540<Text, FSUTransaction__823757434>;
+      var size : Nat__490723111
+    };
+  stable var lastExpiryCheck : Int;
+  stable memberEarningsIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable memberFSUTxIndex :
+    {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
+  stable memberTiers :
+    {
+      var root : Node__46230540<Principal, MemberTierRecord__809706739>;
+      var size : Nat__490723111
+    };
+  stable memberVoteIndex :
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
+  stable var nextBillingId : Nat;
+  stable var nextCommentId : Nat;
+  stable var nextCredentialCounter : Nat;
+  stable var nextCrowdfundingCampaignId : Nat;
+  stable var nextCrowdfundingPledgeId : Nat;
+  stable var nextDaoTxId : Nat;
   stable var nextEarningId : Nat;
   stable var nextFSUTxId : Nat;
   stable var nextNotificationId : Nat;
@@ -564,4 +851,4 @@ actor {
       var root : Node__46230540<Nat, Vote__1045594672>;
       var size : Nat__490723111
     }
-};
+}) ;

@@ -669,5 +669,61 @@ export interface ExtendedBackend {
   getProposalComments(
     proposalId: bigint,
   ): Promise<import("@/backend").DebateComment[]>;
+  // Public (unauthenticated) governance queries
+  listProposalsPublic(): Promise<import("@/backend").Proposal[]>;
+  getProposalPublic(
+    proposalId: bigint,
+  ): Promise<import("@/backend").Proposal | null>;
+  getProposalCommentsPublic(
+    proposalId: bigint,
+  ): Promise<import("@/backend").DebateComment[]>;
+  getVoteTallyPublic(
+    proposalId: bigint,
+  ): Promise<import("@/backend").VoteTally | null>;
   getMyDelegation(): Promise<import("@/backend").DelegationRecord | null>;
+
+  // ── Credentials (Decentralized Identity) ────────────────────────────────
+  issueCredential(
+    subject: import("@icp-sdk/core/principal").Principal,
+    credType: import("@/backend").CredentialType,
+    title: string,
+    description: string,
+    metadata: string,
+    expiresAt: bigint | null,
+  ): Promise<string>;
+  approveCredential(credId: string): Promise<boolean>;
+  rejectCredential(credId: string): Promise<boolean>;
+  revokeCredential(credId: string): Promise<boolean>;
+  listAllCredentialsAdmin(): Promise<import("@/backend").Credential[]>;
+  getCredential(credId: string): Promise<import("@/backend").Credential | null>;
+  getMyCredentials(): Promise<import("@/backend").Credential[]>;
+  listPublicCredentialsByType(
+    credType: import("@/backend").CredentialType,
+  ): Promise<import("@/backend").Credential[]>;
+  toggleCredentialPublic(credId: string, isPublic: boolean): Promise<boolean>;
+
+  // ── DAO Governance Token ─────────────────────────────────────────────────
+  airdropToAllMembers(): Promise<{ totalTokens: bigint; airdropped: bigint }>;
+  getDAOTokenStats(): Promise<{
+    treasuryBalance: bigint;
+    totalHolders: bigint;
+    totalSupply: bigint;
+  }>;
+  listAllDAOTokensAdmin(): Promise<import("@/backend").DAOTokenRecord[]>;
+  getMyDAOBalance(): Promise<import("@/backend").DAOTokenRecord>;
+  getDaoLeaderboard(): Promise<import("@/backend").DAOTokenRecord[]>;
+  getDAOTransactionHistory(): Promise<
+    import("@/backend").DAOTokenTransaction[]
+  >;
+  burnDAOTokens(
+    amount: bigint,
+  ): Promise<{ __kind__: "ok"; ok: bigint } | { __kind__: "err"; err: string }>;
+  transferDAOTokens(
+    to: import("@icp-sdk/core/principal").Principal,
+    amount: bigint,
+    note: string,
+  ): Promise<{ __kind__: "ok"; ok: bigint } | { __kind__: "err"; err: string }>;
+  claimVotingReward(
+    proposalId: bigint,
+  ): Promise<{ __kind__: "ok"; ok: bigint } | { __kind__: "err"; err: string }>;
 }

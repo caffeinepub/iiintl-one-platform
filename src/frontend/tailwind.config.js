@@ -46,6 +46,14 @@ export default {
           DEFAULT: "oklch(var(--accent) / <alpha-value>)",
           foreground: "oklch(var(--accent-foreground))",
         },
+        credentials: {
+          DEFAULT: "oklch(var(--credentials) / <alpha-value>)",
+          foreground: "oklch(var(--credentials-foreground))",
+        },
+        token: {
+          DEFAULT: "oklch(var(--token) / <alpha-value>)",
+          foreground: "oklch(var(--token-foreground))",
+        },
         popover: {
           DEFAULT: "oklch(var(--popover))",
           foreground: "oklch(var(--popover-foreground))",
@@ -85,6 +93,8 @@ export default {
         topbar: "0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px 0 rgba(0,0,0,0.04)",
         "topbar-scrolled": "0 2px 8px 0 rgba(0,0,0,0.10), 0 1px 3px 0 rgba(0,0,0,0.06)",
         "card-hover": "0 8px 25px -5px rgba(0,0,0,0.10), 0 4px 10px -5px rgba(0,0,0,0.06)",
+        "credential-glow": "0 0 20px rgba(104, 211, 145, 0.3), 0 0 40px rgba(104, 211, 145, 0.15)",
+        "token-glow": "0 0 20px rgba(191, 144, 0, 0.3), 0 0 40px rgba(191, 144, 0, 0.15)",
       },
       keyframes: {
         "accordion-down": {
@@ -95,10 +105,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "verify-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
+        "token-shimmer": {
+          "0%, 100%": { backgroundPosition: "0% center" },
+          "50%": { backgroundPosition: "100% center" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "verify-pulse": "verify-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "token-shimmer": "token-shimmer 3s ease-in-out infinite",
       },
     },
   },

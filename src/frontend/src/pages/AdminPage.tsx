@@ -1,4 +1,10 @@
-import type { Campaign, ForumThread, Organization } from "@/backend";
+import type {
+  Campaign,
+  Credential,
+  DAOTokenRecord,
+  ForumThread,
+  Organization,
+} from "@/backend";
 import {
   CampaignStatus,
   OrgStatus,
@@ -6,6 +12,7 @@ import {
   ProposalType,
   ThreadStatus,
 } from "@/backend";
+import type { CredentialType } from "@/backend";
 import type { Proposal } from "@/backend";
 import type { Tenant } from "@/backend";
 import { Layout } from "@/components/Layout";
@@ -48,6 +55,7 @@ import type {
   FSUPoolStatus,
   PlatformAnalytics,
 } from "@/types/appTypes";
+import type { Principal } from "@icp-sdk/core/principal";
 
 // Helper: cast backend to ExtendedBackend for admin cross-tenant calls
 function asAdmin(
@@ -58,6 +66,7 @@ function asAdmin(
 import { TenantStatus, TenantTier } from "@/types/appTypes";
 import {
   Activity,
+  Award,
   BarChart2,
   BookOpen,
   Building,
@@ -75,12 +84,15 @@ import {
   Scale,
   Shield,
   ShoppingBag,
+  Sparkles,
   Target,
   Trash2,
   TrendingUp,
   Users,
   Vote,
+  Wallet,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -4641,6 +4653,895 @@ function GovernanceAdminTab() {
   );
 }
 
+// ── Credentials Admin Tab ─────────────────────────────────────────────────────
+const CRED_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "verifiedHuman", label: "Verified Human" },
+  { value: "orgRepresentative", label: "Org Representative" },
+  { value: "expertiseBadge", label: "Expertise Badge" },
+  { value: "eventAttendee", label: "Event Attendee" },
+  { value: "activistCertification", label: "Activist Certification" },
+  { value: "custom", label: "Custom" },
+];
+
+const CRED_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-500/20 text-amber-400",
+  approved: "bg-sky-500/20 text-sky-400",
+  active: "bg-emerald-500/20 text-emerald-400",
+  revoked: "bg-red-500/20 text-red-400",
+  rejected: "bg-muted text-muted-foreground",
+};
+
+function CredentialsAdminTab() {
+  const backend = useBackend();
+
+  // All credentials list
+  const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [credsLoading, setCredsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Issue form
+  const [issueSubject, setIssueSubject] = useState("");
+  const [issueType, setIssueType] = useState("verifiedHuman");
+  const [issueTitle, setIssueTitle] = useState("");
+  const [issueDesc, setIssueDesc] = useState("");
+  const [issueMeta, setIssueMeta] = useState("");
+  const [issueExpiry, setIssueExpiry] = useState("");
+  const [issuing, setIssuing] = useState(false);
+
+  const loadCredentials = useCallback(async () => {
+    if (!backend) return;
+    setCredsLoading(true);
+    try {
+      const data = await backend.listAllCredentialsAdmin();
+      setCredentials(data);
+    } catch {
+      toast.error("Failed to load credentials");
+    } finally {
+      setCredsLoading(false);
+    }
+  }, [backend]);
+
+  useEffect(() => {
+    loadCredentials();
+  }, [loadCredentials]);
+
+  async function handleApprove(credId: string) {
+    if (!backend) return;
+    setActionLoading(`approve-${credId}`);
+    try {
+      await backend.approveCredential(credId);
+      toast.success("Credential approved");
+      await loadCredentials();
+    } catch {
+      toast.error("Failed to approve credential");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReject(credId: string) {
+    if (!backend) return;
+    setActionLoading(`reject-${credId}`);
+    try {
+      await backend.rejectCredential(credId);
+      toast.success("Credential rejected");
+      await loadCredentials();
+    } catch {
+      toast.error("Failed to reject credential");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRevoke(credId: string) {
+    if (!backend) return;
+    setActionLoading(`revoke-${credId}`);
+    try {
+      await backend.revokeCredential(credId);
+      toast.success("Credential revoked");
+      await loadCredentials();
+    } catch {
+      toast.error("Failed to revoke credential");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleIssue() {
+    if (!backend || !issueSubject.trim() || !issueTitle.trim()) return;
+    setIssuing(true);
+    try {
+      const expiresAt = issueExpiry
+        ? BigInt(new Date(issueExpiry).getTime() * 1_000_000)
+        : null;
+      await backend.issueCredential(
+        issueSubject.trim() as unknown as Principal,
+        issueType as CredentialType,
+        issueTitle.trim(),
+        issueDesc.trim(),
+        issueMeta.trim(),
+        expiresAt,
+      );
+      toast.success("Credential issued successfully");
+      setIssueSubject("");
+      setIssueTitle("");
+      setIssueDesc("");
+      setIssueMeta("");
+      setIssueExpiry("");
+      await loadCredentials();
+    } catch {
+      toast.error("Failed to issue credential");
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  const pending = credentials.filter((c) => String(c.status) === "pending");
+  const others = credentials.filter((c) => String(c.status) !== "pending");
+
+  function truncatePrincipal(p: { toString(): string } | string): string {
+    const s = typeof p === "string" ? p : p.toString();
+    return s.length > 16 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
+  }
+
+  return (
+    <div className="space-y-6" data-ocid="admin.credentials.tab_content">
+      {/* Header Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={Award}
+          label="Total Credentials"
+          value={credentials.length}
+        />
+        <StatCard
+          icon={Clock}
+          label="Pending Approval"
+          value={pending.length}
+          color="amber-500"
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Active"
+          value={
+            credentials.filter((c) => String(c.status) === "active").length
+          }
+          color="emerald-500"
+        />
+        <StatCard
+          icon={XCircle}
+          label="Revoked"
+          value={
+            credentials.filter((c) => String(c.status) === "revoked").length
+          }
+          color="red-500"
+        />
+      </div>
+
+      {/* ── Approval Queue ──────────────────────────────────────────────── */}
+      <Card
+        className="border border-emerald-500/20 bg-card"
+        data-ocid="admin.credentials.approval_queue"
+      >
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock size={14} className="text-amber-500" />
+              Approval Queue
+              {pending.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400">
+                  {pending.length}
+                </span>
+              )}
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Credentials awaiting admin review
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadCredentials}
+            disabled={credsLoading}
+            className="h-7 text-xs"
+            data-ocid="admin.credentials.refresh.button"
+          >
+            {credsLoading ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {credsLoading ? (
+            <div className="p-4" data-ocid="admin.credentials.loading_state">
+              <TableSkeleton rows={3} cols={5} />
+            </div>
+          ) : pending.length === 0 ? (
+            <div
+              className="text-center py-10 text-muted-foreground text-sm"
+              data-ocid="admin.credentials.queue_empty_state"
+            >
+              <Award size={32} className="mx-auto mb-3 opacity-30" />
+              No credentials pending approval
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Subject</TableHead>
+                  <TableHead className="text-xs">Title</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
+                  <TableHead className="text-xs">Issued</TableHead>
+                  <TableHead className="text-xs text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pending.map((cred, i) => (
+                  <TableRow
+                    key={cred.id}
+                    data-ocid={`admin.credentials.queue_row.${i + 1}`}
+                  >
+                    <TableCell className="text-xs font-mono">
+                      {truncatePrincipal(cred.subject)}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium max-w-[180px] truncate">
+                      {cred.title}
+                    </TableCell>
+                    <TableCell>
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 capitalize">
+                        {String(cred.credentialType)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDate(cred.issuedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1.5 justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={actionLoading === `approve-${cred.id}`}
+                          onClick={() => handleApprove(cred.id)}
+                          className="h-6 px-2 text-[10px] border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
+                          data-ocid={`admin.credentials.approve.button.${i + 1}`}
+                        >
+                          {actionLoading === `approve-${cred.id}` ? (
+                            <Loader2 size={10} className="animate-spin" />
+                          ) : (
+                            "Approve"
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={actionLoading === `reject-${cred.id}`}
+                          onClick={() => handleReject(cred.id)}
+                          className="h-6 px-2 text-[10px] border-red-500/40 text-red-500 hover:bg-red-500/10"
+                          data-ocid={`admin.credentials.reject.button.${i + 1}`}
+                        >
+                          {actionLoading === `reject-${cred.id}` ? (
+                            <Loader2 size={10} className="animate-spin" />
+                          ) : (
+                            "Reject"
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Issue Credential Form ───────────────────────────────────────── */}
+      <Card
+        className="border border-emerald-500/20 bg-card"
+        data-ocid="admin.credentials.issue_form"
+      >
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Zap size={14} className="text-emerald-500" />
+            Issue Credential
+          </CardTitle>
+          <CardDescription className="text-xs mt-0.5">
+            Directly issue a verified credential to any member principal
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Subject Principal</Label>
+              <Input
+                placeholder="xxxxx-xxxxx-xxxxx-xxxxx-cai"
+                value={issueSubject}
+                onChange={(e) => setIssueSubject(e.target.value)}
+                className="h-8 text-xs"
+                data-ocid="admin.credentials.issue_subject.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Credential Type</Label>
+              <Select value={issueType} onValueChange={setIssueType}>
+                <SelectTrigger
+                  className="h-8 text-xs"
+                  data-ocid="admin.credentials.issue_type.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CRED_TYPE_OPTIONS.map((o) => (
+                    <SelectItem
+                      key={o.value}
+                      value={o.value}
+                      className="text-xs"
+                    >
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Title</Label>
+              <Input
+                placeholder="e.g. Verified Founding Member"
+                value={issueTitle}
+                onChange={(e) => setIssueTitle(e.target.value)}
+                className="h-8 text-xs"
+                data-ocid="admin.credentials.issue_title.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Expiry Date (optional)</Label>
+              <Input
+                type="date"
+                value={issueExpiry}
+                onChange={(e) => setIssueExpiry(e.target.value)}
+                className="h-8 text-xs"
+                data-ocid="admin.credentials.issue_expiry.input"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">Description</Label>
+              <Input
+                placeholder="Brief description of this credential"
+                value={issueDesc}
+                onChange={(e) => setIssueDesc(e.target.value)}
+                className="h-8 text-xs"
+                data-ocid="admin.credentials.issue_desc.input"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">
+                Metadata (optional JSON or notes)
+              </Label>
+              <Input
+                placeholder='e.g. {"program":"founding","cohort":"2026-Q1"}'
+                value={issueMeta}
+                onChange={(e) => setIssueMeta(e.target.value)}
+                className="h-8 text-xs font-mono"
+                data-ocid="admin.credentials.issue_meta.input"
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleIssue}
+            disabled={issuing || !issueSubject.trim() || !issueTitle.trim()}
+            className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            data-ocid="admin.credentials.issue.submit_button"
+          >
+            {issuing ? (
+              <Loader2 size={12} className="animate-spin mr-1.5" />
+            ) : (
+              <Zap size={12} className="mr-1.5" />
+            )}
+            {issuing ? "Issuing…" : "Issue Credential"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── All Credentials Table ───────────────────────────────────────── */}
+      <Card
+        className="border border-emerald-500/20 bg-card"
+        data-ocid="admin.credentials.all_table"
+      >
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Award size={14} className="text-emerald-500" />
+              All Credentials ({credentials.length})
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Full registry of issued credentials across all tenants
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {credsLoading ? (
+            <div className="p-4">
+              <TableSkeleton rows={4} cols={6} />
+            </div>
+          ) : credentials.length === 0 ? (
+            <div
+              className="text-center py-12 text-muted-foreground text-sm"
+              data-ocid="admin.credentials.all_empty_state"
+            >
+              <Award size={32} className="mx-auto mb-3 opacity-30" />
+              No credentials issued yet
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Subject</TableHead>
+                  <TableHead className="text-xs">Title</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Issued</TableHead>
+                  <TableHead className="text-xs">Expires</TableHead>
+                  <TableHead className="text-xs text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...pending, ...others].map((cred, i) => {
+                  const statusKey = String(cred.status);
+                  const isActive = statusKey === "active";
+                  return (
+                    <TableRow
+                      key={cred.id}
+                      data-ocid={`admin.credentials.row.${i + 1}`}
+                      className={statusKey === "revoked" ? "opacity-50" : ""}
+                    >
+                      <TableCell className="text-xs font-mono">
+                        {truncatePrincipal(cred.subject)}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium max-w-[160px] truncate">
+                        {cred.title}
+                      </TableCell>
+                      <TableCell>
+                        <span className="px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary capitalize">
+                          {String(cred.credentialType)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs capitalize ${CRED_STATUS_COLORS[statusKey] ?? "bg-muted text-muted-foreground"}`}
+                        >
+                          {statusKey}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(cred.issuedAt)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {cred.expiresAt ? formatDate(cred.expiresAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isActive && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actionLoading === `revoke-${cred.id}`}
+                            onClick={() => handleRevoke(cred.id)}
+                            className="h-6 px-2 text-[10px] border-red-500/30 text-red-500 hover:bg-red-500/10"
+                            data-ocid={`admin.credentials.revoke.button.${i + 1}`}
+                          >
+                            {actionLoading === `revoke-${cred.id}` ? (
+                              <Loader2 size={10} className="animate-spin" />
+                            ) : (
+                              "Revoke"
+                            )}
+                          </Button>
+                        )}
+                        {statusKey === "pending" && (
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoading === `approve-${cred.id}`}
+                              onClick={() => handleApprove(cred.id)}
+                              className="h-6 px-2 text-[10px] border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10"
+                              data-ocid={`admin.credentials.all_approve.button.${i + 1}`}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actionLoading === `reject-${cred.id}`}
+                              onClick={() => handleReject(cred.id)}
+                              className="h-6 px-2 text-[10px] border-red-500/40 text-red-500 hover:bg-red-500/10"
+                              data-ocid={`admin.credentials.all_reject.button.${i + 1}`}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── DAO Token Admin Tab ───────────────────────────────────────────────────────
+function DAOTokenAdminTab() {
+  const backend = useBackend();
+
+  // Stats
+  const [stats, setStats] = useState<{
+    totalSupply: bigint;
+    treasuryBalance: bigint;
+    totalHolders: bigint;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Holders table
+  const [holders, setHolders] = useState<DAOTokenRecord[]>([]);
+  const [holdersLoading, setHoldersLoading] = useState(true);
+
+  // Airdrop
+  const [airdropping, setAirdropping] = useState(false);
+  const [airdropResult, setAirdropResult] = useState<{
+    totalTokens: bigint;
+    airdropped: bigint;
+  } | null>(null);
+  const [airdropError, setAirdropError] = useState<string | null>(null);
+
+  const loadStats = useCallback(async () => {
+    if (!backend) return;
+    setStatsLoading(true);
+    try {
+      const data = await backend.getDAOTokenStats();
+      setStats(data);
+    } catch {
+      toast.error("Failed to load DAO token stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [backend]);
+
+  const loadHolders = useCallback(async () => {
+    if (!backend) return;
+    setHoldersLoading(true);
+    try {
+      const data = await backend.listAllDAOTokensAdmin();
+      setHolders(data);
+    } catch {
+      toast.error("Failed to load token holders");
+    } finally {
+      setHoldersLoading(false);
+    }
+  }, [backend]);
+
+  useEffect(() => {
+    loadStats();
+    loadHolders();
+  }, [loadStats, loadHolders]);
+
+  async function handleAirdrop() {
+    if (!backend) return;
+    setAirdropping(true);
+    setAirdropResult(null);
+    setAirdropError(null);
+    try {
+      const result = await backend.airdropToAllMembers();
+      setAirdropResult(result);
+      toast.success(
+        `Airdrop complete — ${Number(result.airdropped)} members received tokens`,
+      );
+      await Promise.all([loadStats(), loadHolders()]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Airdrop failed";
+      setAirdropError(msg);
+      toast.error(msg);
+    } finally {
+      setAirdropping(false);
+    }
+  }
+
+  function truncatePrincipal(p: { toString(): string } | string): string {
+    const s = typeof p === "string" ? p : p.toString();
+    return s.length > 16 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s;
+  }
+
+  const tierAirdropAmounts: Record<string, number> = {
+    supporter: 100,
+    associate: 200,
+    community: 500,
+    activist: 1000,
+    partner: 2000,
+    ambassador: 5000,
+    founder: 10000,
+  };
+
+  return (
+    <div className="space-y-6" data-ocid="admin.dao_token.tab_content">
+      {/* ── Token Stats ─────────────────────────────────────────────────── */}
+      <div
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        data-ocid="admin.dao_token.stats_section"
+      >
+        {statsLoading ? (
+          <>
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-24" />
+          </>
+        ) : stats ? (
+          <>
+            <Card className="border border-amber-500/20 bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500/10">
+                    <Coins size={18} className="text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Total Supply
+                    </p>
+                    <p className="text-2xl font-bold text-amber-500 font-display">
+                      {Number(stats.totalSupply).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-amber-500/20 bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500/10">
+                    <Wallet size={18} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Treasury Balance
+                    </p>
+                    <p className="text-2xl font-bold text-foreground font-display">
+                      {Number(stats.treasuryBalance).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border border-amber-500/20 bg-card">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500/10">
+                    <Users size={18} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Token Holders
+                    </p>
+                    <p className="text-2xl font-bold text-foreground font-display">
+                      {Number(stats.totalHolders).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <div className="col-span-3 text-center py-8 text-muted-foreground text-sm">
+            Could not load token stats
+          </div>
+        )}
+      </div>
+
+      {/* ── Airdrop Panel ───────────────────────────────────────────────── */}
+      <Card
+        className="border border-amber-500/20 bg-card"
+        data-ocid="admin.dao_token.airdrop_panel"
+      >
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Sparkles size={14} className="text-amber-500" />
+            Token Airdrop
+          </CardTitle>
+          <CardDescription className="text-xs mt-0.5">
+            Distribute IIINTL governance tokens to all MLM-initialized members
+            based on membership tier
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Tier distribution reference */}
+          <div className="rounded-lg border border-amber-500/15 bg-amber-500/5 p-4">
+            <p className="text-xs font-medium text-amber-500 mb-3 flex items-center gap-1.5">
+              <Coins size={12} />
+              Tier-Based Distribution Amounts
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {Object.entries(tierAirdropAmounts).map(([tier, amount]) => (
+                <div
+                  key={tier}
+                  className="flex items-center justify-between rounded bg-amber-500/10 px-2.5 py-1.5"
+                >
+                  <span className="text-xs capitalize text-muted-foreground">
+                    {tier}
+                  </span>
+                  <span className="text-xs font-bold text-amber-400">
+                    {amount.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Airdrop trigger */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <Button
+              size="default"
+              onClick={handleAirdrop}
+              disabled={airdropping}
+              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-6"
+              data-ocid="admin.dao_token.airdrop.trigger_button"
+            >
+              {airdropping ? (
+                <>
+                  <Loader2 size={14} className="animate-spin mr-2" />
+                  Distributing Tokens…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} className="mr-2" />
+                  Trigger Airdrop to All Members
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              This action distributes tokens to all members who have initialized
+              their MLM profile.
+            </p>
+          </div>
+
+          {/* Result banner */}
+          {airdropResult && (
+            <div
+              className="flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-sm"
+              data-ocid="admin.dao_token.airdrop.result_banner"
+            >
+              <CheckCircle
+                size={15}
+                className="text-amber-500 shrink-0 mt-0.5"
+              />
+              <div>
+                <p className="font-semibold text-amber-400">
+                  Airdrop complete —{" "}
+                  {Number(airdropResult.airdropped).toLocaleString()} member
+                  {airdropResult.airdropped !== BigInt(1) ? "s" : ""} received
+                  tokens
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {Number(airdropResult.totalTokens).toLocaleString()} total
+                  tokens distributed
+                </p>
+              </div>
+            </div>
+          )}
+          {airdropError && (
+            <div
+              className="flex items-center gap-2 rounded-md bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400"
+              data-ocid="admin.dao_token.airdrop.error_banner"
+            >
+              <XCircle size={15} className="shrink-0" />
+              {airdropError}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── All Token Holders Table ──────────────────────────────────────── */}
+      <Card
+        className="border border-amber-500/20 bg-card"
+        data-ocid="admin.dao_token.holders_table"
+      >
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users size={14} className="text-amber-500" />
+              All Token Holders ({holders.length})
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Complete token holder registry sorted by balance
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadHolders}
+            disabled={holdersLoading}
+            className="h-7 text-xs"
+            data-ocid="admin.dao_token.holders.refresh.button"
+          >
+            {holdersLoading ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              "Refresh"
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {holdersLoading ? (
+            <div
+              className="p-4"
+              data-ocid="admin.dao_token.holders.loading_state"
+            >
+              <TableSkeleton rows={5} cols={5} />
+            </div>
+          ) : holders.length === 0 ? (
+            <div
+              className="text-center py-12 text-muted-foreground text-sm"
+              data-ocid="admin.dao_token.holders.empty_state"
+            >
+              <Wallet size={32} className="mx-auto mb-3 opacity-30" />
+              No token holders yet — trigger an airdrop to get started
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">#</TableHead>
+                  <TableHead className="text-xs">Principal</TableHead>
+                  <TableHead className="text-xs text-right">Balance</TableHead>
+                  <TableHead className="text-xs text-right">
+                    Total Earned
+                  </TableHead>
+                  <TableHead className="text-xs text-right">
+                    Total Burned
+                  </TableHead>
+                  <TableHead className="text-xs">Last Airdrop</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...holders]
+                  .sort((a, b) => Number(b.balance) - Number(a.balance))
+                  .map((holder, i) => (
+                    <TableRow
+                      key={holder.principal.toString()}
+                      data-ocid={`admin.dao_token.holder_row.${i + 1}`}
+                    >
+                      <TableCell className="text-xs text-muted-foreground w-8">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {truncatePrincipal(holder.principal)}
+                      </TableCell>
+                      <TableCell className="text-xs text-right font-bold text-amber-500">
+                        {Number(holder.balance).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-emerald-500 font-medium">
+                        {Number(holder.totalEarned).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-muted-foreground">
+                        {Number(holder.totalBurned).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {holder.lastAirdropAt
+                          ? formatDate(holder.lastAirdropAt)
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main AdminPage ────────────────────────────────────────────────────────────
 export function AdminPage() {
   const { user } = useAuth();
@@ -4797,6 +5698,22 @@ export function AdminPage() {
               <Scale size={13} />
               Governance
             </TabsTrigger>
+            <TabsTrigger
+              value="credentials"
+              className="text-xs gap-1.5"
+              data-ocid="admin.credentials.tab"
+            >
+              <Award size={13} />
+              Credentials
+            </TabsTrigger>
+            <TabsTrigger
+              value="dao-token"
+              className="text-xs gap-1.5"
+              data-ocid="admin.dao_token.tab"
+            >
+              <Coins size={13} />
+              DAO Token
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -4849,6 +5766,12 @@ export function AdminPage() {
           </TabsContent>
           <TabsContent value="governance">
             <GovernanceAdminTab />
+          </TabsContent>
+          <TabsContent value="credentials">
+            <CredentialsAdminTab />
+          </TabsContent>
+          <TabsContent value="dao-token">
+            <DAOTokenAdminTab />
           </TabsContent>
         </Tabs>
       </div>

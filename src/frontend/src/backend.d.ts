@@ -118,6 +118,30 @@ export interface CrowdfundingConfig {
     milestoneAchievementBonusBps: bigint;
     creatorFSUBonus: bigint;
 }
+export interface DAOTokenRecord {
+    principal: Principal;
+    balance: bigint;
+    createdAt: bigint;
+    totalEarned: bigint;
+    totalBurned: bigint;
+    lastAirdropAt?: bigint;
+}
+export interface Credential {
+    id: string;
+    status: CredentialStatus;
+    title: string;
+    expiresAt?: bigint;
+    subject: Principal;
+    metadata: string;
+    approvedAt?: bigint;
+    credentialType: CredentialType;
+    description: string;
+    updatedAt: bigint;
+    isPublic: boolean;
+    issuedAt: bigint;
+    issuedBy: Principal;
+    revokedAt?: bigint;
+}
 export interface Proposal {
     id: bigint;
     status: ProposalStatus;
@@ -139,6 +163,15 @@ export interface Proposal {
     sponsors: Array<Principal>;
     sponsorThreshold: bigint;
 }
+export interface DAOTokenTransaction {
+    id: bigint;
+    to: Principal;
+    from?: Principal;
+    note: string;
+    createdAt: bigint;
+    txType: DAOTokenTxType;
+    amount: bigint;
+}
 export interface RankedChoiceEntry {
     rank: bigint;
     candidateId: string;
@@ -151,14 +184,6 @@ export interface Notification {
     recipient: Principal;
     isRead: boolean;
     message: string;
-}
-export interface CommissionRate {
-    basisPoints: bigint;
-    tier: MembershipTierLevel;
-    flatAmountUnits: bigint;
-    isActive: boolean;
-    earningType: EarningType;
-    depthLevel: bigint;
 }
 export interface Organization {
     id: string;
@@ -187,6 +212,14 @@ export interface MemberTierRecord {
     upgradedAt: bigint;
     sponsorPrincipal?: Principal;
     sponsorCode?: string;
+}
+export interface CommissionRate {
+    basisPoints: bigint;
+    tier: MembershipTierLevel;
+    flatAmountUnits: bigint;
+    isActive: boolean;
+    earningType: EarningType;
+    depthLevel: bigint;
 }
 export interface Tenant {
     id: string;
@@ -354,6 +387,21 @@ export enum CampaignType {
     fundraiser = "fundraiser",
     petition = "petition"
 }
+export enum CredentialStatus {
+    active = "active",
+    revoked = "revoked",
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
+}
+export enum CredentialType {
+    verifiedHuman = "verifiedHuman",
+    orgRepresentative = "orgRepresentative",
+    eventAttendee = "eventAttendee",
+    expertiseBadge = "expertiseBadge",
+    custom = "custom",
+    activistCertification = "activistCertification"
+}
 export enum CrowdfundingCategory {
     research = "research",
     civic = "civic",
@@ -373,6 +421,13 @@ export enum CrowdfundingStatus {
     pending = "pending",
     funded = "funded",
     failed = "failed"
+}
+export enum DAOTokenTxType {
+    votingReward = "votingReward",
+    transferred = "transferred",
+    earned = "earned",
+    airdrop = "airdrop",
+    burned = "burned"
 }
 export enum EarningStatus {
     pending = "pending",
@@ -412,8 +467,10 @@ export enum MembershipTierLevel {
 export enum NotificationType {
     warning = "warning",
     info = "info",
+    credentialIssued = "credentialIssued",
     error = "error",
-    success = "success"
+    success = "success",
+    credentialApproved = "credentialApproved"
 }
 export enum OrgMemberRole {
     member = "member",
@@ -508,11 +565,30 @@ export interface backendInterface {
     addTransaction(walletAddress: string, amount: number, description: string, txType: TransactionType): Promise<void>;
     adminListAllCrowdfundingCampaigns(): Promise<Array<CrowdfundingCampaign>>;
     adminListCrowdfundingPledges(campaignId: string): Promise<Array<CrowdfundingPledge>>;
+    /**
+     * / Admin-only. Distributes IIINTL tokens to all MLM-initialized members based on their tier.
+     * / Sends a notification to each recipient.
+     */
+    airdropToAllMembers(): Promise<{
+        totalTokens: bigint;
+        airdropped: bigint;
+    }>;
+    approveCredential(credId: string): Promise<boolean>;
     approveCrowdfundingCampaign(campaignId: string): Promise<boolean>;
     archiveCampaign(id: string): Promise<boolean>;
     archiveOrg(orgId: string): Promise<boolean>;
     archiveThread(threadId: bigint): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    /**
+     * / Burns the caller's tokens. Reduces total supply. Awards 10 platform credits per token burned.
+     */
+    burnDAOTokens(amount: bigint): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     cancelProposal(proposalId: bigint): Promise<{
         __kind__: "ok";
         ok: string;
@@ -536,6 +612,17 @@ export interface backendInterface {
     checkAndExpireTrials(): Promise<{
         checked: bigint;
         expired: bigint;
+    }>;
+    /**
+     * / Awards 50 IIINTL voting reward tokens to a member who voted on a proposal.
+     * / Prevents double-claiming per proposal per member.
+     */
+    claimVotingReward(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
     }>;
     closeProposal(proposalId: bigint): Promise<{
         __kind__: "ok";
@@ -593,9 +680,26 @@ export interface backendInterface {
     getCampaignSupporterCount(campaignId: string): Promise<bigint | null>;
     getCommissionRate(tier: MembershipTierLevel, depthLevel: bigint, earningType: EarningType): Promise<CommissionRate | null>;
     getCommissionRates(): Promise<Array<CommissionRate>>;
+    getCredential(credId: string): Promise<Credential | null>;
     getCrowdfundingCampaign(campaignId: string): Promise<CrowdfundingCampaign | null>;
     getCrowdfundingConfig(): Promise<CrowdfundingConfig>;
     getCrowdfundingPledge(pledgeId: string): Promise<CrowdfundingPledge | null>;
+    /**
+     * / Returns platform-wide DAO token statistics. Public, no auth required.
+     */
+    getDAOTokenStats(): Promise<{
+        treasuryBalance: bigint;
+        totalHolders: bigint;
+        totalSupply: bigint;
+    }>;
+    /**
+     * / Returns all DAO transactions where the caller is sender or recipient.
+     */
+    getDAOTransactionHistory(): Promise<Array<DAOTokenTransaction>>;
+    /**
+     * / Returns the top 20 token holders by balance. Public, no auth required.
+     */
+    getDaoLeaderboard(): Promise<Array<DAOTokenRecord>>;
     /**
      * / Returns all tenants whose trial will expire within the next `daysFromNow` days,
      * / including any that are already past their trial end date but not yet suspended.
@@ -607,6 +711,11 @@ export interface backendInterface {
     getMemberEarnings(member: Principal): Promise<Array<EarningRecord>>;
     getMemberTierRecord(p: Principal): Promise<MemberTierRecord | null>;
     getMemberVote(proposalId: bigint, member: Principal): Promise<Vote | null>;
+    getMyCredentials(): Promise<Array<Credential>>;
+    /**
+     * / Returns the caller's DAO token record. Returns a zero-balance record if not yet initialized.
+     */
+    getMyDAOBalance(): Promise<DAOTokenRecord>;
     getMyDelegation(): Promise<DelegationRecord | null>;
     getMyDownline(): Promise<Array<DownlineMember>>;
     getMyEarnings(): Promise<Array<EarningRecord>>;
@@ -625,6 +734,16 @@ export interface backendInterface {
     getPreferredLanguage(): Promise<string>;
     getProposal(proposalId: bigint): Promise<Proposal | null>;
     getProposalComments(proposalId: bigint): Promise<Array<DebateComment>>;
+    /**
+     * / Returns all debate comments for a proposal.
+     * / No authentication required.
+     */
+    getProposalCommentsPublic(proposalId: bigint): Promise<Array<DebateComment>>;
+    /**
+     * / Returns a single proposal by ID if it is not in draft or cancelled state.
+     * / No authentication required.
+     */
+    getProposalPublic(proposalId: bigint): Promise<Proposal | null>;
     getProposalSponsors(proposalId: bigint): Promise<Array<Principal>>;
     getQuorumStatus(proposalId: bigint): Promise<{
         totalVoters: bigint;
@@ -650,11 +769,17 @@ export interface backendInterface {
     getUserOrgs(userId: string): Promise<Array<Organization>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getVoteTally(proposalId: bigint): Promise<VoteTally | null>;
+    /**
+     * / Returns the current vote tally for a proposal.
+     * / No authentication required.
+     */
+    getVoteTallyPublic(proposalId: bigint): Promise<VoteTally | null>;
     getVotesByProposal(proposalId: bigint): Promise<Array<Vote>>;
     getWalletBalance(address: string): Promise<number>;
     incrementThreadView(threadId: bigint): Promise<boolean>;
     initMemberMLM(sponsorCode: string | null): Promise<string>;
     isCallerAdmin(): Promise<boolean>;
+    issueCredential(subject: Principal, credType: CredentialType, title: string, description: string, metadata: string, expiresAt: bigint | null): Promise<string>;
     joinCampaign(campaignId: string): Promise<boolean>;
     joinOrg(orgId: string): Promise<boolean>;
     leaveCampaign(campaignId: string): Promise<boolean>;
@@ -663,6 +788,11 @@ export interface backendInterface {
     listActiveCampaigns(): Promise<Array<Campaign>>;
     listActiveOrgs(): Promise<Array<Organization>>;
     listActiveProposals(): Promise<Array<Proposal>>;
+    listAllCredentialsAdmin(): Promise<Array<Credential>>;
+    /**
+     * / Admin-only. Returns all DAO token records for admin oversight.
+     */
+    listAllDAOTokensAdmin(): Promise<Array<DAOTokenRecord>>;
     listAllMemberTiers(): Promise<Array<MemberTierRecord>>;
     listBillingHistory(tenantId: string): Promise<Array<BillingRecord>>;
     listCampaigns(): Promise<Array<Campaign>>;
@@ -674,6 +804,12 @@ export interface backendInterface {
     listProposals(): Promise<Array<Proposal>>;
     listProposalsByStatus(status: ProposalStatus): Promise<Array<Proposal>>;
     listProposalsByType(proposalType: ProposalType): Promise<Array<Proposal>>;
+    /**
+     * / Returns all non-draft, non-cancelled proposals visible to the public feed.
+     * / No authentication required.
+     */
+    listProposalsPublic(): Promise<Array<Proposal>>;
+    listPublicCredentialsByType(credType: CredentialType): Promise<Array<Credential>>;
     listRoyaltyPools(): Promise<Array<RoyaltyPool>>;
     listTenantMembers(tenantId: string): Promise<Array<TenantMember>>;
     listTenants(): Promise<Array<Tenant>>;
@@ -699,10 +835,12 @@ export interface backendInterface {
     redeemFSU(amount: bigint, description: string): Promise<boolean>;
     refundPledge(pledgeId: string): Promise<boolean>;
     registerUser(displayName: string, email: string): Promise<string>;
+    rejectCredential(credId: string): Promise<boolean>;
     rejectCrowdfundingCampaign(campaignId: string): Promise<boolean>;
     removeTenantMember(tenantId: string, member: Principal): Promise<boolean>;
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     resolveReferralCode(code: string): Promise<Principal | null>;
+    revokeCredential(credId: string): Promise<boolean>;
     revokeDelegation(proposalId: bigint | null): Promise<{
         __kind__: "ok";
         ok: string;
@@ -730,6 +868,17 @@ export interface backendInterface {
         err: string;
     }>;
     suspendTenant(tenantId: string): Promise<boolean>;
+    toggleCredentialPublic(credId: string, isPublic: boolean): Promise<boolean>;
+    /**
+     * / Peer-to-peer token transfer between members.
+     */
+    transferDAOTokens(to: Principal, amount: bigint, note: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
     updateCrowdfundingCampaign(campaignId: string, title: string, description: string, coverImageUrl: string): Promise<boolean>;

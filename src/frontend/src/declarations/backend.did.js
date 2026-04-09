@@ -189,10 +189,65 @@ export const CommissionRate = IDL.Record({
   'earningType' : EarningType,
   'depthLevel' : IDL.Nat,
 });
+export const CredentialStatus = IDL.Variant({
+  'active' : IDL.Null,
+  'revoked' : IDL.Null,
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const CredentialType = IDL.Variant({
+  'verifiedHuman' : IDL.Null,
+  'orgRepresentative' : IDL.Null,
+  'eventAttendee' : IDL.Null,
+  'expertiseBadge' : IDL.Null,
+  'custom' : IDL.Null,
+  'activistCertification' : IDL.Null,
+});
+export const Credential = IDL.Record({
+  'id' : IDL.Text,
+  'status' : CredentialStatus,
+  'title' : IDL.Text,
+  'expiresAt' : IDL.Opt(IDL.Int),
+  'subject' : IDL.Principal,
+  'metadata' : IDL.Text,
+  'approvedAt' : IDL.Opt(IDL.Int),
+  'credentialType' : CredentialType,
+  'description' : IDL.Text,
+  'updatedAt' : IDL.Int,
+  'isPublic' : IDL.Bool,
+  'issuedAt' : IDL.Int,
+  'issuedBy' : IDL.Principal,
+  'revokedAt' : IDL.Opt(IDL.Int),
+});
 export const CrowdfundingConfig = IDL.Record({
   'defaultFSUContributionBps' : IDL.Nat,
   'milestoneAchievementBonusBps' : IDL.Nat,
   'creatorFSUBonus' : IDL.Nat,
+});
+export const DAOTokenTxType = IDL.Variant({
+  'votingReward' : IDL.Null,
+  'transferred' : IDL.Null,
+  'earned' : IDL.Null,
+  'airdrop' : IDL.Null,
+  'burned' : IDL.Null,
+});
+export const DAOTokenTransaction = IDL.Record({
+  'id' : IDL.Nat,
+  'to' : IDL.Principal,
+  'from' : IDL.Opt(IDL.Principal),
+  'note' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'txType' : DAOTokenTxType,
+  'amount' : IDL.Nat,
+});
+export const DAOTokenRecord = IDL.Record({
+  'principal' : IDL.Principal,
+  'balance' : IDL.Nat,
+  'createdAt' : IDL.Int,
+  'totalEarned' : IDL.Nat,
+  'totalBurned' : IDL.Nat,
+  'lastAirdropAt' : IDL.Opt(IDL.Int),
 });
 export const TenantStatus = IDL.Variant({
   'trial' : IDL.Null,
@@ -327,8 +382,10 @@ export const FSUTransaction = IDL.Record({
 export const NotificationType = IDL.Variant({
   'warning' : IDL.Null,
   'info' : IDL.Null,
+  'credentialIssued' : IDL.Null,
   'error' : IDL.Null,
   'success' : IDL.Null,
+  'credentialApproved' : IDL.Null,
 });
 export const Notification = IDL.Record({
   'id' : IDL.Text,
@@ -529,11 +586,22 @@ export const idlService = IDL.Service({
       [IDL.Vec(CrowdfundingPledge)],
       ['query'],
     ),
+  'airdropToAllMembers' : IDL.Func(
+      [],
+      [IDL.Record({ 'totalTokens' : IDL.Nat, 'airdropped' : IDL.Nat })],
+      [],
+    ),
+  'approveCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'approveCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'burnDAOTokens' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      [],
+    ),
   'cancelProposal' : IDL.Func(
       [IDL.Nat],
       [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -548,6 +616,11 @@ export const idlService = IDL.Service({
   'checkAndExpireTrials' : IDL.Func(
       [],
       [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+      [],
+    ),
+  'claimVotingReward' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
       [],
     ),
   'closeProposal' : IDL.Func(
@@ -664,6 +737,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getCommissionRates' : IDL.Func([], [IDL.Vec(CommissionRate)], ['query']),
+  'getCredential' : IDL.Func([IDL.Text], [IDL.Opt(Credential)], ['query']),
   'getCrowdfundingCampaign' : IDL.Func(
       [IDL.Text],
       [IDL.Opt(CrowdfundingCampaign)],
@@ -675,6 +749,23 @@ export const idlService = IDL.Service({
       [IDL.Opt(CrowdfundingPledge)],
       ['query'],
     ),
+  'getDAOTokenStats' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'treasuryBalance' : IDL.Nat,
+          'totalHolders' : IDL.Nat,
+          'totalSupply' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
+  'getDAOTransactionHistory' : IDL.Func(
+      [],
+      [IDL.Vec(DAOTokenTransaction)],
+      ['query'],
+    ),
+  'getDaoLeaderboard' : IDL.Func([], [IDL.Vec(DAOTokenRecord)], ['query']),
   'getExpiringTrials' : IDL.Func([IDL.Nat], [IDL.Vec(Tenant)], ['query']),
   'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
   'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
@@ -693,6 +784,8 @@ export const idlService = IDL.Service({
       [IDL.Opt(Vote)],
       ['query'],
     ),
+  'getMyCredentials' : IDL.Func([], [IDL.Vec(Credential)], ['query']),
+  'getMyDAOBalance' : IDL.Func([], [DAOTokenRecord], ['query']),
   'getMyDelegation' : IDL.Func([], [IDL.Opt(DelegationRecord)], ['query']),
   'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
   'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
@@ -719,6 +812,12 @@ export const idlService = IDL.Service({
       [IDL.Vec(DebateComment)],
       ['query'],
     ),
+  'getProposalCommentsPublic' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(DebateComment)],
+      ['query'],
+    ),
+  'getProposalPublic' : IDL.Func([IDL.Nat], [IDL.Opt(Proposal)], ['query']),
   'getProposalSponsors' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(IDL.Principal)],
@@ -763,11 +862,24 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getVoteTally' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
+  'getVoteTallyPublic' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
   'getVotesByProposal' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
   'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'issueCredential' : IDL.Func(
+      [
+        IDL.Principal,
+        CredentialType,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Opt(IDL.Int),
+      ],
+      [IDL.Text],
+      [],
+    ),
   'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
@@ -776,6 +888,8 @@ export const idlService = IDL.Service({
   'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
   'listActiveProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+  'listAllCredentialsAdmin' : IDL.Func([], [IDL.Vec(Credential)], ['query']),
+  'listAllDAOTokensAdmin' : IDL.Func([], [IDL.Vec(DAOTokenRecord)], ['query']),
   'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
   'listBillingHistory' : IDL.Func(
       [IDL.Text],
@@ -809,6 +923,12 @@ export const idlService = IDL.Service({
   'listProposalsByType' : IDL.Func(
       [ProposalType],
       [IDL.Vec(Proposal)],
+      ['query'],
+    ),
+  'listProposalsPublic' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+  'listPublicCredentialsByType' : IDL.Func(
+      [CredentialType],
+      [IDL.Vec(Credential)],
       ['query'],
     ),
   'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
@@ -854,6 +974,7 @@ export const idlService = IDL.Service({
   'redeemFSU' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
   'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+  'rejectCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'removeTenantMember' : IDL.Func([IDL.Text, IDL.Principal], [IDL.Bool], []),
   'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
@@ -862,6 +983,7 @@ export const idlService = IDL.Service({
       [IDL.Opt(IDL.Principal)],
       ['query'],
     ),
+  'revokeCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'revokeDelegation' : IDL.Func(
       [IDL.Opt(IDL.Nat)],
       [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -888,6 +1010,12 @@ export const idlService = IDL.Service({
       [],
     ),
   'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'toggleCredentialPublic' : IDL.Func([IDL.Text, IDL.Bool], [IDL.Bool], []),
+  'transferDAOTokens' : IDL.Func(
+      [IDL.Principal, IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      [],
+    ),
   'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
       [
@@ -1110,10 +1238,65 @@ export const idlFactory = ({ IDL }) => {
     'earningType' : EarningType,
     'depthLevel' : IDL.Nat,
   });
+  const CredentialStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'revoked' : IDL.Null,
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const CredentialType = IDL.Variant({
+    'verifiedHuman' : IDL.Null,
+    'orgRepresentative' : IDL.Null,
+    'eventAttendee' : IDL.Null,
+    'expertiseBadge' : IDL.Null,
+    'custom' : IDL.Null,
+    'activistCertification' : IDL.Null,
+  });
+  const Credential = IDL.Record({
+    'id' : IDL.Text,
+    'status' : CredentialStatus,
+    'title' : IDL.Text,
+    'expiresAt' : IDL.Opt(IDL.Int),
+    'subject' : IDL.Principal,
+    'metadata' : IDL.Text,
+    'approvedAt' : IDL.Opt(IDL.Int),
+    'credentialType' : CredentialType,
+    'description' : IDL.Text,
+    'updatedAt' : IDL.Int,
+    'isPublic' : IDL.Bool,
+    'issuedAt' : IDL.Int,
+    'issuedBy' : IDL.Principal,
+    'revokedAt' : IDL.Opt(IDL.Int),
+  });
   const CrowdfundingConfig = IDL.Record({
     'defaultFSUContributionBps' : IDL.Nat,
     'milestoneAchievementBonusBps' : IDL.Nat,
     'creatorFSUBonus' : IDL.Nat,
+  });
+  const DAOTokenTxType = IDL.Variant({
+    'votingReward' : IDL.Null,
+    'transferred' : IDL.Null,
+    'earned' : IDL.Null,
+    'airdrop' : IDL.Null,
+    'burned' : IDL.Null,
+  });
+  const DAOTokenTransaction = IDL.Record({
+    'id' : IDL.Nat,
+    'to' : IDL.Principal,
+    'from' : IDL.Opt(IDL.Principal),
+    'note' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'txType' : DAOTokenTxType,
+    'amount' : IDL.Nat,
+  });
+  const DAOTokenRecord = IDL.Record({
+    'principal' : IDL.Principal,
+    'balance' : IDL.Nat,
+    'createdAt' : IDL.Int,
+    'totalEarned' : IDL.Nat,
+    'totalBurned' : IDL.Nat,
+    'lastAirdropAt' : IDL.Opt(IDL.Int),
   });
   const TenantStatus = IDL.Variant({
     'trial' : IDL.Null,
@@ -1248,8 +1431,10 @@ export const idlFactory = ({ IDL }) => {
   const NotificationType = IDL.Variant({
     'warning' : IDL.Null,
     'info' : IDL.Null,
+    'credentialIssued' : IDL.Null,
     'error' : IDL.Null,
     'success' : IDL.Null,
+    'credentialApproved' : IDL.Null,
   });
   const Notification = IDL.Record({
     'id' : IDL.Text,
@@ -1447,11 +1632,22 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(CrowdfundingPledge)],
         ['query'],
       ),
+    'airdropToAllMembers' : IDL.Func(
+        [],
+        [IDL.Record({ 'totalTokens' : IDL.Nat, 'airdropped' : IDL.Nat })],
+        [],
+      ),
+    'approveCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'approveCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'burnDAOTokens' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        [],
+      ),
     'cancelProposal' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -1466,6 +1662,11 @@ export const idlFactory = ({ IDL }) => {
     'checkAndExpireTrials' : IDL.Func(
         [],
         [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+        [],
+      ),
+    'claimVotingReward' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
         [],
       ),
     'closeProposal' : IDL.Func(
@@ -1588,6 +1789,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getCommissionRates' : IDL.Func([], [IDL.Vec(CommissionRate)], ['query']),
+    'getCredential' : IDL.Func([IDL.Text], [IDL.Opt(Credential)], ['query']),
     'getCrowdfundingCampaign' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(CrowdfundingCampaign)],
@@ -1599,6 +1801,23 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(CrowdfundingPledge)],
         ['query'],
       ),
+    'getDAOTokenStats' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'treasuryBalance' : IDL.Nat,
+            'totalHolders' : IDL.Nat,
+            'totalSupply' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
+    'getDAOTransactionHistory' : IDL.Func(
+        [],
+        [IDL.Vec(DAOTokenTransaction)],
+        ['query'],
+      ),
+    'getDaoLeaderboard' : IDL.Func([], [IDL.Vec(DAOTokenRecord)], ['query']),
     'getExpiringTrials' : IDL.Func([IDL.Nat], [IDL.Vec(Tenant)], ['query']),
     'getFSUPoolStatus' : IDL.Func([], [FSUPoolStatus], ['query']),
     'getLinkedWallets' : IDL.Func([], [IDL.Vec(Wallet)], ['query']),
@@ -1617,6 +1836,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(Vote)],
         ['query'],
       ),
+    'getMyCredentials' : IDL.Func([], [IDL.Vec(Credential)], ['query']),
+    'getMyDAOBalance' : IDL.Func([], [DAOTokenRecord], ['query']),
     'getMyDelegation' : IDL.Func([], [IDL.Opt(DelegationRecord)], ['query']),
     'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
     'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
@@ -1643,6 +1864,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(DebateComment)],
         ['query'],
       ),
+    'getProposalCommentsPublic' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(DebateComment)],
+        ['query'],
+      ),
+    'getProposalPublic' : IDL.Func([IDL.Nat], [IDL.Opt(Proposal)], ['query']),
     'getProposalSponsors' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(IDL.Principal)],
@@ -1687,11 +1914,24 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getVoteTally' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
+    'getVoteTallyPublic' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
     'getVotesByProposal' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
     'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'issueCredential' : IDL.Func(
+        [
+          IDL.Principal,
+          CredentialType,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Opt(IDL.Int),
+        ],
+        [IDL.Text],
+        [],
+      ),
     'joinCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'joinOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'leaveCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
@@ -1700,6 +1940,12 @@ export const idlFactory = ({ IDL }) => {
     'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
     'listActiveProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+    'listAllCredentialsAdmin' : IDL.Func([], [IDL.Vec(Credential)], ['query']),
+    'listAllDAOTokensAdmin' : IDL.Func(
+        [],
+        [IDL.Vec(DAOTokenRecord)],
+        ['query'],
+      ),
     'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
     'listBillingHistory' : IDL.Func(
         [IDL.Text],
@@ -1733,6 +1979,12 @@ export const idlFactory = ({ IDL }) => {
     'listProposalsByType' : IDL.Func(
         [ProposalType],
         [IDL.Vec(Proposal)],
+        ['query'],
+      ),
+    'listProposalsPublic' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+    'listPublicCredentialsByType' : IDL.Func(
+        [CredentialType],
+        [IDL.Vec(Credential)],
         ['query'],
       ),
     'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
@@ -1782,6 +2034,7 @@ export const idlFactory = ({ IDL }) => {
     'redeemFSU' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
     'refundPledge' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'registerUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'rejectCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'rejectCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'removeTenantMember' : IDL.Func([IDL.Text, IDL.Principal], [IDL.Bool], []),
     'replyToThread' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Nat], []),
@@ -1790,6 +2043,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Principal)],
         ['query'],
       ),
+    'revokeCredential' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'revokeDelegation' : IDL.Func(
         [IDL.Opt(IDL.Nat)],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -1816,6 +2070,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'toggleCredentialPublic' : IDL.Func([IDL.Text, IDL.Bool], [IDL.Bool], []),
+    'transferDAOTokens' : IDL.Func(
+        [IDL.Principal, IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        [],
+      ),
     'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
         [

@@ -15,9 +15,12 @@ import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
 import { CampaignHubPage } from "@/pages/CampaignHubPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
 import { CartPage } from "@/pages/CartPage";
+import { CredentialVerifyPage } from "@/pages/CredentialVerifyPage";
+import { CredentialsPage } from "@/pages/CredentialsPage";
 import { CrowdfundingCreatePage } from "@/pages/CrowdfundingCreatePage";
 import { CrowdfundingDetailPage } from "@/pages/CrowdfundingDetailPage";
 import { CrowdfundingPage } from "@/pages/CrowdfundingPage";
+import { DAOPage } from "@/pages/DAOPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { DocsPage } from "@/pages/DocsPage";
 import { EventDetailPage } from "@/pages/EventDetailPage";
@@ -29,6 +32,7 @@ import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MLMPage } from "@/pages/MLMPage";
 import { MembersPage } from "@/pages/MembersPage";
+import { MyCredentialsPage } from "@/pages/MyCredentialsPage";
 import { MyTicketsPage } from "@/pages/MyTicketsPage";
 import { OrganizationDetailPage } from "@/pages/OrganizationDetailPage";
 import { OrganizationsPage } from "@/pages/OrganizationsPage";
@@ -398,15 +402,34 @@ const termsRoute = createRoute({
   component: TermsOfServicePage,
 });
 
+// ── Identity / Credentials routes ──
+const credentialsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/credentials",
+  component: CredentialsPage,
+});
+
+const credentialVerifyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/credentials/$id/verify",
+  component: CredentialVerifyPage,
+});
+
+const myCredentialsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/my-credentials",
+  component: () => (
+    <ProtectedRoute>
+      <MyCredentialsPage />
+    </ProtectedRoute>
+  ),
+});
+
 // ── Governance routes ──
 const proposalsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/proposals",
-  component: () => (
-    <ProtectedRoute>
-      <ProposalsPage />
-    </ProtectedRoute>
-  ),
+  component: ProposalsPage,
 });
 
 const proposalCreateRoute = createRoute({
@@ -422,11 +445,7 @@ const proposalCreateRoute = createRoute({
 const proposalDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/proposals/$id",
-  component: () => (
-    <ProtectedRoute>
-      <ProposalDetailPage />
-    </ProtectedRoute>
-  ),
+  component: ProposalDetailPage,
 });
 
 const voteRoute = createRoute({
@@ -435,6 +454,16 @@ const voteRoute = createRoute({
   component: () => (
     <ProtectedRoute>
       <VotePage />
+    </ProtectedRoute>
+  ),
+});
+
+const daoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dao",
+  component: () => (
+    <ProtectedRoute>
+      <DAOPage />
     </ProtectedRoute>
   ),
 });
@@ -480,6 +509,10 @@ const routeTree = rootRoute.addChildren([
   proposalCreateRoute,
   proposalDetailRoute,
   voteRoute,
+  daoRoute,
+  credentialsRoute,
+  credentialVerifyRoute,
+  myCredentialsRoute,
 ]);
 
 // ── Router ──

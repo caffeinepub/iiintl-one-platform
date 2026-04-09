@@ -10,9 +10,11 @@ import Float "mo:core/Float";
 import Principal "mo:core/Principal";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
+import Migration "migration";
 
 
 
+(with migration = Migration.run)
 actor {
   // Initialize the access control system
   let accessControlState = AccessControl.initState();
@@ -2426,6 +2428,8 @@ actor {
     #warning;
     #success;
     #error;
+    #credentialIssued;
+    #credentialApproved;
   };
 
   public type Notification = {
@@ -3421,6 +3425,546 @@ actor {
         case (?closesAt) { now < closesAt };
       };
     }).toArray();
+  };
+
+  // === Public (unauthenticated) Proposal Feed ===
+
+  /// Returns all non-draft, non-cancelled proposals visible to the public feed.
+  /// No authentication required.
+  public query func listProposalsPublic() : async [Proposal] {
+    let result = proposals.values().filter(func(p : Proposal) : Bool {
+      p.status != #draft and p.status != #cancelled
+    }).toArray();
+    result.sort(func(a : Proposal, b : Proposal) : { #less; #equal; #greater } {
+      Int.compare(b.createdAt, a.createdAt)
+    });
+  };
+
+  /// Returns a single proposal by ID if it is not in draft or cancelled state.
+  /// No authentication required.
+  public query func getProposalPublic(proposalId : Nat) : async ?Proposal {
+    switch (proposals.get(proposalId)) {
+      case (null) { null };
+      case (?p) {
+        if (p.status == #draft or p.status == #cancelled) { null }
+        else { ?p };
+      };
+    };
+  };
+
+  /// Returns all debate comments for a proposal.
+  /// No authentication required.
+  public query func getProposalCommentsPublic(proposalId : Nat) : async [DebateComment] {
+    let ids = switch (proposalCommentIndex.get(proposalId)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    let allComments = ids.filterMap(func(id : Nat) : ?DebateComment { debateComments.get(id) });
+    let active = allComments.filter(func(c : DebateComment) : Bool { not c.isDeleted });
+    active.sort(func(a : DebateComment, b : DebateComment) : { #less; #equal; #greater } {
+      Int.compare(a.createdAt, b.createdAt)
+    });
+  };
+
+  /// Returns the current vote tally for a proposal.
+  /// No authentication required.
+  public query func getVoteTallyPublic(proposalId : Nat) : async ?VoteTally {
+    _computeTally(proposalId);
+  };
+
+  // =========================================================================
+  // === DAO GOVERNANCE TOKEN MODULE =========================================
+  // =========================================================================
+
+  // --- DAO Token Types ---
+
+  public type DAOTokenTxType = {
+    #airdrop;
+    #earned;
+    #transferred;
+    #burned;
+    #votingReward;
+  };
+
+  public type DAOTokenRecord = {
+    principal : Principal;
+    balance : Nat;
+    totalEarned : Nat;
+    totalBurned : Nat;
+    lastAirdropAt : ?Int;
+    createdAt : Int;
+  };
+
+  public type DAOTokenTransaction = {
+    id : Nat;
+    txType : DAOTokenTxType;
+    from : ?Principal;
+    to : Principal;
+    amount : Nat;
+    note : Text;
+    createdAt : Int;
+  };
+
+  // --- DAO Token Storage ---
+
+  let daoTokenLedger = Map.empty<Principal, DAOTokenRecord>();
+  let daoTokenTransactions = Map.empty<Nat, DAOTokenTransaction>();
+  // claimedVotingRewards key: principalText # ":" # proposalIdText
+  let claimedVotingRewards = Map.empty<Text, Bool>();
+  var daoTotalSupply : Nat = 0;
+  var daoTreasuryBalance : Nat = 0;
+  var nextDaoTxId : Nat = 1;
+
+  // --- DAO Token Private Helpers ---
+
+  private func _ensureDAORecord(p : Principal) : DAOTokenRecord {
+    switch (daoTokenLedger.get(p)) {
+      case (?rec) { rec };
+      case (null) {
+        let rec : DAOTokenRecord = {
+          principal = p;
+          balance = 0;
+          totalEarned = 0;
+          totalBurned = 0;
+          lastAirdropAt = null;
+          createdAt = Time.now();
+        };
+        daoTokenLedger.add(p, rec);
+        rec;
+      };
+    };
+  };
+
+  private func _recordDaoTx(txType : DAOTokenTxType, from : ?Principal, to : Principal, amount : Nat, note : Text) : Nat {
+    let txId = nextDaoTxId;
+    nextDaoTxId += 1;
+    let tx : DAOTokenTransaction = {
+      id = txId;
+      txType;
+      from;
+      to;
+      amount;
+      note;
+      createdAt = Time.now();
+    };
+    daoTokenTransactions.add(txId, tx);
+    txId;
+  };
+
+  /// Private helper for reward distribution — called by voting and participation hooks.
+  private func earnDAOTokens(recipient : Principal, amount : Nat, note : Text, txType : DAOTokenTxType) {
+    let rec = _ensureDAORecord(recipient);
+    daoTokenLedger.add(recipient, {
+      rec with
+      balance = rec.balance + amount;
+      totalEarned = rec.totalEarned + amount;
+    });
+    daoTotalSupply += amount;
+    ignore _recordDaoTx(txType, null, recipient, amount, note);
+  };
+
+  private func _airdropAmountForTier(tier : MembershipTierLevel) : Nat {
+    switch (tier) {
+      case (#founder)    { 10000 };
+      case (#ambassador) { 5000  };
+      case (#executive)  { 2000  };
+      case (#partner)    { 2000  };
+      case (#affiliate)  { 1000  };
+      case (#associate)  { 200   };
+      case (#free)       { 100   };
+    };
+  };
+
+  // --- DAO Token Public Functions ---
+
+  /// Returns the caller's DAO token record. Returns a zero-balance record if not yet initialized.
+  public query ({ caller }) func getMyDAOBalance() : async DAOTokenRecord {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can view DAO balance");
+    };
+    switch (daoTokenLedger.get(caller)) {
+      case (?rec) { rec };
+      case (null) {
+        {
+          principal = caller;
+          balance = 0;
+          totalEarned = 0;
+          totalBurned = 0;
+          lastAirdropAt = null;
+          createdAt = Time.now();
+        };
+      };
+    };
+  };
+
+  /// Returns platform-wide DAO token statistics. Public, no auth required.
+  public query func getDAOTokenStats() : async {
+    totalSupply : Nat;
+    treasuryBalance : Nat;
+    totalHolders : Nat;
+  } {
+    {
+      totalSupply = daoTotalSupply;
+      treasuryBalance = daoTreasuryBalance;
+      totalHolders = daoTokenLedger.size();
+    };
+  };
+
+  /// Peer-to-peer token transfer between members.
+  public shared ({ caller }) func transferDAOTokens(to : Principal, amount : Nat, note : Text) : async { #ok : Nat; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can transfer tokens");
+    };
+    if (caller == to) {
+      return #err("Cannot transfer tokens to yourself");
+    };
+    if (amount == 0) {
+      return #err("Transfer amount must be greater than zero");
+    };
+    let senderRec = _ensureDAORecord(caller);
+    if (senderRec.balance < amount) {
+      return #err("Insufficient DAO token balance");
+    };
+    // Debit sender
+    daoTokenLedger.add(caller, { senderRec with balance = Nat.sub(senderRec.balance, amount) });
+    // Credit recipient
+    let recipientRec = _ensureDAORecord(to);
+    daoTokenLedger.add(to, {
+      recipientRec with
+      balance = recipientRec.balance + amount;
+      totalEarned = recipientRec.totalEarned + amount;
+    });
+    let txId = _recordDaoTx(#transferred, ?caller, to, amount, note);
+    #ok(txId);
+  };
+
+  /// Burns the caller's tokens. Reduces total supply. Awards 10 platform credits per token burned.
+  public shared ({ caller }) func burnDAOTokens(amount : Nat) : async { #ok : Nat; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can burn tokens");
+    };
+    if (amount == 0) {
+      return #err("Burn amount must be greater than zero");
+    };
+    let rec = _ensureDAORecord(caller);
+    if (rec.balance < amount) {
+      return #err("Insufficient DAO token balance");
+    };
+    daoTokenLedger.add(caller, {
+      rec with
+      balance = Nat.sub(rec.balance, amount);
+      totalBurned = rec.totalBurned + amount;
+    });
+    daoTotalSupply := Nat.sub(daoTotalSupply, amount);
+    let txId = _recordDaoTx(#burned, ?caller, caller, amount, "Burned for platform credits");
+    // Platform credits: 1 IIINTL = 10 credits — record as activity bonus in MLM
+    let platformCredits = amount * 10;
+    ignore _recordEarning(caller, platformCredits, #activityBonus, "DAO token burn: " # amount.toText() # " IIINTL -> " # platformCredits.toText() # " credits", "dao-burn");
+    #ok(txId);
+  };
+
+  /// Returns all DAO transactions where the caller is sender or recipient.
+  public query ({ caller }) func getDAOTransactionHistory() : async [DAOTokenTransaction] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can view DAO transaction history");
+    };
+    daoTokenTransactions.values().filter(func(tx : DAOTokenTransaction) : Bool {
+      let isSender = switch (tx.from) {
+        case (null) { false };
+        case (?f) { f == caller };
+      };
+      let isRecipient = tx.to == caller;
+      isSender or isRecipient;
+    }).toArray();
+  };
+
+  /// Returns the top 20 token holders by balance. Public, no auth required.
+  public query func getDaoLeaderboard() : async [DAOTokenRecord] {
+    let all = daoTokenLedger.values().toArray();
+    let sorted = all.sort(func(a : DAOTokenRecord, b : DAOTokenRecord) : { #less; #equal; #greater } {
+      Nat.compare(b.balance, a.balance)
+    });
+    if (sorted.size() <= 20) { sorted }
+    else { sorted.sliceToArray(0, 20) };
+  };
+
+  /// Admin-only. Distributes IIINTL tokens to all MLM-initialized members based on their tier.
+  /// Sends a notification to each recipient.
+  public shared ({ caller }) func airdropToAllMembers() : async { airdropped : Nat; totalTokens : Nat } {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    let now = Time.now();
+    var airdropped = 0;
+    var totalTokens = 0;
+    for ((_p, tierRec) in memberTiers.entries()) {
+      let amount = _airdropAmountForTier(tierRec.tier);
+      if (amount > 0) {
+        let rec = _ensureDAORecord(tierRec.principal);
+        daoTokenLedger.add(tierRec.principal, {
+          rec with
+          balance = rec.balance + amount;
+          totalEarned = rec.totalEarned + amount;
+          lastAirdropAt = ?now;
+        });
+        daoTotalSupply += amount;
+        ignore _recordDaoTx(#airdrop, null, tierRec.principal, amount, "DAO governance token airdrop");
+        _createNotification(
+          tierRec.principal,
+          "IIINTL Token Airdrop Received",
+          "You received " # amount.toText() # " IIINTL governance tokens based on your " # debug_show(tierRec.tier) # " membership tier.",
+          #success,
+        );
+        airdropped += 1;
+        totalTokens += amount;
+      };
+    };
+    { airdropped; totalTokens };
+  };
+
+  /// Awards 50 IIINTL voting reward tokens to a member who voted on a proposal.
+  /// Prevents double-claiming per proposal per member.
+  public shared ({ caller }) func claimVotingReward(proposalId : Nat) : async { #ok : Nat; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can claim voting rewards");
+    };
+    let rewardKey = caller.toText() # ":" # proposalId.toText();
+    if (claimedVotingRewards.containsKey(rewardKey)) {
+      return #err("Voting reward already claimed for this proposal");
+    };
+    // Verify the caller actually voted on this proposal
+    let memberVoteIds = switch (memberVoteIndex.get(caller)) {
+      case (null) { return #err("You did not vote on this proposal") };
+      case (?ids) { ids };
+    };
+    let proposalVoteIds = switch (proposalVoteIndex.get(proposalId)) {
+      case (null) { return #err("Proposal not found or has no votes") };
+      case (?ids) { ids };
+    };
+    let didVote = memberVoteIds.find(func(vid : Nat) : Bool {
+      proposalVoteIds.find(func(pvid : Nat) : Bool { pvid == vid }) != null
+    });
+    if (didVote == null) {
+      return #err("You did not vote on this proposal");
+    };
+    // Mark as claimed
+    claimedVotingRewards.add(rewardKey, true);
+    // Award 50 IIINTL tokens
+    let rewardAmount : Nat = 50;
+    earnDAOTokens(caller, rewardAmount, "Voting reward for proposal #" # proposalId.toText(), #votingReward);
+    _createNotification(
+      caller,
+      "Voting Reward Claimed",
+      "You earned " # rewardAmount.toText() # " IIINTL tokens for participating in proposal #" # proposalId.toText() # ".",
+      #success,
+    );
+    let txId = nextDaoTxId - 1;
+    #ok(txId);
+  };
+
+  /// Admin-only. Returns all DAO token records for admin oversight.
+  public query ({ caller }) func listAllDAOTokensAdmin() : async [DAOTokenRecord] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    daoTokenLedger.values().toArray();
+  };
+
+  // =========================================================================
+  // === DECENTRALIZED IDENTITY & VERIFIED CREDENTIALS MODULE ================
+  // =========================================================================
+
+  public type CredentialType = {
+    #verifiedHuman;
+    #orgRepresentative;
+    #expertiseBadge;
+    #eventAttendee;
+    #activistCertification;
+    #custom;
+  };
+
+  public type CredentialStatus = {
+    #pending;
+    #approved;
+    #active;
+    #revoked;
+    #rejected;
+  };
+
+  public type Credential = {
+    id : Text;
+    credentialType : CredentialType;
+    status : CredentialStatus;
+    subject : Principal;
+    issuedBy : Principal;
+    title : Text;
+    description : Text;
+    metadata : Text;
+    isPublic : Bool;
+    issuedAt : Int;
+    approvedAt : ?Int;
+    expiresAt : ?Int;
+    revokedAt : ?Int;
+    updatedAt : Int;
+  };
+
+  // Credentials storage
+  let credentials = Map.empty<Text, Credential>();
+  let credentialsBySubject = Map.empty<Principal, [Text]>();
+  var nextCredentialCounter : Nat = 1;
+
+  // Private helper: generate a unique credential ID
+  private func _generateCredentialId() : Text {
+    let id = "CRED-" # Time.now().toText() # "-" # nextCredentialCounter.toText();
+    nextCredentialCounter += 1;
+    id;
+  };
+
+  // Admin only: issue a new credential (creates in #pending status)
+  public shared ({ caller }) func issueCredential(
+    subject : Principal,
+    credType : CredentialType,
+    title : Text,
+    description : Text,
+    metadata : Text,
+    expiresAt : ?Int,
+  ) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Admin only");
+    };
+    let credId = _generateCredentialId();
+    let now = Time.now();
+    let cred : Credential = {
+      id = credId;
+      credentialType = credType;
+      status = #pending;
+      subject;
+      issuedBy = caller;
+      title;
+      description;
+      metadata;
+      isPublic = false;
+      issuedAt = now;
+      approvedAt = null;
+      expiresAt;
+      revokedAt = null;
+      updatedAt = now;
+    };
+    credentials.add(credId, cred);
+    // Index by subject
+    let existing = switch (credentialsBySubject.get(subject)) {
+      case (null) { [] };
+      case (?ids) { ids };
+    };
+    credentialsBySubject.add(subject, existing.concat([credId]));
+    // Notify the subject
+    _createNotification(
+      subject,
+      "New Credential Issued",
+      "A new credential has been issued to you: " # title # ". Pending admin approval.",
+      #credentialIssued,
+    );
+    credId;
+  };
+
+  // Admin only: approve a pending credential → sets status to #active
+  public shared ({ caller }) func approveCredential(credId : Text) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Admin only");
+    };
+    switch (credentials.get(credId)) {
+      case (null) { Runtime.trap("Credential not found") };
+      case (?cred) {
+        if (cred.status != #pending) {
+          Runtime.trap("Credential is not in pending status");
+        };
+        let now = Time.now();
+        credentials.add(credId, { cred with status = #active; approvedAt = ?now; updatedAt = now });
+        _createNotification(
+          cred.subject,
+          "Credential Approved",
+          "Your credential has been approved and is now active: " # cred.title,
+          #credentialApproved,
+        );
+        true;
+      };
+    };
+  };
+
+  // Admin only: revoke an active credential
+  public shared ({ caller }) func revokeCredential(credId : Text) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Admin only");
+    };
+    switch (credentials.get(credId)) {
+      case (null) { Runtime.trap("Credential not found") };
+      case (?cred) {
+        let now = Time.now();
+        credentials.add(credId, { cred with status = #revoked; revokedAt = ?now; updatedAt = now });
+        true;
+      };
+    };
+  };
+
+  // Admin only: reject a pending credential
+  public shared ({ caller }) func rejectCredential(credId : Text) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Admin only");
+    };
+    switch (credentials.get(credId)) {
+      case (null) { Runtime.trap("Credential not found") };
+      case (?cred) {
+        let now = Time.now();
+        credentials.add(credId, { cred with status = #rejected; updatedAt = now });
+        true;
+      };
+    };
+  };
+
+  // Authenticated: subject toggles public/private visibility of their own credential
+  public shared ({ caller }) func toggleCredentialPublic(credId : Text, isPublic : Bool) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Must be logged in");
+    };
+    switch (credentials.get(credId)) {
+      case (null) { Runtime.trap("Credential not found") };
+      case (?cred) {
+        if (cred.subject != caller) {
+          Runtime.trap("Unauthorized: Only the credential subject can change visibility");
+        };
+        credentials.add(credId, { cred with isPublic; updatedAt = Time.now() });
+        true;
+      };
+    };
+  };
+
+  // Authenticated: returns all credentials where subject = caller
+  public query ({ caller }) func getMyCredentials() : async [Credential] {
+    let ids = switch (credentialsBySubject.get(caller)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    ids.filterMap(func(id : Text) : ?Credential { credentials.get(id) });
+  };
+
+  // Public: returns a credential by ID (no auth required)
+  public query func getCredential(credId : Text) : async ?Credential {
+    credentials.get(credId);
+  };
+
+  // Public: returns all active + public credentials of a given type
+  public query func listPublicCredentialsByType(credType : CredentialType) : async [Credential] {
+    credentials.values().filter(func(c : Credential) : Bool {
+      c.status == #active and c.isPublic and c.credentialType == credType
+    }).toArray();
+  };
+
+  // Admin only: returns all credentials for admin panel
+  public query ({ caller }) func listAllCredentialsAdmin() : async [Credential] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Admin only");
+    };
+    credentials.values().toArray();
   };
 
 };

@@ -53,9 +53,17 @@
     --muted: 0.94 0.008 250;
     --muted-foreground: 0.55 0.02 250;
 
-    /* Accent */
+    /* Accent — cyan for civic/democratic */
     --accent: 0.92 0.015 260;
     --accent-foreground: 0.35 0.1 255;
+
+    /* Credentials accent — verdant trust */
+    --credentials: 0.65 0.18 165;
+    --credentials-foreground: 0.98 0.005 240;
+
+    /* DAO token accent — governance authority gold */
+    --token: 0.72 0.12 85;
+    --token-foreground: 0.18 0.02 250;
 
     /* Destructive */
     --destructive: 0.55 0.22 25;
@@ -102,6 +110,10 @@
     --muted-foreground: 0.62 0.02 240;
     --accent: 0.28 0.06 255;
     --accent-foreground: 0.85 0.015 240;
+    --credentials: 0.68 0.2 165;
+    --credentials-foreground: 0.98 0.005 240;
+    --token: 0.75 0.14 85;
+    --token-foreground: 0.13 0.03 255;
     --destructive: 0.55 0.22 25;
     --destructive-foreground: 0.92 0.005 25;
     --border: 0.28 0.05 255;
@@ -153,5 +165,46 @@
   .civic-rule {
     height: 1px;
     background: currentColor;
+  }
+
+  .credentials-badge {
+    background: linear-gradient(
+      135deg,
+      oklch(0.68 0.2 165),
+      oklch(0.65 0.18 170)
+    );
+  }
+
+  .token-accent {
+    background: linear-gradient(135deg, oklch(0.75 0.14 85), oklch(0.7 0.12 90));
+  }
+
+  .verify-pulse {
+    animation: verify-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes verify-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  .token-shimmer {
+    animation: token-shimmer 3s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+
+  @keyframes token-shimmer {
+    0%,
+    100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
   }
 }

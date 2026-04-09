@@ -250,6 +250,8 @@ type OrgMember =
  };
 type NotificationType = 
  variant {
+   credentialApproved;
+   credentialIssued;
    error;
    info;
    success;
@@ -414,6 +416,33 @@ type DebateComment =
    parentCommentId: opt nat;
    proposalId: nat;
  };
+type DAOTokenTxType = 
+ variant {
+   airdrop;
+   burned;
+   earned;
+   transferred;
+   votingReward;
+ };
+type DAOTokenTransaction = 
+ record {
+   amount: nat;
+   createdAt: int;
+   from: opt principal;
+   id: nat;
+   note: text;
+   to: principal;
+   txType: DAOTokenTxType;
+ };
+type DAOTokenRecord = 
+ record {
+   balance: nat;
+   createdAt: int;
+   lastAirdropAt: opt int;
+   "principal": principal;
+   totalBurned: nat;
+   totalEarned: nat;
+ };
 type CrowdfundingStatus = 
  variant {
    active;
@@ -498,6 +527,40 @@ type CrowdfundingCampaign =
    totalFSUDistributed: nat;
    updatedAt: int;
  };
+type CredentialType = 
+ variant {
+   activistCertification;
+   custom;
+   eventAttendee;
+   expertiseBadge;
+   orgRepresentative;
+   verifiedHuman;
+ };
+type CredentialStatus = 
+ variant {
+   active;
+   approved;
+   pending;
+   rejected;
+   revoked;
+ };
+type Credential = 
+ record {
+   approvedAt: opt int;
+   credentialType: CredentialType;
+   description: text;
+   expiresAt: opt int;
+   id: text;
+   isPublic: bool;
+   issuedAt: int;
+   issuedBy: principal;
+   metadata: text;
+   revokedAt: opt int;
+   status: CredentialStatus;
+   subject: principal;
+   title: text;
+   updatedAt: int;
+ };
 type CommissionRate = 
  record {
    basisPoints: nat;
@@ -564,11 +627,23 @@ service : {
   adminListAllCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
   adminListCrowdfundingPledges: (campaignId: text) ->
    (vec CrowdfundingPledge) query;
+  /// Admin-only. Distributes IIINTL tokens to all MLM-initialized members based on their tier.
+  /// Sends a notification to each recipient.
+  airdropToAllMembers: () -> (record {
+                                airdropped: nat;
+                                totalTokens: nat;
+                              });
+  approveCredential: (credId: text) -> (bool);
   approveCrowdfundingCampaign: (campaignId: text) -> (bool);
   archiveCampaign: (id: text) -> (bool);
   archiveOrg: (orgId: text) -> (bool);
   archiveThread: (threadId: nat) -> (bool);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  /// Burns the caller's tokens. Reduces total supply. Awards 10 platform credits per token burned.
+  burnDAOTokens: (amount: nat) -> (variant {
+                                     err: text;
+                                     ok: nat;
+                                   });
   cancelProposal: (proposalId: nat) -> (variant {
                                           err: text;
                                           ok: text;
@@ -586,6 +661,12 @@ service : {
                                  checked: nat;
                                  expired: nat;
                                });
+  /// Awards 50 IIINTL voting reward tokens to a member who voted on a proposal.
+  /// Prevents double-claiming per proposal per member.
+  claimVotingReward: (proposalId: nat) -> (variant {
+                                             err: text;
+                                             ok: nat;
+                                           });
   closeProposal: (proposalId: nat) -> (variant {
                                          err: text;
                                          ok: text;
@@ -643,10 +724,22 @@ service : {
   getCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
    earningType: EarningType) -> (opt CommissionRate) query;
   getCommissionRates: () -> (vec CommissionRate) query;
+  getCredential: (credId: text) -> (opt Credential) query;
   getCrowdfundingCampaign: (campaignId: text) ->
    (opt CrowdfundingCampaign) query;
   getCrowdfundingConfig: () -> (CrowdfundingConfig) query;
   getCrowdfundingPledge: (pledgeId: text) -> (opt CrowdfundingPledge) query;
+  /// Returns platform-wide DAO token statistics. Public, no auth required.
+  getDAOTokenStats: () ->
+   (record {
+      totalHolders: nat;
+      totalSupply: nat;
+      treasuryBalance: nat;
+    }) query;
+  /// Returns all DAO transactions where the caller is sender or recipient.
+  getDAOTransactionHistory: () -> (vec DAOTokenTransaction) query;
+  /// Returns the top 20 token holders by balance. Public, no auth required.
+  getDaoLeaderboard: () -> (vec DAOTokenRecord) query;
   /// Returns all tenants whose trial will expire within the next `daysFromNow` days,
   /// including any that are already past their trial end date but not yet suspended.
   /// Sorted by trialEndsAt ascending (earliest expiry first).
@@ -656,6 +749,9 @@ service : {
   getMemberEarnings: (member: principal) -> (vec EarningRecord) query;
   getMemberTierRecord: (p: principal) -> (opt MemberTierRecord) query;
   getMemberVote: (proposalId: nat, member: principal) -> (opt Vote) query;
+  getMyCredentials: () -> (vec Credential) query;
+  /// Returns the caller's DAO token record. Returns a zero-balance record if not yet initialized.
+  getMyDAOBalance: () -> (DAOTokenRecord) query;
   getMyDelegation: () -> (opt DelegationRecord) query;
   getMyDownline: () -> (vec DownlineMember) query;
   getMyEarnings: () -> (vec EarningRecord) query;
@@ -674,6 +770,12 @@ service : {
   getPreferredLanguage: () -> (text) query;
   getProposal: (proposalId: nat) -> (opt Proposal) query;
   getProposalComments: (proposalId: nat) -> (vec DebateComment) query;
+  /// Returns all debate comments for a proposal.
+  /// No authentication required.
+  getProposalCommentsPublic: (proposalId: nat) -> (vec DebateComment) query;
+  /// Returns a single proposal by ID if it is not in draft or cancelled state.
+  /// No authentication required.
+  getProposalPublic: (proposalId: nat) -> (opt Proposal) query;
   getProposalSponsors: (proposalId: nat) -> (vec principal) query;
   getQuorumStatus: (proposalId: nat) ->
    (record {
@@ -699,11 +801,16 @@ service : {
   getUserOrgs: (userId: text) -> (vec Organization) query;
   getUserProfile: (user: principal) -> (opt UserProfile) query;
   getVoteTally: (proposalId: nat) -> (opt VoteTally) query;
+  /// Returns the current vote tally for a proposal.
+  /// No authentication required.
+  getVoteTallyPublic: (proposalId: nat) -> (opt VoteTally) query;
   getVotesByProposal: (proposalId: nat) -> (vec Vote) query;
   getWalletBalance: (address: text) -> (float64) query;
   incrementThreadView: (threadId: nat) -> (bool);
   initMemberMLM: (sponsorCode: opt text) -> (text);
   isCallerAdmin: () -> (bool) query;
+  issueCredential: (subject: principal, credType: CredentialType, title:
+   text, description: text, metadata: text, expiresAt: opt int) -> (text);
   joinCampaign: (campaignId: text) -> (bool);
   joinOrg: (orgId: text) -> (bool);
   leaveCampaign: (campaignId: text) -> (bool);
@@ -713,6 +820,9 @@ service : {
   listActiveCampaigns: () -> (vec Campaign) query;
   listActiveOrgs: () -> (vec Organization) query;
   listActiveProposals: () -> (vec Proposal) query;
+  listAllCredentialsAdmin: () -> (vec Credential) query;
+  /// Admin-only. Returns all DAO token records for admin oversight.
+  listAllDAOTokensAdmin: () -> (vec DAOTokenRecord) query;
   listAllMemberTiers: () -> (vec MemberTierRecord) query;
   listBillingHistory: (tenantId: text) -> (vec BillingRecord) query;
   listCampaigns: () -> (vec Campaign) query;
@@ -725,6 +835,11 @@ service : {
   listProposals: () -> (vec Proposal) query;
   listProposalsByStatus: (status: ProposalStatus) -> (vec Proposal) query;
   listProposalsByType: (proposalType: ProposalType) -> (vec Proposal) query;
+  /// Returns all non-draft, non-cancelled proposals visible to the public feed.
+  /// No authentication required.
+  listProposalsPublic: () -> (vec Proposal) query;
+  listPublicCredentialsByType: (credType: CredentialType) ->
+   (vec Credential) query;
   listRoyaltyPools: () -> (vec RoyaltyPool) query;
   listTenantMembers: (tenantId: text) -> (vec TenantMember) query;
   listTenants: () -> (vec Tenant) query;
@@ -750,10 +865,12 @@ service : {
   redeemFSU: (amount: nat, description: text) -> (bool);
   refundPledge: (pledgeId: text) -> (bool);
   registerUser: (displayName: text, email: text) -> (text);
+  rejectCredential: (credId: text) -> (bool);
   rejectCrowdfundingCampaign: (campaignId: text) -> (bool);
   removeTenantMember: (tenantId: text, member: principal) -> (bool);
   replyToThread: (threadId: nat, body: text) -> (nat);
   resolveReferralCode: (code: text) -> (opt principal) query;
+  revokeCredential: (credId: text) -> (bool);
   revokeDelegation: (proposalId: opt nat) -> (variant {
                                                 err: text;
                                                 ok: text;
@@ -776,6 +893,13 @@ service : {
                                            ok: text;
                                          });
   suspendTenant: (tenantId: text) -> (bool);
+  toggleCredentialPublic: (credId: text, isPublic: bool) -> (bool);
+  /// Peer-to-peer token transfer between members.
+  transferDAOTokens: (to: principal, amount: nat, note: text) ->
+   (variant {
+      err: text;
+      ok: nat;
+    });
   unlinkWallet: (address: text) -> ();
   updateCampaign: (id: text, title: text, description: text, campaignType:
    CampaignType, goal: nat, startDate: int, endDate: int, tags: vec text) ->

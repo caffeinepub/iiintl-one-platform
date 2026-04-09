@@ -50,6 +50,33 @@ export interface CommissionRate {
   'earningType' : EarningType,
   'depthLevel' : bigint,
 }
+export interface Credential {
+  'id' : string,
+  'status' : CredentialStatus,
+  'title' : string,
+  'expiresAt' : [] | [bigint],
+  'subject' : Principal,
+  'metadata' : string,
+  'approvedAt' : [] | [bigint],
+  'credentialType' : CredentialType,
+  'description' : string,
+  'updatedAt' : bigint,
+  'isPublic' : boolean,
+  'issuedAt' : bigint,
+  'issuedBy' : Principal,
+  'revokedAt' : [] | [bigint],
+}
+export type CredentialStatus = { 'active' : null } |
+  { 'revoked' : null } |
+  { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
+export type CredentialType = { 'verifiedHuman' : null } |
+  { 'orgRepresentative' : null } |
+  { 'eventAttendee' : null } |
+  { 'expertiseBadge' : null } |
+  { 'custom' : null } |
+  { 'activistCertification' : null };
 export interface CrowdfundingCampaign {
   'id' : string,
   'status' : CrowdfundingStatus,
@@ -120,6 +147,28 @@ export type CrowdfundingStatus = { 'active' : null } |
   { 'pending' : null } |
   { 'funded' : null } |
   { 'failed' : null };
+export interface DAOTokenRecord {
+  'principal' : Principal,
+  'balance' : bigint,
+  'createdAt' : bigint,
+  'totalEarned' : bigint,
+  'totalBurned' : bigint,
+  'lastAirdropAt' : [] | [bigint],
+}
+export interface DAOTokenTransaction {
+  'id' : bigint,
+  'to' : Principal,
+  'from' : [] | [Principal],
+  'note' : string,
+  'createdAt' : bigint,
+  'txType' : DAOTokenTxType,
+  'amount' : bigint,
+}
+export type DAOTokenTxType = { 'votingReward' : null } |
+  { 'transferred' : null } |
+  { 'earned' : null } |
+  { 'airdrop' : null } |
+  { 'burned' : null };
 export interface DebateComment {
   'id' : bigint,
   'isDeleted' : boolean,
@@ -254,8 +303,10 @@ export interface Notification {
 }
 export type NotificationType = { 'warning' : null } |
   { 'info' : null } |
+  { 'credentialIssued' : null } |
   { 'error' : null } |
-  { 'success' : null };
+  { 'success' : null } |
+  { 'credentialApproved' : null };
 export interface OrgMember {
   'userId' : string,
   'joinedAt' : bigint,
@@ -466,11 +517,28 @@ export interface _SERVICE {
     [string],
     Array<CrowdfundingPledge>
   >,
+  /**
+   * / Admin-only. Distributes IIINTL tokens to all MLM-initialized members based on their tier.
+   * / Sends a notification to each recipient.
+   */
+  'airdropToAllMembers' : ActorMethod<
+    [],
+    { 'totalTokens' : bigint, 'airdropped' : bigint }
+  >,
+  'approveCredential' : ActorMethod<[string], boolean>,
   'approveCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'archiveCampaign' : ActorMethod<[string], boolean>,
   'archiveOrg' : ActorMethod<[string], boolean>,
   'archiveThread' : ActorMethod<[bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  /**
+   * / Burns the caller's tokens. Reduces total supply. Awards 10 platform credits per token burned.
+   */
+  'burnDAOTokens' : ActorMethod<
+    [bigint],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
   'cancelProposal' : ActorMethod<
     [bigint],
     { 'ok' : string } |
@@ -490,6 +558,15 @@ export interface _SERVICE {
   'checkAndExpireTrials' : ActorMethod<
     [],
     { 'checked' : bigint, 'expired' : bigint }
+  >,
+  /**
+   * / Awards 50 IIINTL voting reward tokens to a member who voted on a proposal.
+   * / Prevents double-claiming per proposal per member.
+   */
+  'claimVotingReward' : ActorMethod<
+    [bigint],
+    { 'ok' : bigint } |
+      { 'err' : string }
   >,
   'closeProposal' : ActorMethod<
     [bigint],
@@ -586,12 +663,32 @@ export interface _SERVICE {
     [] | [CommissionRate]
   >,
   'getCommissionRates' : ActorMethod<[], Array<CommissionRate>>,
+  'getCredential' : ActorMethod<[string], [] | [Credential]>,
   'getCrowdfundingCampaign' : ActorMethod<
     [string],
     [] | [CrowdfundingCampaign]
   >,
   'getCrowdfundingConfig' : ActorMethod<[], CrowdfundingConfig>,
   'getCrowdfundingPledge' : ActorMethod<[string], [] | [CrowdfundingPledge]>,
+  /**
+   * / Returns platform-wide DAO token statistics. Public, no auth required.
+   */
+  'getDAOTokenStats' : ActorMethod<
+    [],
+    {
+      'treasuryBalance' : bigint,
+      'totalHolders' : bigint,
+      'totalSupply' : bigint,
+    }
+  >,
+  /**
+   * / Returns all DAO transactions where the caller is sender or recipient.
+   */
+  'getDAOTransactionHistory' : ActorMethod<[], Array<DAOTokenTransaction>>,
+  /**
+   * / Returns the top 20 token holders by balance. Public, no auth required.
+   */
+  'getDaoLeaderboard' : ActorMethod<[], Array<DAOTokenRecord>>,
   /**
    * / Returns all tenants whose trial will expire within the next `daysFromNow` days,
    * / including any that are already past their trial end date but not yet suspended.
@@ -603,6 +700,11 @@ export interface _SERVICE {
   'getMemberEarnings' : ActorMethod<[Principal], Array<EarningRecord>>,
   'getMemberTierRecord' : ActorMethod<[Principal], [] | [MemberTierRecord]>,
   'getMemberVote' : ActorMethod<[bigint, Principal], [] | [Vote]>,
+  'getMyCredentials' : ActorMethod<[], Array<Credential>>,
+  /**
+   * / Returns the caller's DAO token record. Returns a zero-balance record if not yet initialized.
+   */
+  'getMyDAOBalance' : ActorMethod<[], DAOTokenRecord>,
   'getMyDelegation' : ActorMethod<[], [] | [DelegationRecord]>,
   'getMyDownline' : ActorMethod<[], Array<DownlineMember>>,
   'getMyEarnings' : ActorMethod<[], Array<EarningRecord>>,
@@ -621,6 +723,16 @@ export interface _SERVICE {
   'getPreferredLanguage' : ActorMethod<[], string>,
   'getProposal' : ActorMethod<[bigint], [] | [Proposal]>,
   'getProposalComments' : ActorMethod<[bigint], Array<DebateComment>>,
+  /**
+   * / Returns all debate comments for a proposal.
+   * / No authentication required.
+   */
+  'getProposalCommentsPublic' : ActorMethod<[bigint], Array<DebateComment>>,
+  /**
+   * / Returns a single proposal by ID if it is not in draft or cancelled state.
+   * / No authentication required.
+   */
+  'getProposalPublic' : ActorMethod<[bigint], [] | [Proposal]>,
   'getProposalSponsors' : ActorMethod<[bigint], Array<Principal>>,
   'getQuorumStatus' : ActorMethod<
     [bigint],
@@ -649,11 +761,20 @@ export interface _SERVICE {
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getVoteTally' : ActorMethod<[bigint], [] | [VoteTally]>,
+  /**
+   * / Returns the current vote tally for a proposal.
+   * / No authentication required.
+   */
+  'getVoteTallyPublic' : ActorMethod<[bigint], [] | [VoteTally]>,
   'getVotesByProposal' : ActorMethod<[bigint], Array<Vote>>,
   'getWalletBalance' : ActorMethod<[string], number>,
   'incrementThreadView' : ActorMethod<[bigint], boolean>,
   'initMemberMLM' : ActorMethod<[[] | [string]], string>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'issueCredential' : ActorMethod<
+    [Principal, CredentialType, string, string, string, [] | [bigint]],
+    string
+  >,
   'joinCampaign' : ActorMethod<[string], boolean>,
   'joinOrg' : ActorMethod<[string], boolean>,
   'leaveCampaign' : ActorMethod<[string], boolean>,
@@ -662,6 +783,11 @@ export interface _SERVICE {
   'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
   'listActiveProposals' : ActorMethod<[], Array<Proposal>>,
+  'listAllCredentialsAdmin' : ActorMethod<[], Array<Credential>>,
+  /**
+   * / Admin-only. Returns all DAO token records for admin oversight.
+   */
+  'listAllDAOTokensAdmin' : ActorMethod<[], Array<DAOTokenRecord>>,
   'listAllMemberTiers' : ActorMethod<[], Array<MemberTierRecord>>,
   'listBillingHistory' : ActorMethod<[string], Array<BillingRecord>>,
   'listCampaigns' : ActorMethod<[], Array<Campaign>>,
@@ -676,6 +802,15 @@ export interface _SERVICE {
   'listProposals' : ActorMethod<[], Array<Proposal>>,
   'listProposalsByStatus' : ActorMethod<[ProposalStatus], Array<Proposal>>,
   'listProposalsByType' : ActorMethod<[ProposalType], Array<Proposal>>,
+  /**
+   * / Returns all non-draft, non-cancelled proposals visible to the public feed.
+   * / No authentication required.
+   */
+  'listProposalsPublic' : ActorMethod<[], Array<Proposal>>,
+  'listPublicCredentialsByType' : ActorMethod<
+    [CredentialType],
+    Array<Credential>
+  >,
   'listRoyaltyPools' : ActorMethod<[], Array<RoyaltyPool>>,
   'listTenantMembers' : ActorMethod<[string], Array<TenantMember>>,
   'listTenants' : ActorMethod<[], Array<Tenant>>,
@@ -708,10 +843,12 @@ export interface _SERVICE {
   'redeemFSU' : ActorMethod<[bigint, string], boolean>,
   'refundPledge' : ActorMethod<[string], boolean>,
   'registerUser' : ActorMethod<[string, string], string>,
+  'rejectCredential' : ActorMethod<[string], boolean>,
   'rejectCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'removeTenantMember' : ActorMethod<[string, Principal], boolean>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
   'resolveReferralCode' : ActorMethod<[string], [] | [Principal]>,
+  'revokeCredential' : ActorMethod<[string], boolean>,
   'revokeDelegation' : ActorMethod<
     [[] | [bigint]],
     { 'ok' : string } |
@@ -738,6 +875,15 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'suspendTenant' : ActorMethod<[string], boolean>,
+  'toggleCredentialPublic' : ActorMethod<[string, boolean], boolean>,
+  /**
+   * / Peer-to-peer token transfer between members.
+   */
+  'transferDAOTokens' : ActorMethod<
+    [Principal, bigint, string],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
   'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
     [

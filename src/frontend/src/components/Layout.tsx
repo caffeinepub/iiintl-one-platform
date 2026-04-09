@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Coins,
   DollarSign,
   FileText,
   Globe,
@@ -46,6 +47,7 @@ import {
   Scale,
   Server,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Shuffle,
@@ -131,6 +133,27 @@ function SidebarContent({
       ],
     },
     {
+      title: "Identity",
+      links: [
+        {
+          to: "/credentials",
+          label: "Credentials",
+          icon: <ShieldCheck size={16} />,
+          ocid: "sidebar.credentials_link",
+        },
+        ...(user
+          ? [
+              {
+                to: "/my-credentials",
+                label: "My Credentials",
+                icon: <ShieldCheck size={16} />,
+                ocid: "sidebar.my_credentials_link",
+              },
+            ]
+          : []),
+      ],
+    },
+    {
       title: t.sidebar.community,
       links: [
         {
@@ -156,6 +179,12 @@ function SidebarContent({
           label: "Proposals",
           icon: <Scale size={16} />,
           ocid: "nav-proposals",
+        },
+        {
+          to: "/dao",
+          label: "DAO Token",
+          icon: <Coins size={16} />,
+          ocid: "sidebar.dao_link",
         },
       ],
     },

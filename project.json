@@ -1,0 +1,27 @@
+{
+  "overview": "IIIntl One Platform is a global, multi-organization civic platform enabling independent international collaboration with on-chain governance, decentralized identity, participatory democracy, and a DAO governance token — serving organizations and citizens across 190+ countries in 5 languages.",
+  "features": [
+    "Public proposals feed visible without login",
+    "Decentralized Identity & Verified Credentials module with on-chain issuance and public verification",
+    "DAO governance token (IIINTL) with tier-based airdrop and token-weighted voting",
+    "On-chain participatory democracy with 4 voting mechanisms",
+    "Multi-tenant PaaS platform with white-label branding",
+    "Multi-level membership and FinFracFran fractal rewards system",
+    "Crowdfunding with fractal micro-share distribution",
+    "Multi-lingual support including RTL Arabic and Chinese"
+  ],
+  "category": "civic-technology-governance",
+  "tags": [
+    "governance",
+    "dao",
+    "civic-tech",
+    "decentralized-identity",
+    "icp",
+    "motoko",
+    "multi-tenant",
+    "multilingual",
+    "democracy",
+    "crowdfunding"
+  ],
+  "last_updated": "2026-04-09T01:14:31.731Z"
+}

@@ -5,7 +5,6 @@ import {
   VotingMechanism,
 } from "@/backend";
 import { Layout } from "@/components/Layout";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +17,8 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Info,
+  LogIn,
   Plus,
   Scale,
   Search,
@@ -71,7 +72,7 @@ const STATUS_COLORS: Record<string, string> = {
   closed: "bg-orange-500/15 text-orange-400 border-orange-500/30",
   enacted: "bg-green-500/15 text-green-400 border-green-500/30",
   rejected: "bg-red-500/15 text-red-400 border-red-500/30",
-  cancelled: "bg-gray-500/15 text-gray-400 border-gray-500/30",
+  cancelled: "bg-muted text-muted-foreground border-border",
 };
 
 const MECHANISM_LABELS: Record<string, string> = {
@@ -182,11 +183,11 @@ const MOCK_PROPOSALS: Proposal[] = [
 // ── Status filter tabs ────────────────────────────────────────────────────────
 const STATUS_TABS = [
   { key: "all", label: "All" },
-  { key: ProposalStatus.draft, label: "Draft" },
-  { key: ProposalStatus.review, label: "In Review" },
   { key: ProposalStatus.openVote, label: "Open Vote" },
-  { key: ProposalStatus.closed, label: "Closed" },
+  { key: ProposalStatus.review, label: "In Review" },
   { key: ProposalStatus.enacted, label: "Enacted" },
+  { key: ProposalStatus.closed, label: "Closed" },
+  { key: ProposalStatus.draft, label: "Draft" },
 ] as const;
 
 const TYPE_TABS = [
@@ -307,7 +308,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
 // ── ProposalsPage ─────────────────────────────────────────────────────────────
 export function ProposalsPage() {
   const backend = useBackend();
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -318,7 +319,8 @@ export function ProposalsPage() {
     async function load() {
       try {
         if (!backend) throw new Error("no backend");
-        const data = await backend.listProposals();
+        // Use public function — works for both authenticated and unauthenticated
+        const data = await backend.listProposalsPublic();
         setProposals(data.length > 0 ? data : MOCK_PROPOSALS);
       } catch {
         setProposals(MOCK_PROPOSALS);
@@ -360,7 +362,7 @@ export function ProposalsPage() {
               collective decisions
             </p>
           </div>
-          {user && (
+          {isAuthenticated && (
             <Link to="/proposals/create">
               <Button
                 className="gap-2"
@@ -371,6 +373,30 @@ export function ProposalsPage() {
             </Link>
           )}
         </div>
+
+        {/* Public access callout for unauthenticated visitors */}
+        {!isAuthenticated && (
+          <div
+            className="flex items-center gap-3 p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-sm"
+            data-ocid="proposals.public_access_banner"
+          >
+            <Info size={16} className="text-cyan-400 flex-shrink-0" />
+            <p className="text-cyan-300/90 flex-1">
+              You're viewing proposals publicly. Log in to vote, sponsor, or
+              create proposals.
+            </p>
+            <Link to="/login">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10 flex-shrink-0"
+                data-ocid="proposals.login_cta_btn"
+              >
+                <LogIn size={13} /> Log in
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative max-w-sm">
@@ -451,13 +477,26 @@ export function ProposalsPage() {
                 No proposals found
               </h3>
               <p className="text-muted-foreground text-sm mt-1">
-                Adjust your filters or be the first to create a proposal.
+                {isAuthenticated
+                  ? "Adjust your filters or be the first to create a proposal."
+                  : "Adjust your filters or log in to create the first proposal."}
               </p>
             </div>
-            {user && (
+            {isAuthenticated && (
               <Link to="/proposals/create">
                 <Button data-ocid="proposals.empty_create_btn">
                   <Plus size={15} className="mr-1.5" /> Create First Proposal
+                </Button>
+              </Link>
+            )}
+            {!isAuthenticated && (
+              <Link to="/login">
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  data-ocid="proposals.empty_login_btn"
+                >
+                  <LogIn size={15} /> Log in to participate
                 </Button>
               </Link>
             )}

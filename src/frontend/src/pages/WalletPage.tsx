@@ -1,5 +1,6 @@
 import { WalletType } from "@/backend";
 import { TransactionType } from "@/backend";
+import type { DAOTokenRecord } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,12 +31,16 @@ import {
   formatAmount,
   useWallet,
 } from "@/context/WalletContext";
+import { useBackend } from "@/hooks/useBackend";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Check,
+  Coins,
   Copy,
+  ExternalLink,
   Fingerprint,
   Link2,
   Loader2,
@@ -43,7 +48,7 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 
 const WALLET_TYPE_META: Record<
@@ -106,6 +111,17 @@ export function WalletPage() {
     removeWallet,
     totalBalanceICP,
   } = useWallet();
+
+  const backend = useBackend();
+  const [daoRecord, setDaoRecord] = useState<DAOTokenRecord | null>(null);
+
+  useEffect(() => {
+    if (!backend) return;
+    backend
+      .getMyDAOBalance()
+      .then(setDaoRecord)
+      .catch(() => {});
+  }, [backend]);
 
   const [addOpen, setAddOpen] = useState(false);
   const [newWalletType, setNewWalletType] = useState<WalletType>(
@@ -213,6 +229,76 @@ export function WalletPage() {
               <p className="text-sm font-medium text-foreground">
                 {totalBalanceICP.toFixed(4)} ICP
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* IIINTL DAO Token Balance Card */}
+        <Card
+          className="border-border"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.72 0.12 85 / 0.10), oklch(0.7 0.12 90 / 0.04), transparent)",
+          }}
+          data-ocid="wallet.dao_token_card"
+        >
+          <CardContent className="px-6 py-4 flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div
+                className="p-2 rounded-lg"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.75 0.14 85), oklch(0.7 0.12 90))",
+                }}
+              >
+                <Coins size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                  IIINTL Token
+                </p>
+                <p
+                  className="text-3xl font-display font-bold mt-0.5"
+                  style={{ color: "oklch(0.62 0.14 85)" }}
+                >
+                  {daoRecord ? Number(daoRecord.balance).toLocaleString() : "—"}
+                </p>
+              </div>
+            </div>
+            <Separator
+              orientation="vertical"
+              className="h-10 hidden sm:block"
+            />
+            <div className="flex gap-5">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Earned</p>
+                <p className="text-sm font-medium text-foreground">
+                  {daoRecord
+                    ? Number(daoRecord.totalEarned).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Burned</p>
+                <p className="text-sm font-medium text-foreground">
+                  {daoRecord
+                    ? Number(daoRecord.totalBurned).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="gap-1.5 text-xs"
+                data-ocid="wallet.dao_token_details_link"
+              >
+                <Link to="/dao">
+                  DAO Dashboard <ExternalLink size={11} />
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

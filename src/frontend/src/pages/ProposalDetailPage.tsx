@@ -1,12 +1,4 @@
-import {
-  type DebateComment,
-  type Proposal,
-  ProposalStatus,
-  ProposalType,
-  VoteChoice,
-  type VoteTally,
-  VotingMechanism,
-} from "@/backend";
+import type { DebateComment, Proposal, VoteTally } from "@/backend";
 import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +17,7 @@ import {
   Clock,
   FileText,
   Loader2,
+  LogIn,
   MessageSquare,
   Scale,
   Shield,
@@ -69,7 +62,7 @@ const STATUS_COLORS: Record<string, string> = {
   closed: "bg-orange-500/15 text-orange-400 border-orange-500/30",
   enacted: "bg-green-500/15 text-green-400 border-green-500/30",
   rejected: "bg-red-500/15 text-red-400 border-red-500/30",
-  cancelled: "bg-gray-500/15 text-gray-400 border-gray-500/30",
+  cancelled: "bg-muted text-muted-foreground border-border",
 };
 
 const MECHANISM_LABELS: Record<string, string> = {
@@ -190,7 +183,7 @@ function TallySection({ tally }: { tally: VoteTally }) {
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-slate-500 rounded-full transition-all"
+                  className="h-full bg-muted-foreground/40 rounded-full transition-all"
                   style={{ width: `${abstainPct}%` }}
                 />
               </div>
@@ -314,7 +307,7 @@ function DebateTab({
 
   return (
     <div className="space-y-5">
-      {/* Comment input */}
+      {/* Comment input — authenticated only */}
       {isAuthenticated && (
         <div className="space-y-2">
           {replyTo && (
@@ -348,6 +341,32 @@ function DebateTab({
               Post Comment
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Login prompt for unauthenticated readers */}
+      {!isAuthenticated && (
+        <div
+          className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/20 text-sm"
+          data-ocid="proposal_detail.debate_login_prompt"
+        >
+          <MessageSquare
+            size={14}
+            className="text-muted-foreground flex-shrink-0"
+          />
+          <p className="text-muted-foreground flex-1 text-xs">
+            Log in to join the debate.
+          </p>
+          <Link to="/login">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs h-7 flex-shrink-0"
+              data-ocid="proposal_detail.debate_login_btn"
+            >
+              <LogIn size={12} /> Log in
+            </Button>
+          </Link>
         </div>
       )}
 
@@ -425,7 +444,7 @@ function CommentItem({
   onEditSubmit: (id: bigint) => void;
   posting: boolean;
 }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const authorText = principalText(comment.author);
   const isEditing = editingId === comment.id;
 
@@ -485,14 +504,16 @@ function CommentItem({
         <>
           <p className="text-sm text-foreground/90">{comment.content}</p>
           <div className="flex gap-3 mt-2">
-            <button
-              type="button"
-              className="text-xs text-muted-foreground hover:text-primary transition-colors"
-              onClick={() => onReply(comment.id)}
-              data-ocid="proposal_detail.reply_btn"
-            >
-              Reply
-            </button>
+            {isAuthenticated && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => onReply(comment.id)}
+                data-ocid="proposal_detail.reply_btn"
+              >
+                Reply
+              </button>
+            )}
             {user &&
               principalText(comment.author).startsWith(
                 authorText.slice(0, 5),
@@ -517,7 +538,7 @@ function CommentItem({
 export function ProposalDetailPage() {
   const { id } = useParams({ from: "/proposals/$id" });
   const backend = useBackend();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [sponsors, setSponsors] = useState<Principal[]>([]);
@@ -527,22 +548,35 @@ export function ProposalDetailPage() {
   const [actioning, setActioning] = useState(false);
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-  const isAuthenticated = !!user;
 
   const load = async () => {
     if (!backend) return;
     try {
       const pid = BigInt(id);
-      const [p, s, t, c] = await Promise.all([
-        backend.getProposal(pid),
-        backend.getProposalSponsors(pid),
-        backend.getVoteTally(pid),
-        backend.getProposalComments(pid),
-      ]);
-      setProposal(p);
-      setSponsors(s);
-      setTally(t);
-      setComments(c);
+      if (isAuthenticated) {
+        // Authenticated: use full query functions
+        const [p, s, t, c] = await Promise.all([
+          backend.getProposal(pid),
+          backend.getProposalSponsors(pid),
+          backend.getVoteTally(pid),
+          backend.getProposalComments(pid),
+        ]);
+        setProposal(p);
+        setSponsors(s);
+        setTally(t);
+        setComments(c);
+      } else {
+        // Public: use public query functions (no auth required)
+        const [p, t, c] = await Promise.all([
+          backend.getProposalPublic(pid),
+          backend.getVoteTallyPublic(pid),
+          backend.getProposalCommentsPublic(pid),
+        ]);
+        setProposal(p);
+        setTally(t);
+        setComments(c);
+        setSponsors([]); // sponsors list requires auth
+      }
     } catch {
       toast.error("Failed to load proposal");
     } finally {
@@ -550,10 +584,10 @@ export function ProposalDetailPage() {
     }
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: load is stable within backend+id scope
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load is stable within backend+id+isAuthenticated scope
   useEffect(() => {
     load();
-  }, [backend, id]);
+  }, [backend, id, isAuthenticated]);
 
   async function doAdminAction(
     fn: () => Promise<
@@ -754,7 +788,7 @@ export function ProposalDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Tally (if relevant) */}
+            {/* Tally (visible to everyone) */}
             {(isOpenVote ||
               statusKey === "closed" ||
               statusKey === "enacted" ||
@@ -814,7 +848,9 @@ export function ProposalDetailPage() {
                 <div className="space-y-2">
                   {sponsors.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">
-                      No sponsors yet. Co-sign to advance this proposal.
+                      {isAuthenticated
+                        ? "No sponsors yet. Co-sign to advance this proposal."
+                        : "Co-signer data visible after logging in."}
                     </p>
                   ) : (
                     sponsors.map((s, i) => (
@@ -896,7 +932,7 @@ export function ProposalDetailPage() {
                   Actions
                 </p>
 
-                {/* Vote button */}
+                {/* Vote button (authenticated + open) */}
                 {canVote && (
                   <Link to="/vote/$id" params={{ id: String(proposal.id) }}>
                     <Button
@@ -909,7 +945,28 @@ export function ProposalDetailPage() {
                   </Link>
                 )}
 
-                {/* Sponsor actions */}
+                {/* Login to participate prompt for public visitors */}
+                {!isAuthenticated && (
+                  <div
+                    className="space-y-2"
+                    data-ocid="proposal_detail.login_to_participate"
+                  >
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Log in to vote, sponsor, or comment on this proposal.
+                    </p>
+                    <Link to="/login" className="block">
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 text-sm"
+                        data-ocid="proposal_detail.participate_login_btn"
+                      >
+                        <LogIn size={14} /> Log in to Participate
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
+                {/* Sponsor actions (authenticated only) */}
                 {canSponsor && (
                   <Button
                     variant="outline"
