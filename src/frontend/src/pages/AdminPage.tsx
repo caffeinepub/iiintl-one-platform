@@ -4063,6 +4063,14 @@ function GovernanceAdminTab() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [actioning, setActioning] = useState<bigint | null>(null);
+  const [showTenant, setShowTenant] = useState(true);
+
+  // Governance Settings — session-local defaults (not persisted to backend)
+  const [govSettings, setGovSettings] = useState({
+    quorumPercent: 51,
+    sponsorThreshold: 3,
+    voteWindowDays: 7,
+  });
 
   const load = async () => {
     if (!backend) return;
@@ -4116,6 +4124,59 @@ function GovernanceAdminTab() {
     review: proposals.filter((p) => String(p.status) === "review").length,
   };
 
+  // ── Voting Analytics (derived client-side) ───────────────────────────────
+  const nonDraft = proposals.filter((p) => String(p.status) !== "draft");
+  const enactedCount = proposals.filter(
+    (p) => String(p.status) === "enacted",
+  ).length;
+  const closedOrRejected = proposals.filter((p) =>
+    ["enacted", "rejected", "closed"].includes(String(p.status)),
+  ).length;
+  const participationRate =
+    nonDraft.length > 0
+      ? Math.round((enactedCount / nonDraft.length) * 100)
+      : 0;
+  const quorumPassRate =
+    closedOrRejected > 0
+      ? Math.round((enactedCount / closedOrRejected) * 100)
+      : 0;
+  const mechCounts = proposals.reduce<Record<string, number>>((acc, p) => {
+    const k = String(p.mechanism);
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topMech =
+    Object.entries(mechCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const mechDisplayMap: Record<string, string> = {
+    simpleMajority: "Simple Majority",
+    supermajority66: "Supermajority 2/3",
+    supermajority75: "Supermajority 3/4",
+    rankedChoice: "Ranked Choice",
+    liquidDelegation: "Liquid Delegation",
+  };
+  const avgSponsors =
+    proposals.length > 0
+      ? (
+          proposals.reduce((sum, p) => sum + p.sponsors.length, 0) /
+          proposals.length
+        ).toFixed(1)
+      : "N/A";
+
+  function copyGovSettings() {
+    const json = JSON.stringify(
+      {
+        defaultQuorumPercent: govSettings.quorumPercent,
+        defaultSponsorThreshold: govSettings.sponsorThreshold,
+        defaultVoteWindowDays: govSettings.voteWindowDays,
+      },
+      null,
+      2,
+    );
+    navigator.clipboard.writeText(json).then(() => {
+      toast.success("Settings copied to clipboard");
+    });
+  }
+
   return (
     <div className="space-y-6" data-ocid="admin.governance.tab_content">
       {/* Stats row */}
@@ -4141,34 +4202,128 @@ function GovernanceAdminTab() {
         />
       </div>
 
-      {/* Filters */}
-      <div
-        className="flex gap-2 flex-wrap"
-        data-ocid="admin.governance.status_filter"
-      >
-        {[
-          "all",
-          "draft",
-          "review",
-          "openVote",
-          "closed",
-          "enacted",
-          "cancelled",
-        ].map((s) => (
-          <button
-            type="button"
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-              statusFilter === s
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:border-primary/30"
-            }`}
-            data-ocid={`admin.governance.filter_${s}`}
-          >
-            {s === "all" ? "All" : (PROPOSAL_STATUS_LABELS[s] ?? s)}
-          </button>
-        ))}
+      {/* ── Voting Analytics ─────────────────────────────────────────────── */}
+      <div data-ocid="admin.governance.voting_analytics">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart2 size={15} className="text-primary" />
+          <h3 className="text-sm font-semibold">Voting Analytics</h3>
+          <span className="text-xs text-muted-foreground">
+            — calculated from all loaded proposals
+          </span>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-border">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground mb-1">
+                Participation Rate
+              </p>
+              <p
+                className="text-2xl font-bold text-primary"
+                data-ocid="admin.governance.analytics_participation"
+              >
+                {participationRate}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                enacted / non-draft
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground mb-1">
+                Quorum Pass Rate
+              </p>
+              <p
+                className="text-2xl font-bold text-emerald-400"
+                data-ocid="admin.governance.analytics_quorum"
+              >
+                {quorumPassRate}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                enacted / decided
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground mb-1">
+                Top Mechanism
+              </p>
+              {topMech ? (
+                <Badge
+                  variant="secondary"
+                  className="mt-1 text-xs"
+                  data-ocid="admin.governance.analytics_top_mech"
+                >
+                  {mechDisplayMap[topMech] ?? topMech}
+                </Badge>
+              ) : (
+                <p className="text-sm text-muted-foreground">N/A</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                most used voting type
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground mb-1">Avg Sponsors</p>
+              <p
+                className="text-2xl font-bold text-blue-400"
+                data-ocid="admin.governance.analytics_avg_sponsors"
+              >
+                {avgSponsors}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">per proposal</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Filters + tenant toggle */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div
+          className="flex gap-2 flex-wrap"
+          data-ocid="admin.governance.status_filter"
+        >
+          {[
+            "all",
+            "draft",
+            "review",
+            "openVote",
+            "closed",
+            "enacted",
+            "cancelled",
+          ].map((s) => (
+            <button
+              type="button"
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                statusFilter === s
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary/30"
+              }`}
+              data-ocid={`admin.governance.filter_${s}`}
+            >
+              {s === "all" ? "All" : (PROPOSAL_STATUS_LABELS[s] ?? s)}
+            </button>
+          ))}
+        </div>
+        {/* Cross-tenant visibility toggle */}
+        <button
+          type="button"
+          onClick={() => setShowTenant((v) => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            showTenant
+              ? "bg-primary/10 border-primary/40 text-primary"
+              : "border-border text-muted-foreground hover:border-primary/30"
+          }`}
+          data-ocid="admin.governance.toggle_tenant_col"
+        >
+          <Building2 size={12} />
+          {showTenant ? "Tenant column: on" : "Tenant column: off"}
+        </button>
       </div>
 
       {/* Proposals table */}
@@ -4189,6 +4344,9 @@ function GovernanceAdminTab() {
               <TableRow>
                 <TableHead className="w-12">ID</TableHead>
                 <TableHead>Title</TableHead>
+                {showTenant && (
+                  <TableHead className="text-xs">Tenant</TableHead>
+                )}
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Mechanism</TableHead>
@@ -4224,6 +4382,17 @@ function GovernanceAdminTab() {
                         {p.title}
                       </p>
                     </TableCell>
+                    {showTenant && (
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-mono max-w-[120px] truncate"
+                          data-ocid={`admin.governance.tenant_badge_${String(p.id)}`}
+                        >
+                          {p.tenantId || "platform"}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
                         {PROP_TYPE_LABELS[typeKey] ?? typeKey}
@@ -4333,6 +4502,141 @@ function GovernanceAdminTab() {
           </Table>
         </div>
       )}
+
+      {/* ── Governance Settings ───────────────────────────────────────────── */}
+      <Card
+        className="border-border"
+        data-ocid="admin.governance.settings_panel"
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Shield size={15} className="text-primary" />
+                Governance Settings
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Session defaults — resets on page reload. Persistent governance
+                configuration will be available in a future update.
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={copyGovSettings}
+              data-ocid="admin.governance.settings_copy"
+            >
+              <FileText size={12} className="mr-1.5" />
+              Copy as JSON
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="gov-quorum"
+                className="text-xs text-muted-foreground"
+              >
+                Default Quorum %
+              </Label>
+              <Input
+                id="gov-quorum"
+                type="number"
+                min={1}
+                max={100}
+                value={govSettings.quorumPercent}
+                onChange={(e) =>
+                  setGovSettings((s) => ({
+                    ...s,
+                    quorumPercent: Math.min(
+                      100,
+                      Math.max(1, Number(e.target.value)),
+                    ),
+                  }))
+                }
+                className="h-8 text-sm"
+                data-ocid="admin.governance.settings_quorum"
+              />
+              <p className="text-xs text-muted-foreground">
+                Minimum participation to pass (1–100)
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="gov-sponsors"
+                className="text-xs text-muted-foreground"
+              >
+                Default Sponsor Threshold
+              </Label>
+              <Input
+                id="gov-sponsors"
+                type="number"
+                min={1}
+                max={20}
+                value={govSettings.sponsorThreshold}
+                onChange={(e) =>
+                  setGovSettings((s) => ({
+                    ...s,
+                    sponsorThreshold: Math.min(
+                      20,
+                      Math.max(1, Number(e.target.value)),
+                    ),
+                  }))
+                }
+                className="h-8 text-sm"
+                data-ocid="admin.governance.settings_sponsors"
+              />
+              <p className="text-xs text-muted-foreground">
+                Co-signers required to advance (1–20)
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="gov-window"
+                className="text-xs text-muted-foreground"
+              >
+                Default Vote Window (days)
+              </Label>
+              <Input
+                id="gov-window"
+                type="number"
+                min={1}
+                max={365}
+                value={govSettings.voteWindowDays}
+                onChange={(e) =>
+                  setGovSettings((s) => ({
+                    ...s,
+                    voteWindowDays: Math.min(
+                      365,
+                      Math.max(1, Number(e.target.value)),
+                    ),
+                  }))
+                }
+                className="h-8 text-sm"
+                data-ocid="admin.governance.settings_window"
+              />
+              <p className="text-xs text-muted-foreground">
+                Voting period length (1–365)
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-md bg-muted/40 border border-border px-3 py-2 flex items-start gap-2">
+            <HelpCircle
+              size={13}
+              className="text-muted-foreground mt-0.5 shrink-0"
+            />
+            <p className="text-xs text-muted-foreground">
+              These defaults auto-fill the proposal creation form when members
+              submit new proposals. Use{" "}
+              <span className="font-medium text-foreground">Copy as JSON</span>{" "}
+              to document your organisation's preferred governance
+              configuration.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
