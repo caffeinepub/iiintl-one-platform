@@ -7,6 +7,7 @@ import Array "mo:core/Array";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Float "mo:core/Float";
+import Principal "mo:core/Principal";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
 
@@ -2657,4 +2658,769 @@ actor {
 
     { lastCheck = lastExpiryCheck; nextCheckIn };
   };
+
+  // ==================== VOTING & DEMOCRACY ENGINE (G1+G2) ====================
+
+  // === G1 Types: Proposal Foundation ===
+
+  public type ProposalType = {
+    #policy;
+    #resolution;
+    #budget;
+    #amendment;
+    #communityInitiative;
+  };
+
+  public type ProposalStatus = {
+    #draft;
+    #review;
+    #openVote;
+    #closed;
+    #enacted;
+    #rejected;
+    #cancelled;
+  };
+
+  public type VotingMechanism = {
+    #simpleMajority;
+    #supermajority66;
+    #supermajority75;
+    #rankedChoice;
+    #liquidDelegation;
+  };
+
+  public type Proposal = {
+    id : Nat;
+    proposer : Principal;
+    tenantId : Text;
+    orgId : ?Text;
+    proposalType : ProposalType;
+    title : Text;
+    description : Text;
+    status : ProposalStatus;
+    mechanism : VotingMechanism;
+    quorumPercent : Nat;
+    sponsorThreshold : Nat;
+    sponsors : [Principal];
+    voteWindowHours : Nat;
+    votingOpensAt : ?Int;
+    votingClosesAt : ?Int;
+    createdAt : Int;
+    updatedAt : Int;
+    enactedAt : ?Int;
+    tags : [Text];
+  };
+
+  public type DebateComment = {
+    id : Nat;
+    proposalId : Nat;
+    author : Principal;
+    content : Text;
+    parentCommentId : ?Nat;
+    createdAt : Int;
+    editedAt : ?Int;
+    isDeleted : Bool;
+  };
+
+  // === G2 Types: Voting Engine ===
+
+  public type VoteChoice = {
+    #yes;
+    #no;
+    #abstain;
+  };
+
+  public type RankedChoiceEntry = {
+    candidateId : Text;
+    rank : Nat;
+  };
+
+  public type Vote = {
+    id : Nat;
+    proposalId : Nat;
+    voter : Principal;
+    choice : VoteChoice;
+    rankedChoices : [RankedChoiceEntry];
+    weight : Nat;
+    delegatedTo : ?Principal;
+    castAt : Int;
+  };
+
+  public type DelegationRecord = {
+    delegator : Principal;
+    delegateTo : Principal;
+    proposalId : ?Nat;
+    createdAt : Int;
+    revokedAt : ?Int;
+    isActive : Bool;
+  };
+
+  public type VoteTally = {
+    proposalId : Nat;
+    mechanism : VotingMechanism;
+    totalVoters : Nat;
+    totalVotesCast : Nat;
+    yesVotes : Nat;
+    noVotes : Nat;
+    abstainVotes : Nat;
+    yesWeight : Nat;
+    noWeight : Nat;
+    abstainWeight : Nat;
+    quorumMet : Bool;
+    quorumPercent : Nat;
+    passed : Bool;
+    rankedResults : [(Text, Nat)];
+    tallyComputedAt : Int;
+  };
+
+  // === G1 Storage ===
+
+  let proposals = Map.empty<Nat, Proposal>();
+  let proposalSponsorIndex = Map.empty<Nat, [Principal]>();
+  let debateComments = Map.empty<Nat, DebateComment>();
+  let proposalCommentIndex = Map.empty<Nat, [Nat]>();
+  let proposerIndex = Map.empty<Principal, [Nat]>();
+  var nextProposalId : Nat = 1;
+  var nextCommentId : Nat = 1;
+
+  // === G2 Storage ===
+
+  let votes = Map.empty<Nat, Vote>();
+  let proposalVoteIndex = Map.empty<Nat, [Nat]>();
+  let memberVoteIndex = Map.empty<Principal, [Nat]>();
+  let delegations = Map.empty<Principal, DelegationRecord>();
+  var nextVoteId : Nat = 1;
+
+  // === G1 Functions: Proposal Lifecycle ===
+
+  public shared ({ caller }) func createProposal(
+    proposalType : ProposalType,
+    title : Text,
+    description : Text,
+    mechanism : VotingMechanism,
+    quorumPercent : Nat,
+    sponsorThreshold : Nat,
+    voteWindowHours : Nat,
+    orgId : ?Text,
+    tags : [Text],
+  ) : async { #ok : Nat; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can create proposals");
+    };
+    let tenantId = switch (ownerToTenantId.get(caller)) {
+      case (?tid) { tid };
+      case (null) { "platform" };
+    };
+    let now = Time.now();
+    let proposalId = nextProposalId;
+    nextProposalId += 1;
+    let threshold = if (sponsorThreshold == 0) { 1 } else { sponsorThreshold };
+    let initialStatus : ProposalStatus = if (threshold == 1) { #review } else { #draft };
+    let newProposal : Proposal = {
+      id = proposalId;
+      proposer = caller;
+      tenantId;
+      orgId;
+      proposalType;
+      title;
+      description;
+      status = initialStatus;
+      mechanism;
+      quorumPercent;
+      sponsorThreshold = threshold;
+      sponsors = [caller];
+      voteWindowHours;
+      votingOpensAt = null;
+      votingClosesAt = null;
+      createdAt = now;
+      updatedAt = now;
+      enactedAt = null;
+      tags;
+    };
+    proposals.add(proposalId, newProposal);
+    proposalSponsorIndex.add(proposalId, [caller]);
+    let existingProposerIds = switch (proposerIndex.get(caller)) {
+      case (null) { [] };
+      case (?ids) { ids };
+    };
+    proposerIndex.add(caller, existingProposerIds.concat([proposalId]));
+    #ok(proposalId);
+  };
+
+  public shared ({ caller }) func sponsorProposal(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can sponsor proposals");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status != #draft) {
+          return #err("Proposal is not in draft status");
+        };
+        let currentSponsors = switch (proposalSponsorIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?s) { s };
+        };
+        let alreadySponsored = currentSponsors.find(func(p : Principal) : Bool { p == caller });
+        if (alreadySponsored != null) {
+          return #err("Already a sponsor of this proposal");
+        };
+        let newSponsors = currentSponsors.concat([caller]);
+        proposalSponsorIndex.add(proposalId, newSponsors);
+        let now = Time.now();
+        let updatedProposal = if (newSponsors.size() >= proposal.sponsorThreshold) {
+          { proposal with sponsors = newSponsors; status = #review; updatedAt = now }
+        } else {
+          { proposal with sponsors = newSponsors; updatedAt = now }
+        };
+        proposals.add(proposalId, updatedProposal);
+        #ok("Proposal sponsored successfully");
+      };
+    };
+  };
+
+  public shared ({ caller }) func withdrawSponsor(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can withdraw sponsorship");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status == #openVote or proposal.status == #closed or
+            proposal.status == #enacted or proposal.status == #cancelled) {
+          return #err("Cannot withdraw sponsorship at this stage");
+        };
+        let currentSponsors = switch (proposalSponsorIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?s) { s };
+        };
+        let newSponsors = currentSponsors.filter(func(p : Principal) : Bool { p != caller });
+        proposalSponsorIndex.add(proposalId, newSponsors);
+        let now = Time.now();
+        let newStatus : ProposalStatus = if (
+          proposal.status == #review and newSponsors.size() < proposal.sponsorThreshold
+        ) { #draft } else { proposal.status };
+        proposals.add(proposalId, { proposal with sponsors = newSponsors; status = newStatus; updatedAt = now });
+        #ok("Sponsorship withdrawn");
+      };
+    };
+  };
+
+  public shared ({ caller }) func openProposalForVoting(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      return #err("Unauthorized: Admins only");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status != #review) {
+          return #err("Proposal must be in review status to open for voting");
+        };
+        let now = Time.now();
+        let hourNs : Int = 3_600_000_000_000;
+        let windowNs : Int = proposal.voteWindowHours.toInt() * hourNs;
+        let opensAt = now;
+        let closesAt = now + windowNs;
+        let updatedProposal = {
+          proposal with
+          status = #openVote;
+          votingOpensAt = ?opensAt;
+          votingClosesAt = ?closesAt;
+          updatedAt = now;
+        };
+        proposals.add(proposalId, updatedProposal);
+        // Broadcast notification to all registered users
+        for ((principal, _userId) in principalToUserId.entries()) {
+          _createNotification(
+            principal,
+            "New Proposal Open for Voting",
+            "A proposal titled \"" # proposal.title # "\" is now open for voting. Cast your vote before it closes.",
+            #info,
+          );
+        };
+        #ok("Proposal opened for voting");
+      };
+    };
+  };
+
+  public shared ({ caller }) func closeProposal(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      return #err("Unauthorized: Admins only");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status != #openVote and proposal.status != #review) {
+          return #err("Proposal cannot be closed from its current status");
+        };
+        let now = Time.now();
+        proposals.add(proposalId, { proposal with status = #closed; updatedAt = now });
+        ignore _computeTally(proposalId);
+        #ok("Proposal closed");
+      };
+    };
+  };
+
+  public shared ({ caller }) func enactProposal(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      return #err("Unauthorized: Admins only");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status != #closed) {
+          return #err("Proposal must be closed before it can be enacted");
+        };
+        let now = Time.now();
+        proposals.add(proposalId, { proposal with status = #enacted; enactedAt = ?now; updatedAt = now });
+        #ok("Proposal enacted");
+      };
+    };
+  };
+
+  public shared ({ caller }) func cancelProposal(proposalId : Nat) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can cancel proposals");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        let isProposer = proposal.proposer == caller;
+        let isAdmin = AccessControl.isAdmin(accessControlState, caller);
+        if (not isProposer and not isAdmin) {
+          return #err("Unauthorized: Only the proposer or an admin can cancel");
+        };
+        if (proposal.status == #openVote) {
+          return #err("Cannot cancel a proposal that is currently open for voting");
+        };
+        let now = Time.now();
+        proposals.add(proposalId, { proposal with status = #cancelled; updatedAt = now });
+        #ok("Proposal cancelled");
+      };
+    };
+  };
+
+  public query func getProposal(proposalId : Nat) : async ?Proposal {
+    proposals.get(proposalId);
+  };
+
+  public query func listProposals() : async [Proposal] {
+    let result = proposals.values().filter(func(p : Proposal) : Bool { p.status != #cancelled }).toArray();
+    result.sort(func(a : Proposal, b : Proposal) : { #less; #equal; #greater } {
+      Int.compare(b.createdAt, a.createdAt)
+    });
+  };
+
+  public query func listProposalsByStatus(status : ProposalStatus) : async [Proposal] {
+    proposals.values().filter(func(p : Proposal) : Bool { p.status == status }).toArray();
+  };
+
+  public query func listProposalsByType(proposalType : ProposalType) : async [Proposal] {
+    proposals.values().filter(func(p : Proposal) : Bool { p.proposalType == proposalType and p.status != #cancelled }).toArray();
+  };
+
+  public query func getProposalSponsors(proposalId : Nat) : async [Principal] {
+    switch (proposalSponsorIndex.get(proposalId)) {
+      case (null) { [] };
+      case (?sponsors) { sponsors };
+    };
+  };
+
+  public shared ({ caller }) func addDebateComment(
+    proposalId : Nat,
+    content : Text,
+    parentCommentId : ?Nat,
+  ) : async { #ok : Nat; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can comment");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status == #cancelled) {
+          return #err("Cannot comment on a cancelled proposal");
+        };
+        let commentId = nextCommentId;
+        nextCommentId += 1;
+        let now = Time.now();
+        let comment : DebateComment = {
+          id = commentId;
+          proposalId;
+          author = caller;
+          content;
+          parentCommentId;
+          createdAt = now;
+          editedAt = null;
+          isDeleted = false;
+        };
+        debateComments.add(commentId, comment);
+        let existingCommentIds = switch (proposalCommentIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        proposalCommentIndex.add(proposalId, existingCommentIds.concat([commentId]));
+        #ok(commentId);
+      };
+    };
+  };
+
+  public shared ({ caller }) func editDebateComment(commentId : Nat, newContent : Text) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can edit comments");
+    };
+    switch (debateComments.get(commentId)) {
+      case (null) { #err("Comment not found") };
+      case (?comment) {
+        if (comment.author != caller) {
+          return #err("Unauthorized: Only the comment author can edit");
+        };
+        debateComments.add(commentId, {
+          comment with
+          content = newContent;
+          editedAt = ?Time.now();
+        });
+        #ok("Comment updated");
+      };
+    };
+  };
+
+  public query func getProposalComments(proposalId : Nat) : async [DebateComment] {
+    let ids = switch (proposalCommentIndex.get(proposalId)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    let allComments = ids.filterMap(func(id : Nat) : ?DebateComment { debateComments.get(id) });
+    let active = allComments.filter(func(c : DebateComment) : Bool { not c.isDeleted });
+    active.sort(func(a : DebateComment, b : DebateComment) : { #less; #equal; #greater } {
+      Int.compare(a.createdAt, b.createdAt)
+    });
+  };
+
+  // === G2 Functions: Voting Engine ===
+
+  public shared ({ caller }) func castVote(
+    proposalId : Nat,
+    choice : VoteChoice,
+    rankedChoices : [RankedChoiceEntry],
+  ) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can vote");
+    };
+    switch (proposals.get(proposalId)) {
+      case (null) { #err("Proposal not found") };
+      case (?proposal) {
+        if (proposal.status != #openVote) {
+          return #err("Proposal is not open for voting");
+        };
+        let now = Time.now();
+        switch (proposal.votingClosesAt) {
+          case (?closesAt) {
+            if (now > closesAt) {
+              return #err("Voting window has closed");
+            };
+          };
+          case (null) {};
+        };
+        // Check if already voted
+        let existingVoteIds = switch (memberVoteIndex.get(caller)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        let existingProposalVotes = switch (proposalVoteIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        let alreadyVoted = existingVoteIds.find(func(vid : Nat) : Bool {
+          existingProposalVotes.find(func(pvid : Nat) : Bool { pvid == vid }) != null
+        });
+        if (alreadyVoted != null) {
+          return #err("Already voted on this proposal");
+        };
+        let voteId = nextVoteId;
+        nextVoteId += 1;
+        let newVote : Vote = {
+          id = voteId;
+          proposalId;
+          voter = caller;
+          choice;
+          rankedChoices;
+          weight = 1;
+          delegatedTo = null;
+          castAt = now;
+        };
+        votes.add(voteId, newVote);
+        proposalVoteIndex.add(proposalId, existingProposalVotes.concat([voteId]));
+        memberVoteIndex.add(caller, existingVoteIds.concat([voteId]));
+        // For liquidDelegation: cast on behalf of any delegators who delegated to caller
+        if (proposal.mechanism == #liquidDelegation) {
+          for ((delegator, delegation) in delegations.entries()) {
+              if (delegation.isActive and delegation.delegateTo == caller) {
+              let delegatorMatch = switch (delegation.proposalId) {
+                case (null) { true };
+                case (?pid) { pid == proposalId };
+              };
+              if (delegatorMatch) {
+                let delegatorVoteIds = switch (memberVoteIndex.get(delegator)) {
+                  case (null) { [] };
+                  case (?ids) { ids };
+                };
+                let delegatorProposalVoteIds = switch (proposalVoteIndex.get(proposalId)) {
+                  case (null) { [] };
+                  case (?ids) { ids };
+                };
+                let delegatorAlreadyVoted = delegatorVoteIds.find(func(vid : Nat) : Bool {
+                  delegatorProposalVoteIds.find(func(pvid : Nat) : Bool { pvid == vid }) != null
+                });
+                if (delegatorAlreadyVoted == null) {
+                  let delegatedVoteId = nextVoteId;
+                  nextVoteId += 1;
+                  let delegatedVote : Vote = {
+                    id = delegatedVoteId;
+                    proposalId;
+                    voter = delegator;
+                    choice;
+                    rankedChoices;
+                    weight = 1;
+                    delegatedTo = ?caller;
+                    castAt = now;
+                  };
+                  votes.add(delegatedVoteId, delegatedVote);
+                  let latestProposalVoteIds = switch (proposalVoteIndex.get(proposalId)) {
+                    case (null) { [] };
+                    case (?ids) { ids };
+                  };
+                  proposalVoteIndex.add(proposalId, latestProposalVoteIds.concat([delegatedVoteId]));
+                  memberVoteIndex.add(delegator, delegatorVoteIds.concat([delegatedVoteId]));
+                };
+              };
+            };
+          };
+        };
+        #ok("Vote cast successfully");
+      };
+    };
+  };
+
+  public shared ({ caller }) func delegateVote(delegateTo : Principal, proposalId : ?Nat) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can delegate votes");
+    };
+    if (caller == delegateTo) {
+      return #err("Cannot delegate to yourself");
+    };
+    let now = Time.now();
+    let record : DelegationRecord = {
+      delegator = caller;
+      delegateTo;
+      proposalId;
+      createdAt = now;
+      revokedAt = null;
+      isActive = true;
+    };
+    delegations.add(caller, record);
+    #ok("Vote delegation set");
+  };
+
+  public shared ({ caller }) func revokeDelegation(proposalId : ?Nat) : async { #ok : Text; #err : Text } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      return #err("Unauthorized: Only authenticated users can revoke delegations");
+    };
+    switch (delegations.get(caller)) {
+      case (null) { #err("No active delegation found") };
+      case (?record) {
+        let matchesScope = switch (proposalId) {
+          case (null) { record.proposalId == null };
+          case (?pid) {
+            switch (record.proposalId) {
+              case (null) { false };
+              case (?rpid) { rpid == pid };
+            };
+          };
+        };
+        if (not matchesScope) {
+          return #err("Delegation scope does not match");
+        };
+        delegations.add(caller, { record with isActive = false; revokedAt = ?Time.now() });
+        #ok("Delegation revoked");
+      };
+    };
+  };
+
+  public query ({ caller }) func getMyDelegation() : async ?DelegationRecord {
+    switch (delegations.get(caller)) {
+      case (null) { null };
+      case (?record) {
+        if (record.isActive) { ?record } else { null };
+      };
+    };
+  };
+
+  public query func getVotesByProposal(proposalId : Nat) : async [Vote] {
+    let voteIds = switch (proposalVoteIndex.get(proposalId)) {
+      case (null) { return [] };
+      case (?ids) { ids };
+    };
+    voteIds.filterMap(func(vid : Nat) : ?Vote { votes.get(vid) });
+  };
+
+  public query func getMemberVote(proposalId : Nat, member : Principal) : async ?Vote {
+    let memberVoteIds = switch (memberVoteIndex.get(member)) {
+      case (null) { return null };
+      case (?ids) { ids };
+    };
+    let proposalVoteIds = switch (proposalVoteIndex.get(proposalId)) {
+      case (null) { return null };
+      case (?ids) { ids };
+    };
+    // Find a vote that belongs to both member and proposal
+    let matchingVoteId = memberVoteIds.find(func(vid : Nat) : Bool {
+      proposalVoteIds.find(func(pvid : Nat) : Bool { pvid == vid }) != null
+    });
+    switch (matchingVoteId) {
+      case (null) { null };
+      case (?vid) { votes.get(vid) };
+    };
+  };
+
+  public query func getVoteTally(proposalId : Nat) : async ?VoteTally {
+    _computeTally(proposalId);
+  };
+
+  private func _computeTally(proposalId : Nat) : ?VoteTally {
+    switch (proposals.get(proposalId)) {
+      case (null) { null };
+      case (?proposal) {
+        let voteIds = switch (proposalVoteIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        let proposalVotes = voteIds.filterMap(func(vid : Nat) : ?Vote { votes.get(vid) });
+        let totalVoters = users.size();
+        let totalVotesCast = proposalVotes.size();
+        var yesVotes : Nat = 0;
+        var noVotes : Nat = 0;
+        var abstainVotes : Nat = 0;
+        var yesWeight : Nat = 0;
+        var noWeight : Nat = 0;
+        var abstainWeight : Nat = 0;
+        // Tally ranked-choice candidate counts
+        let rankedCounts = Map.empty<Text, Nat>();
+        for (v in proposalVotes.values()) {
+          switch (v.choice) {
+            case (#yes) { yesVotes += 1; yesWeight += v.weight };
+            case (#no)  { noVotes += 1;  noWeight += v.weight };
+            case (#abstain) { abstainVotes += 1; abstainWeight += v.weight };
+          };
+          if (proposal.mechanism == #rankedChoice) {
+            // Count first-preference votes for ranked choice
+            let firstChoice = v.rankedChoices.find(func(e : RankedChoiceEntry) : Bool { e.rank == 1 });
+            switch (firstChoice) {
+              case (null) {};
+              case (?entry) {
+                let current = switch (rankedCounts.get(entry.candidateId)) {
+                  case (null) { 0 };
+                  case (?c) { c };
+                };
+                rankedCounts.add(entry.candidateId, current + 1);
+              };
+            };
+          };
+        };
+        let quorumMet = if (proposal.quorumPercent == 0) {
+          true
+        } else if (totalVoters == 0) {
+          false
+        } else {
+          (totalVotesCast * 100 / totalVoters) >= proposal.quorumPercent
+        };
+        let contested = yesWeight + noWeight;
+        let passed : Bool = if (not quorumMet) {
+          false
+        } else {
+          switch (proposal.mechanism) {
+            case (#simpleMajority or #liquidDelegation) {
+              yesWeight > noWeight
+            };
+            case (#supermajority66) {
+              contested > 0 and (yesWeight * 10000 / contested) >= 6667
+            };
+            case (#supermajority75) {
+              contested > 0 and (yesWeight * 10000 / contested) >= 7500
+            };
+            case (#rankedChoice) {
+              // Simple plurality for first-preference in ranked choice
+              var maxCandidate = ("", 0 : Nat);
+              for ((cand, cnt) in rankedCounts.entries()) {
+                if (cnt > maxCandidate.1) { maxCandidate := (cand, cnt) };
+              };
+              let maxEntry = maxCandidate;
+              maxEntry.1 > 0
+            };
+          };
+        };
+        let rankedResultsUnsorted = rankedCounts.entries().toArray();
+        let rankedResults = rankedResultsUnsorted.sort(func(a : (Text, Nat), b : (Text, Nat)) : { #less; #equal; #greater } {
+          Nat.compare(b.1, a.1)
+        });
+        ?{
+          proposalId;
+          mechanism = proposal.mechanism;
+          totalVoters;
+          totalVotesCast;
+          yesVotes;
+          noVotes;
+          abstainVotes;
+          yesWeight;
+          noWeight;
+          abstainWeight;
+          quorumMet;
+          quorumPercent = proposal.quorumPercent;
+          passed;
+          rankedResults;
+          tallyComputedAt = Time.now();
+        };
+      };
+    };
+  };
+
+  public query func getQuorumStatus(proposalId : Nat) : async {
+    totalVoters : Nat;
+    votesCast : Nat;
+    quorumPercent : Nat;
+    quorumMet : Bool;
+    percentVoted : Nat;
+  } {
+    switch (proposals.get(proposalId)) {
+      case (null) {
+        { totalVoters = 0; votesCast = 0; quorumPercent = 0; quorumMet = false; percentVoted = 0 }
+      };
+      case (?proposal) {
+        let voteIds = switch (proposalVoteIndex.get(proposalId)) {
+          case (null) { [] };
+          case (?ids) { ids };
+        };
+        let totalVoters = users.size();
+        let votesCast = voteIds.size();
+        let percentVoted = if (totalVoters == 0) { 0 } else { votesCast * 100 / totalVoters };
+        let quorumMet = if (proposal.quorumPercent == 0) {
+          true
+        } else {
+          percentVoted >= proposal.quorumPercent
+        };
+        { totalVoters; votesCast; quorumPercent = proposal.quorumPercent; quorumMet; percentVoted };
+      };
+    };
+  };
+
+  public query func listActiveProposals() : async [Proposal] {
+    let now = Time.now();
+    proposals.values().filter(func(p : Proposal) : Bool {
+      if (p.status != #openVote) { false }
+      else switch (p.votingClosesAt) {
+        case (null) { true };
+        case (?closesAt) { now < closesAt };
+      };
+    }).toArray();
+  };
+
 };

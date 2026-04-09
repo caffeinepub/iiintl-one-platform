@@ -7,34 +7,6 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface FSUPoolStatus {
-    totalOutstandingFSU: bigint;
-    valuePerUnitCents: bigint;
-    poolSizeUnits: bigint;
-    nextDistributionLabel: string;
-}
-export interface CommissionRate {
-    basisPoints: bigint;
-    tier: MembershipTierLevel;
-    flatAmountUnits: bigint;
-    isActive: boolean;
-    earningType: EarningType;
-    depthLevel: bigint;
-}
-export interface Tenant {
-    id: string;
-    status: TenantStatus;
-    subscription?: TenantSubscription;
-    ownerPrincipal: Principal;
-    name: string;
-    createdAt: bigint;
-    memberCount: bigint;
-    tier: TenantTier;
-    storageUsedMb: bigint;
-    updatedAt: bigint;
-    branding?: TenantBranding;
-    trialEndsAt?: bigint;
-}
 export interface CrowdfundingCampaign {
     id: string;
     status: CrowdfundingStatus;
@@ -74,12 +46,6 @@ export interface OrgMember {
     joinedAt: bigint;
     role: OrgMemberRole;
 }
-export interface TenantMember {
-    principal: Principal;
-    role: string;
-    tenantId: string;
-    addedAt: bigint;
-}
 export interface FSUTransaction {
     id: string;
     member: Principal;
@@ -96,34 +62,12 @@ export interface DownlineMember {
     tier: MembershipTierLevel;
     directReferralCount: bigint;
 }
-export interface Transaction {
-    id: bigint;
-    description: string;
-    walletAddress: string;
-    timestamp: bigint;
-    txType: TransactionType;
-    amountICP: number;
-}
-export interface TenantSubscription {
-    monthlyCents: bigint;
-    tier: TenantTier;
-    renewalDate: bigint;
-    startDate: bigint;
-}
 export interface Wallet {
     linkedAt: bigint;
     walletType: WalletType;
     address: string;
     balanceICP: number;
     walletLabel: string;
-}
-export interface CrowdfundingRewardTier {
-    id: string;
-    title: string;
-    description: string;
-    maxBackers?: bigint;
-    backerCount: bigint;
-    minPledgeCents: bigint;
 }
 export interface CrowdfundingMilestone {
     id: string;
@@ -132,14 +76,6 @@ export interface CrowdfundingMilestone {
     bonusFSUAmount: bigint;
     description: string;
     targetCents: bigint;
-}
-export interface RoyaltyPool {
-    id: string;
-    isDistributed: boolean;
-    period: string;
-    createdAt: bigint;
-    totalUnits: bigint;
-    poolType: RoyaltyPoolType;
 }
 export interface UserSummary {
     id: string;
@@ -166,6 +102,149 @@ export interface CrowdfundingPledge {
     amountCents: bigint;
     rewardTierId?: string;
     fsuEarned: bigint;
+}
+export interface Vote {
+    id: bigint;
+    weight: bigint;
+    voter: Principal;
+    delegatedTo?: Principal;
+    castAt: bigint;
+    choice: VoteChoice;
+    proposalId: bigint;
+    rankedChoices: Array<RankedChoiceEntry>;
+}
+export interface CrowdfundingConfig {
+    defaultFSUContributionBps: bigint;
+    milestoneAchievementBonusBps: bigint;
+    creatorFSUBonus: bigint;
+}
+export interface Proposal {
+    id: bigint;
+    status: ProposalStatus;
+    title: string;
+    mechanism: VotingMechanism;
+    enactedAt?: bigint;
+    orgId?: string;
+    createdAt: bigint;
+    tags: Array<string>;
+    description: string;
+    quorumPercent: bigint;
+    tenantId: string;
+    proposalType: ProposalType;
+    votingClosesAt?: bigint;
+    updatedAt: bigint;
+    votingOpensAt?: bigint;
+    voteWindowHours: bigint;
+    proposer: Principal;
+    sponsors: Array<Principal>;
+    sponsorThreshold: bigint;
+}
+export interface RankedChoiceEntry {
+    rank: bigint;
+    candidateId: string;
+}
+export interface Notification {
+    id: string;
+    title: string;
+    notifType: NotificationType;
+    createdAt: bigint;
+    recipient: Principal;
+    isRead: boolean;
+    message: string;
+}
+export interface CommissionRate {
+    basisPoints: bigint;
+    tier: MembershipTierLevel;
+    flatAmountUnits: bigint;
+    isActive: boolean;
+    earningType: EarningType;
+    depthLevel: bigint;
+}
+export interface Organization {
+    id: string;
+    region: string;
+    status: OrgStatus;
+    members: Array<OrgMember>;
+    orgType: string;
+    foundedYear: bigint;
+    name: string;
+    createdAt: bigint;
+    createdBy: Principal;
+    description: string;
+    website: string;
+}
+export interface UserProfile {
+    bio: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string;
+}
+export interface MemberTierRecord {
+    principal: Principal;
+    referralCode: string;
+    joinedAt: bigint;
+    tier: MembershipTierLevel;
+    upgradedAt: bigint;
+    sponsorPrincipal?: Principal;
+    sponsorCode?: string;
+}
+export interface Tenant {
+    id: string;
+    status: TenantStatus;
+    subscription?: TenantSubscription;
+    ownerPrincipal: Principal;
+    name: string;
+    createdAt: bigint;
+    memberCount: bigint;
+    tier: TenantTier;
+    storageUsedMb: bigint;
+    updatedAt: bigint;
+    branding?: TenantBranding;
+    trialEndsAt?: bigint;
+}
+export interface TenantMember {
+    principal: Principal;
+    role: string;
+    tenantId: string;
+    addedAt: bigint;
+}
+export interface DelegationRecord {
+    delegateTo: Principal;
+    createdAt: bigint;
+    isActive: boolean;
+    delegator: Principal;
+    proposalId?: bigint;
+    revokedAt?: bigint;
+}
+export interface Transaction {
+    id: bigint;
+    description: string;
+    walletAddress: string;
+    timestamp: bigint;
+    txType: TransactionType;
+    amountICP: number;
+}
+export interface TenantSubscription {
+    monthlyCents: bigint;
+    tier: TenantTier;
+    renewalDate: bigint;
+    startDate: bigint;
+}
+export interface CrowdfundingRewardTier {
+    id: string;
+    title: string;
+    description: string;
+    maxBackers?: bigint;
+    backerCount: bigint;
+    minPledgeCents: bigint;
+}
+export interface RoyaltyPool {
+    id: string;
+    isDistributed: boolean;
+    period: string;
+    createdAt: bigint;
+    totalUnits: bigint;
+    poolType: RoyaltyPoolType;
 }
 export interface Campaign {
     id: string;
@@ -194,11 +273,6 @@ export interface EarningRecord {
     amountUnits: bigint;
     depthLevel: bigint;
 }
-export interface CrowdfundingConfig {
-    defaultFSUContributionBps: bigint;
-    milestoneAchievementBonusBps: bigint;
-    creatorFSUBonus: bigint;
-}
 export interface BillingRecord {
     id: string;
     status: string;
@@ -207,6 +281,23 @@ export interface BillingRecord {
     amountCents: bigint;
     tenantId: string;
 }
+export interface VoteTally {
+    noVotes: bigint;
+    abstainWeight: bigint;
+    yesWeight: bigint;
+    totalVoters: bigint;
+    mechanism: VotingMechanism;
+    yesVotes: bigint;
+    quorumPercent: bigint;
+    totalVotesCast: bigint;
+    rankedResults: Array<[string, bigint]>;
+    quorumMet: boolean;
+    tallyComputedAt: bigint;
+    abstainVotes: bigint;
+    noWeight: bigint;
+    proposalId: bigint;
+    passed: boolean;
+}
 export interface ForumReply {
     id: bigint;
     body: string;
@@ -214,6 +305,16 @@ export interface ForumReply {
     createdBy: Principal;
     isModeratorReply: boolean;
     threadId: bigint;
+}
+export interface DebateComment {
+    id: bigint;
+    isDeleted: boolean;
+    content: string;
+    parentCommentId?: bigint;
+    createdAt: bigint;
+    author: Principal;
+    editedAt?: bigint;
+    proposalId: bigint;
 }
 export interface ForumThread {
     id: bigint;
@@ -229,48 +330,17 @@ export interface ForumThread {
     category: ForumCategory;
     isPinned: boolean;
 }
-export interface Notification {
-    id: string;
-    title: string;
-    notifType: NotificationType;
-    createdAt: bigint;
-    recipient: Principal;
-    isRead: boolean;
-    message: string;
-}
 export interface TenantBranding {
     orgName: string;
     primaryColor: string;
     logoUrl: string;
     welcomeMessage: string;
 }
-export interface Organization {
-    id: string;
-    region: string;
-    status: OrgStatus;
-    members: Array<OrgMember>;
-    orgType: string;
-    foundedYear: bigint;
-    name: string;
-    createdAt: bigint;
-    createdBy: Principal;
-    description: string;
-    website: string;
-}
-export interface MemberTierRecord {
-    principal: Principal;
-    referralCode: string;
-    joinedAt: bigint;
-    tier: MembershipTierLevel;
-    upgradedAt: bigint;
-    sponsorPrincipal?: Principal;
-    sponsorCode?: string;
-}
-export interface UserProfile {
-    bio: string;
-    displayName: string;
-    email: string;
-    avatarUrl: string;
+export interface FSUPoolStatus {
+    totalOutstandingFSU: bigint;
+    valuePerUnitCents: bigint;
+    poolSizeUnits: bigint;
+    nextDistributionLabel: string;
 }
 export enum CampaignStatus {
     active = "active",
@@ -353,6 +423,22 @@ export enum OrgStatus {
     active = "active",
     archived = "archived"
 }
+export enum ProposalStatus {
+    review = "review",
+    closed = "closed",
+    cancelled = "cancelled",
+    enacted = "enacted",
+    rejected = "rejected",
+    draft = "draft",
+    openVote = "openVote"
+}
+export enum ProposalType {
+    resolution = "resolution",
+    communityInitiative = "communityInitiative",
+    amendment = "amendment",
+    budget = "budget",
+    policy = "policy"
+}
 export enum Role {
     member = "member",
     admin = "admin",
@@ -390,6 +476,18 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export enum VoteChoice {
+    no = "no",
+    yes = "yes",
+    abstain = "abstain"
+}
+export enum VotingMechanism {
+    simpleMajority = "simpleMajority",
+    liquidDelegation = "liquidDelegation",
+    supermajority66 = "supermajority66",
+    supermajority75 = "supermajority75",
+    rankedChoice = "rankedChoice"
+}
 export enum WalletType {
     internetIdentity = "internetIdentity",
     plug = "plug",
@@ -397,6 +495,13 @@ export enum WalletType {
 }
 export interface backendInterface {
     addBillingRecord(tenantId: string, amountCents: bigint, description: string, status: string): Promise<string>;
+    addDebateComment(proposalId: bigint, content: string, parentCommentId: bigint | null): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     addTenantMember(tenantId: string, member: Principal, role: string): Promise<boolean>;
     addToFSUPool(amount: bigint, description: string): Promise<void>;
     addToRoyaltyPool(poolId: string, amount: bigint): Promise<boolean>;
@@ -408,7 +513,21 @@ export interface backendInterface {
     archiveOrg(orgId: string): Promise<boolean>;
     archiveThread(threadId: bigint): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    cancelProposal(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     cancelTenant(tenantId: string): Promise<boolean>;
+    castVote(proposalId: bigint, choice: VoteChoice, rankedChoices: Array<RankedChoiceEntry>): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     /**
      * / Admin-only. Iterates all tenants and suspends any that are in #trial
      * / status with a trialEndsAt timestamp that has already passed.
@@ -418,15 +537,50 @@ export interface backendInterface {
         checked: bigint;
         expired: bigint;
     }>;
+    closeProposal(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     createCampaign(title: string, description: string, campaignType: CampaignType, orgId: string, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<string>;
     createCrowdfundingCampaign(title: string, description: string, category: CrowdfundingCategory, fundingModel: CrowdfundingFundingModel, goalCents: bigint, currency: string, deadline: bigint, coverImageUrl: string, rewardTiers: Array<CrowdfundingRewardTier>, milestones: Array<CrowdfundingMilestone>, fsuContributionBps: bigint | null): Promise<string>;
     createOrg(name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<string>;
+    createProposal(proposalType: ProposalType, title: string, description: string, mechanism: VotingMechanism, quorumPercent: bigint, sponsorThreshold: bigint, voteWindowHours: bigint, orgId: string | null, tags: Array<string>): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     createRoyaltyPool(poolType: RoyaltyPoolType, period: string): Promise<string>;
     createTenant(name: string, tier: TenantTier, trialDays: bigint | null): Promise<string>;
     createThread(title: string, body: string, category: ForumCategory, orgId: string | null, tags: Array<string>): Promise<bigint>;
     deactivateCommissionRate(tier: MembershipTierLevel, depthLevel: bigint, earningType: EarningType): Promise<boolean>;
+    delegateVote(delegateTo: Principal, proposalId: bigint | null): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     distributeFSU(totalFSU: bigint, description: string): Promise<void>;
     distributeRoyaltyPool(poolId: string, minTierLevel: bigint): Promise<boolean>;
+    editDebateComment(commentId: bigint, newContent: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    enactProposal(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     finalizeCrowdfundingCampaign(campaignId: string): Promise<boolean>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -452,6 +606,8 @@ export interface backendInterface {
     getLinkedWallets(): Promise<Array<Wallet>>;
     getMemberEarnings(member: Principal): Promise<Array<EarningRecord>>;
     getMemberTierRecord(p: Principal): Promise<MemberTierRecord | null>;
+    getMemberVote(proposalId: bigint, member: Principal): Promise<Vote | null>;
+    getMyDelegation(): Promise<DelegationRecord | null>;
     getMyDownline(): Promise<Array<DownlineMember>>;
     getMyEarnings(): Promise<Array<EarningRecord>>;
     getMyEarningsSummary(): Promise<EarningsSummary>;
@@ -467,6 +623,16 @@ export interface backendInterface {
     getOrg(orgId: string): Promise<Organization | null>;
     getOrgMembers(orgId: string): Promise<Array<OrgMember>>;
     getPreferredLanguage(): Promise<string>;
+    getProposal(proposalId: bigint): Promise<Proposal | null>;
+    getProposalComments(proposalId: bigint): Promise<Array<DebateComment>>;
+    getProposalSponsors(proposalId: bigint): Promise<Array<Principal>>;
+    getQuorumStatus(proposalId: bigint): Promise<{
+        totalVoters: bigint;
+        quorumPercent: bigint;
+        percentVoted: bigint;
+        quorumMet: boolean;
+        votesCast: bigint;
+    }>;
     getReplies(threadId: bigint): Promise<Array<ForumReply>>;
     getRoyaltyPool(poolId: string): Promise<RoyaltyPool | null>;
     getTenant(tenantId: string): Promise<Tenant | null>;
@@ -483,6 +649,8 @@ export interface backendInterface {
     }>;
     getUserOrgs(userId: string): Promise<Array<Organization>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getVoteTally(proposalId: bigint): Promise<VoteTally | null>;
+    getVotesByProposal(proposalId: bigint): Promise<Array<Vote>>;
     getWalletBalance(address: string): Promise<number>;
     incrementThreadView(threadId: bigint): Promise<boolean>;
     initMemberMLM(sponsorCode: string | null): Promise<string>;
@@ -494,6 +662,7 @@ export interface backendInterface {
     linkWallet(walletType: WalletType, address: string, walletLabel: string): Promise<void>;
     listActiveCampaigns(): Promise<Array<Campaign>>;
     listActiveOrgs(): Promise<Array<Organization>>;
+    listActiveProposals(): Promise<Array<Proposal>>;
     listAllMemberTiers(): Promise<Array<MemberTierRecord>>;
     listBillingHistory(tenantId: string): Promise<Array<BillingRecord>>;
     listCampaigns(): Promise<Array<Campaign>>;
@@ -502,6 +671,9 @@ export interface backendInterface {
     listCrowdfundingCampaignsByCategory(category: CrowdfundingCategory): Promise<Array<CrowdfundingCampaign>>;
     listMyCrowdfundingCampaigns(): Promise<Array<CrowdfundingCampaign>>;
     listOrgs(): Promise<Array<Organization>>;
+    listProposals(): Promise<Array<Proposal>>;
+    listProposalsByStatus(status: ProposalStatus): Promise<Array<Proposal>>;
+    listProposalsByType(proposalType: ProposalType): Promise<Array<Proposal>>;
     listRoyaltyPools(): Promise<Array<RoyaltyPool>>;
     listTenantMembers(tenantId: string): Promise<Array<TenantMember>>;
     listTenants(): Promise<Array<Tenant>>;
@@ -512,6 +684,13 @@ export interface backendInterface {
     lockThread(threadId: bigint): Promise<boolean>;
     markEarningPaid(earnId: string): Promise<boolean>;
     markNotificationRead(notifId: string): Promise<boolean>;
+    openProposalForVoting(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     pinThread(threadId: bigint): Promise<boolean>;
     pledgeToCrowdfundingCampaign(campaignId: string, amountCents: bigint, rewardTierId: string | null, referrerCode: string | null): Promise<string>;
     processReferralChainBonus(referredMember: Principal, baseAmount: bigint, earningType: EarningType, description: string): Promise<void>;
@@ -524,6 +703,13 @@ export interface backendInterface {
     removeTenantMember(tenantId: string, member: Principal): Promise<boolean>;
     replyToThread(threadId: bigint, body: string): Promise<bigint>;
     resolveReferralCode(code: string): Promise<Principal | null>;
+    revokeDelegation(proposalId: bigint | null): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     runPayCycle(member: Principal): Promise<bigint>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     /**
@@ -536,6 +722,13 @@ export interface backendInterface {
     setCrowdfundingConfig(defaultFSUContributionBps: bigint, creatorFSUBonus: bigint, milestoneAchievementBonusBps: bigint): Promise<void>;
     setMemberTier(target: Principal, tier: MembershipTierLevel): Promise<boolean>;
     setPreferredLanguage(lang: string): Promise<void>;
+    sponsorProposal(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     suspendTenant(tenantId: string): Promise<boolean>;
     unlinkWallet(address: string): Promise<void>;
     updateCampaign(id: string, title: string, description: string, campaignType: CampaignType, goal: bigint, startDate: bigint, endDate: bigint, tags: Array<string>): Promise<boolean>;
@@ -543,4 +736,11 @@ export interface backendInterface {
     updateOrg(orgId: string, name: string, description: string, region: string, orgType: string, website: string, foundedYear: bigint): Promise<boolean>;
     updateTenantBranding(tenantId: string, logoUrl: string, primaryColor: string, orgName: string, welcomeMessage: string): Promise<boolean>;
     upgradeMemberTier(tier: MembershipTierLevel): Promise<boolean>;
+    withdrawSponsor(proposalId: bigint): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
 }

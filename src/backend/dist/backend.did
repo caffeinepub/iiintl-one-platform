@@ -12,6 +12,52 @@ type Wallet =
    walletLabel: text;
    walletType: WalletType;
  };
+type VotingMechanism = 
+ variant {
+   liquidDelegation;
+   rankedChoice;
+   simpleMajority;
+   supermajority66;
+   supermajority75;
+ };
+type VoteTally = 
+ record {
+   abstainVotes: nat;
+   abstainWeight: nat;
+   mechanism: VotingMechanism;
+   noVotes: nat;
+   noWeight: nat;
+   passed: bool;
+   proposalId: nat;
+   quorumMet: bool;
+   quorumPercent: nat;
+   rankedResults: vec record {
+                        text;
+                        nat;
+                      };
+   tallyComputedAt: int;
+   totalVoters: nat;
+   totalVotesCast: nat;
+   yesVotes: nat;
+   yesWeight: nat;
+ };
+type VoteChoice = 
+ variant {
+   abstain;
+   no;
+   yes;
+ };
+type Vote = 
+ record {
+   castAt: int;
+   choice: VoteChoice;
+   delegatedTo: opt principal;
+   id: nat;
+   proposalId: nat;
+   rankedChoices: vec RankedChoiceEntry;
+   voter: principal;
+   weight: nat;
+ };
 type UserSummary = 
  record {
    avatarUrl: text;
@@ -126,6 +172,51 @@ type Role =
    guest;
    member;
    moderator;
+ };
+type RankedChoiceEntry = 
+ record {
+   candidateId: text;
+   rank: nat;
+ };
+type ProposalType = 
+ variant {
+   amendment;
+   budget;
+   communityInitiative;
+   policy;
+   resolution;
+ };
+type ProposalStatus = 
+ variant {
+   cancelled;
+   closed;
+   draft;
+   enacted;
+   openVote;
+   rejected;
+   review;
+ };
+type Proposal = 
+ record {
+   createdAt: int;
+   description: text;
+   enactedAt: opt int;
+   id: nat;
+   mechanism: VotingMechanism;
+   orgId: opt text;
+   proposalType: ProposalType;
+   proposer: principal;
+   quorumPercent: nat;
+   sponsorThreshold: nat;
+   sponsors: vec principal;
+   status: ProposalStatus;
+   tags: vec text;
+   tenantId: text;
+   title: text;
+   updatedAt: int;
+   voteWindowHours: nat;
+   votingClosesAt: opt int;
+   votingOpensAt: opt int;
  };
 type Organization = 
  record {
@@ -303,6 +394,26 @@ type DownlineMember =
    referralCode: text;
    tier: MembershipTierLevel;
  };
+type DelegationRecord = 
+ record {
+   createdAt: int;
+   delegateTo: principal;
+   delegator: principal;
+   isActive: bool;
+   proposalId: opt nat;
+   revokedAt: opt int;
+ };
+type DebateComment = 
+ record {
+   author: principal;
+   content: text;
+   createdAt: int;
+   editedAt: opt int;
+   id: nat;
+   isDeleted: bool;
+   parentCommentId: opt nat;
+   proposalId: nat;
+ };
 type CrowdfundingStatus = 
  variant {
    active;
@@ -440,6 +551,11 @@ service : {
   _initializeAccessControl: () -> ();
   addBillingRecord: (tenantId: text, amountCents: nat, description: text,
    status: text) -> (text);
+  addDebateComment: (proposalId: nat, content: text, parentCommentId:
+   opt nat) -> (variant {
+                  err: text;
+                  ok: nat;
+                });
   addTenantMember: (tenantId: text, member: principal, role: text) -> (bool);
   addToFSUPool: (amount: nat, description: text) -> ();
   addToRoyaltyPool: (poolId: text, amount: nat) -> (bool);
@@ -453,7 +569,16 @@ service : {
   archiveOrg: (orgId: text) -> (bool);
   archiveThread: (threadId: nat) -> (bool);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  cancelProposal: (proposalId: nat) -> (variant {
+                                          err: text;
+                                          ok: text;
+                                        });
   cancelTenant: (tenantId: text) -> (bool);
+  castVote: (proposalId: nat, choice: VoteChoice, rankedChoices:
+   vec RankedChoiceEntry) -> (variant {
+                                err: text;
+                                ok: text;
+                              });
   /// Admin-only. Iterates all tenants and suspends any that are in #trial
   /// status with a trialEndsAt timestamp that has already passed.
   /// Returns the count of tenants checked and the count expired.
@@ -461,6 +586,10 @@ service : {
                                  checked: nat;
                                  expired: nat;
                                });
+  closeProposal: (proposalId: nat) -> (variant {
+                                         err: text;
+                                         ok: text;
+                                       });
   createCampaign: (title: text, description: text, campaignType:
    CampaignType, orgId: text, goal: nat, startDate: int, endDate: int, tags:
    vec text) -> (text);
@@ -471,14 +600,35 @@ service : {
    fsuContributionBps: opt nat) -> (text);
   createOrg: (name: text, description: text, region: text, orgType: text,
    website: text, foundedYear: int) -> (text);
+  createProposal: (proposalType: ProposalType, title: text, description:
+   text, mechanism: VotingMechanism, quorumPercent: nat, sponsorThreshold:
+   nat, voteWindowHours: nat, orgId: opt text, tags: vec text) ->
+   (variant {
+      err: text;
+      ok: nat;
+    });
   createRoyaltyPool: (poolType: RoyaltyPoolType, period: text) -> (text);
   createTenant: (name: text, tier: TenantTier, trialDays: opt nat) -> (text);
   createThread: (title: text, body: text, category: ForumCategory, orgId:
    opt text, tags: vec text) -> (nat);
   deactivateCommissionRate: (tier: MembershipTierLevel, depthLevel: nat,
    earningType: EarningType) -> (bool);
+  delegateVote: (delegateTo: principal, proposalId: opt nat) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
   distributeFSU: (totalFSU: nat, description: text) -> ();
   distributeRoyaltyPool: (poolId: text, minTierLevel: nat) -> (bool);
+  editDebateComment: (commentId: nat, newContent: text) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
+  enactProposal: (proposalId: nat) -> (variant {
+                                         err: text;
+                                         ok: text;
+                                       });
   finalizeCrowdfundingCampaign: (campaignId: text) -> (bool);
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
@@ -505,6 +655,8 @@ service : {
   getLinkedWallets: () -> (vec Wallet) query;
   getMemberEarnings: (member: principal) -> (vec EarningRecord) query;
   getMemberTierRecord: (p: principal) -> (opt MemberTierRecord) query;
+  getMemberVote: (proposalId: nat, member: principal) -> (opt Vote) query;
+  getMyDelegation: () -> (opt DelegationRecord) query;
   getMyDownline: () -> (vec DownlineMember) query;
   getMyEarnings: () -> (vec EarningRecord) query;
   getMyEarningsSummary: () -> (EarningsSummary) query;
@@ -520,6 +672,17 @@ service : {
   getOrg: (orgId: text) -> (opt Organization) query;
   getOrgMembers: (orgId: text) -> (vec OrgMember) query;
   getPreferredLanguage: () -> (text) query;
+  getProposal: (proposalId: nat) -> (opt Proposal) query;
+  getProposalComments: (proposalId: nat) -> (vec DebateComment) query;
+  getProposalSponsors: (proposalId: nat) -> (vec principal) query;
+  getQuorumStatus: (proposalId: nat) ->
+   (record {
+      percentVoted: nat;
+      quorumMet: bool;
+      quorumPercent: nat;
+      totalVoters: nat;
+      votesCast: nat;
+    }) query;
   getReplies: (threadId: nat) -> (vec ForumReply) query;
   getRoyaltyPool: (poolId: text) -> (opt RoyaltyPool) query;
   getTenant: (tenantId: text) -> (opt Tenant) query;
@@ -535,6 +698,8 @@ service : {
     }) query;
   getUserOrgs: (userId: text) -> (vec Organization) query;
   getUserProfile: (user: principal) -> (opt UserProfile) query;
+  getVoteTally: (proposalId: nat) -> (opt VoteTally) query;
+  getVotesByProposal: (proposalId: nat) -> (vec Vote) query;
   getWalletBalance: (address: text) -> (float64) query;
   incrementThreadView: (threadId: nat) -> (bool);
   initMemberMLM: (sponsorCode: opt text) -> (text);
@@ -547,6 +712,7 @@ service : {
    ();
   listActiveCampaigns: () -> (vec Campaign) query;
   listActiveOrgs: () -> (vec Organization) query;
+  listActiveProposals: () -> (vec Proposal) query;
   listAllMemberTiers: () -> (vec MemberTierRecord) query;
   listBillingHistory: (tenantId: text) -> (vec BillingRecord) query;
   listCampaigns: () -> (vec Campaign) query;
@@ -556,6 +722,9 @@ service : {
    (vec CrowdfundingCampaign) query;
   listMyCrowdfundingCampaigns: () -> (vec CrowdfundingCampaign) query;
   listOrgs: () -> (vec Organization) query;
+  listProposals: () -> (vec Proposal) query;
+  listProposalsByStatus: (status: ProposalStatus) -> (vec Proposal) query;
+  listProposalsByType: (proposalType: ProposalType) -> (vec Proposal) query;
   listRoyaltyPools: () -> (vec RoyaltyPool) query;
   listTenantMembers: (tenantId: text) -> (vec TenantMember) query;
   listTenants: () -> (vec Tenant) query;
@@ -566,6 +735,10 @@ service : {
   lockThread: (threadId: nat) -> (bool);
   markEarningPaid: (earnId: text) -> (bool);
   markNotificationRead: (notifId: text) -> (bool);
+  openProposalForVoting: (proposalId: nat) -> (variant {
+                                                 err: text;
+                                                 ok: text;
+                                               });
   pinThread: (threadId: nat) -> (bool);
   pledgeToCrowdfundingCampaign: (campaignId: text, amountCents: nat,
    rewardTierId: opt text, referrerCode: opt text) -> (text);
@@ -581,6 +754,10 @@ service : {
   removeTenantMember: (tenantId: text, member: principal) -> (bool);
   replyToThread: (threadId: nat, body: text) -> (nat);
   resolveReferralCode: (code: text) -> (opt principal) query;
+  revokeDelegation: (proposalId: opt nat) -> (variant {
+                                                err: text;
+                                                ok: text;
+                                              });
   runPayCycle: (member: principal) -> (nat);
   saveCallerUserProfile: (profile: UserProfile) -> ();
   /// Sends in-platform notifications to tenant owners based on days remaining
@@ -594,6 +771,10 @@ service : {
    nat, milestoneAchievementBonusBps: nat) -> ();
   setMemberTier: (target: principal, tier: MembershipTierLevel) -> (bool);
   setPreferredLanguage: (lang: text) -> ();
+  sponsorProposal: (proposalId: nat) -> (variant {
+                                           err: text;
+                                           ok: text;
+                                         });
   suspendTenant: (tenantId: text) -> (bool);
   unlinkWallet: (address: text) -> ();
   updateCampaign: (id: text, title: text, description: text, campaignType:
@@ -606,4 +787,8 @@ service : {
   updateTenantBranding: (tenantId: text, logoUrl: text, primaryColor: 
    text, orgName: text, welcomeMessage: text) -> (bool);
   upgradeMemberTier: (tier: MembershipTierLevel) -> (bool);
+  withdrawSponsor: (proposalId: nat) -> (variant {
+                                           err: text;
+                                           ok: text;
+                                         });
 }

@@ -88,11 +88,34 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const VoteChoice = IDL.Variant({
+  'no' : IDL.Null,
+  'yes' : IDL.Null,
+  'abstain' : IDL.Null,
+});
+export const RankedChoiceEntry = IDL.Record({
+  'rank' : IDL.Nat,
+  'candidateId' : IDL.Text,
+});
 export const CampaignType = IDL.Variant({
   'action' : IDL.Null,
   'awareness' : IDL.Null,
   'fundraiser' : IDL.Null,
   'petition' : IDL.Null,
+});
+export const ProposalType = IDL.Variant({
+  'resolution' : IDL.Null,
+  'communityInitiative' : IDL.Null,
+  'amendment' : IDL.Null,
+  'budget' : IDL.Null,
+  'policy' : IDL.Null,
+});
+export const VotingMechanism = IDL.Variant({
+  'simpleMajority' : IDL.Null,
+  'liquidDelegation' : IDL.Null,
+  'supermajority66' : IDL.Null,
+  'supermajority75' : IDL.Null,
+  'rankedChoice' : IDL.Null,
 });
 export const RoyaltyPoolType = IDL.Variant({
   'event' : IDL.Null,
@@ -246,6 +269,24 @@ export const MemberTierRecord = IDL.Record({
   'sponsorPrincipal' : IDL.Opt(IDL.Principal),
   'sponsorCode' : IDL.Opt(IDL.Text),
 });
+export const Vote = IDL.Record({
+  'id' : IDL.Nat,
+  'weight' : IDL.Nat,
+  'voter' : IDL.Principal,
+  'delegatedTo' : IDL.Opt(IDL.Principal),
+  'castAt' : IDL.Int,
+  'choice' : VoteChoice,
+  'proposalId' : IDL.Nat,
+  'rankedChoices' : IDL.Vec(RankedChoiceEntry),
+});
+export const DelegationRecord = IDL.Record({
+  'delegateTo' : IDL.Principal,
+  'createdAt' : IDL.Int,
+  'isActive' : IDL.Bool,
+  'delegator' : IDL.Principal,
+  'proposalId' : IDL.Opt(IDL.Nat),
+  'revokedAt' : IDL.Opt(IDL.Int),
+});
 export const DownlineMember = IDL.Record({
   'principal' : IDL.Principal,
   'referralCode' : IDL.Text,
@@ -324,6 +365,46 @@ export const Organization = IDL.Record({
   'description' : IDL.Text,
   'website' : IDL.Text,
 });
+export const ProposalStatus = IDL.Variant({
+  'review' : IDL.Null,
+  'closed' : IDL.Null,
+  'cancelled' : IDL.Null,
+  'enacted' : IDL.Null,
+  'rejected' : IDL.Null,
+  'draft' : IDL.Null,
+  'openVote' : IDL.Null,
+});
+export const Proposal = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : ProposalStatus,
+  'title' : IDL.Text,
+  'mechanism' : VotingMechanism,
+  'enactedAt' : IDL.Opt(IDL.Int),
+  'orgId' : IDL.Opt(IDL.Text),
+  'createdAt' : IDL.Int,
+  'tags' : IDL.Vec(IDL.Text),
+  'description' : IDL.Text,
+  'quorumPercent' : IDL.Nat,
+  'tenantId' : IDL.Text,
+  'proposalType' : ProposalType,
+  'votingClosesAt' : IDL.Opt(IDL.Int),
+  'updatedAt' : IDL.Int,
+  'votingOpensAt' : IDL.Opt(IDL.Int),
+  'voteWindowHours' : IDL.Nat,
+  'proposer' : IDL.Principal,
+  'sponsors' : IDL.Vec(IDL.Principal),
+  'sponsorThreshold' : IDL.Nat,
+});
+export const DebateComment = IDL.Record({
+  'id' : IDL.Nat,
+  'isDeleted' : IDL.Bool,
+  'content' : IDL.Text,
+  'parentCommentId' : IDL.Opt(IDL.Nat),
+  'createdAt' : IDL.Int,
+  'author' : IDL.Principal,
+  'editedAt' : IDL.Opt(IDL.Int),
+  'proposalId' : IDL.Nat,
+});
 export const ForumReply = IDL.Record({
   'id' : IDL.Nat,
   'body' : IDL.Text,
@@ -367,6 +448,23 @@ export const Transaction = IDL.Record({
   'txType' : TransactionType,
   'amountICP' : IDL.Float64,
 });
+export const VoteTally = IDL.Record({
+  'noVotes' : IDL.Nat,
+  'abstainWeight' : IDL.Nat,
+  'yesWeight' : IDL.Nat,
+  'totalVoters' : IDL.Nat,
+  'mechanism' : VotingMechanism,
+  'yesVotes' : IDL.Nat,
+  'quorumPercent' : IDL.Nat,
+  'totalVotesCast' : IDL.Nat,
+  'rankedResults' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+  'quorumMet' : IDL.Bool,
+  'tallyComputedAt' : IDL.Int,
+  'abstainVotes' : IDL.Nat,
+  'noWeight' : IDL.Nat,
+  'proposalId' : IDL.Nat,
+  'passed' : IDL.Bool,
+});
 export const BillingRecord = IDL.Record({
   'id' : IDL.Text,
   'status' : IDL.Text,
@@ -404,6 +502,11 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'addDebateComment' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      [],
+    ),
   'addTenantMember' : IDL.Func(
       [IDL.Text, IDL.Principal, IDL.Text],
       [IDL.Bool],
@@ -431,10 +534,25 @@ export const idlService = IDL.Service({
   'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'cancelProposal' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'cancelTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'castVote' : IDL.Func(
+      [IDL.Nat, VoteChoice, IDL.Vec(RankedChoiceEntry)],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'checkAndExpireTrials' : IDL.Func(
       [],
       [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+      [],
+    ),
+  'closeProposal' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
       [],
     ),
   'createCampaign' : IDL.Func(
@@ -473,6 +591,21 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'createProposal' : IDL.Func(
+      [
+        ProposalType,
+        IDL.Text,
+        IDL.Text,
+        VotingMechanism,
+        IDL.Nat,
+        IDL.Nat,
+        IDL.Nat,
+        IDL.Opt(IDL.Text),
+        IDL.Vec(IDL.Text),
+      ],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      [],
+    ),
   'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
   'createTenant' : IDL.Func(
       [IDL.Text, TenantTier, IDL.Opt(IDL.Nat)],
@@ -489,8 +622,23 @@ export const idlService = IDL.Service({
       [IDL.Bool],
       [],
     ),
+  'delegateVote' : IDL.Func(
+      [IDL.Principal, IDL.Opt(IDL.Nat)],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'distributeFSU' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'distributeRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+  'editDebateComment' : IDL.Func(
+      [IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
+  'enactProposal' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'finalizeCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -540,6 +688,12 @@ export const idlService = IDL.Service({
       [IDL.Opt(MemberTierRecord)],
       ['query'],
     ),
+  'getMemberVote' : IDL.Func(
+      [IDL.Nat, IDL.Principal],
+      [IDL.Opt(Vote)],
+      ['query'],
+    ),
+  'getMyDelegation' : IDL.Func([], [IDL.Opt(DelegationRecord)], ['query']),
   'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
   'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
   'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
@@ -559,6 +713,30 @@ export const idlService = IDL.Service({
   'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
   'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
   'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
+  'getProposal' : IDL.Func([IDL.Nat], [IDL.Opt(Proposal)], ['query']),
+  'getProposalComments' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(DebateComment)],
+      ['query'],
+    ),
+  'getProposalSponsors' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(IDL.Principal)],
+      ['query'],
+    ),
+  'getQuorumStatus' : IDL.Func(
+      [IDL.Nat],
+      [
+        IDL.Record({
+          'totalVoters' : IDL.Nat,
+          'quorumPercent' : IDL.Nat,
+          'percentVoted' : IDL.Nat,
+          'quorumMet' : IDL.Bool,
+          'votesCast' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
   'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
   'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
   'getTenant' : IDL.Func([IDL.Text], [IDL.Opt(Tenant)], ['query']),
@@ -584,6 +762,8 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getVoteTally' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
+  'getVotesByProposal' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
   'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
   'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
@@ -595,6 +775,7 @@ export const idlService = IDL.Service({
   'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
   'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
   'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listActiveProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
   'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
   'listBillingHistory' : IDL.Func(
       [IDL.Text],
@@ -619,6 +800,17 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+  'listProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+  'listProposalsByStatus' : IDL.Func(
+      [ProposalStatus],
+      [IDL.Vec(Proposal)],
+      ['query'],
+    ),
+  'listProposalsByType' : IDL.Func(
+      [ProposalType],
+      [IDL.Vec(Proposal)],
+      ['query'],
+    ),
   'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
   'listTenantMembers' : IDL.Func(
       [IDL.Text],
@@ -637,6 +829,11 @@ export const idlService = IDL.Service({
   'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'openProposalForVoting' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'pledgeToCrowdfundingCampaign' : IDL.Func(
       [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
@@ -665,6 +862,11 @@ export const idlService = IDL.Service({
       [IDL.Opt(IDL.Principal)],
       ['query'],
     ),
+  'revokeDelegation' : IDL.Func(
+      [IDL.Opt(IDL.Nat)],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'sendTrialExpiryNotifications' : IDL.Func([], [IDL.Text], []),
@@ -680,6 +882,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
+  'sponsorProposal' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'unlinkWallet' : IDL.Func([IDL.Text], [], []),
   'updateCampaign' : IDL.Func(
@@ -712,6 +919,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'upgradeMemberTier' : IDL.Func([MembershipTierLevel], [IDL.Bool], []),
+  'withdrawSponsor' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
@@ -797,11 +1009,34 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const VoteChoice = IDL.Variant({
+    'no' : IDL.Null,
+    'yes' : IDL.Null,
+    'abstain' : IDL.Null,
+  });
+  const RankedChoiceEntry = IDL.Record({
+    'rank' : IDL.Nat,
+    'candidateId' : IDL.Text,
+  });
   const CampaignType = IDL.Variant({
     'action' : IDL.Null,
     'awareness' : IDL.Null,
     'fundraiser' : IDL.Null,
     'petition' : IDL.Null,
+  });
+  const ProposalType = IDL.Variant({
+    'resolution' : IDL.Null,
+    'communityInitiative' : IDL.Null,
+    'amendment' : IDL.Null,
+    'budget' : IDL.Null,
+    'policy' : IDL.Null,
+  });
+  const VotingMechanism = IDL.Variant({
+    'simpleMajority' : IDL.Null,
+    'liquidDelegation' : IDL.Null,
+    'supermajority66' : IDL.Null,
+    'supermajority75' : IDL.Null,
+    'rankedChoice' : IDL.Null,
   });
   const RoyaltyPoolType = IDL.Variant({
     'event' : IDL.Null,
@@ -955,6 +1190,24 @@ export const idlFactory = ({ IDL }) => {
     'sponsorPrincipal' : IDL.Opt(IDL.Principal),
     'sponsorCode' : IDL.Opt(IDL.Text),
   });
+  const Vote = IDL.Record({
+    'id' : IDL.Nat,
+    'weight' : IDL.Nat,
+    'voter' : IDL.Principal,
+    'delegatedTo' : IDL.Opt(IDL.Principal),
+    'castAt' : IDL.Int,
+    'choice' : VoteChoice,
+    'proposalId' : IDL.Nat,
+    'rankedChoices' : IDL.Vec(RankedChoiceEntry),
+  });
+  const DelegationRecord = IDL.Record({
+    'delegateTo' : IDL.Principal,
+    'createdAt' : IDL.Int,
+    'isActive' : IDL.Bool,
+    'delegator' : IDL.Principal,
+    'proposalId' : IDL.Opt(IDL.Nat),
+    'revokedAt' : IDL.Opt(IDL.Int),
+  });
   const DownlineMember = IDL.Record({
     'principal' : IDL.Principal,
     'referralCode' : IDL.Text,
@@ -1030,6 +1283,46 @@ export const idlFactory = ({ IDL }) => {
     'description' : IDL.Text,
     'website' : IDL.Text,
   });
+  const ProposalStatus = IDL.Variant({
+    'review' : IDL.Null,
+    'closed' : IDL.Null,
+    'cancelled' : IDL.Null,
+    'enacted' : IDL.Null,
+    'rejected' : IDL.Null,
+    'draft' : IDL.Null,
+    'openVote' : IDL.Null,
+  });
+  const Proposal = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : ProposalStatus,
+    'title' : IDL.Text,
+    'mechanism' : VotingMechanism,
+    'enactedAt' : IDL.Opt(IDL.Int),
+    'orgId' : IDL.Opt(IDL.Text),
+    'createdAt' : IDL.Int,
+    'tags' : IDL.Vec(IDL.Text),
+    'description' : IDL.Text,
+    'quorumPercent' : IDL.Nat,
+    'tenantId' : IDL.Text,
+    'proposalType' : ProposalType,
+    'votingClosesAt' : IDL.Opt(IDL.Int),
+    'updatedAt' : IDL.Int,
+    'votingOpensAt' : IDL.Opt(IDL.Int),
+    'voteWindowHours' : IDL.Nat,
+    'proposer' : IDL.Principal,
+    'sponsors' : IDL.Vec(IDL.Principal),
+    'sponsorThreshold' : IDL.Nat,
+  });
+  const DebateComment = IDL.Record({
+    'id' : IDL.Nat,
+    'isDeleted' : IDL.Bool,
+    'content' : IDL.Text,
+    'parentCommentId' : IDL.Opt(IDL.Nat),
+    'createdAt' : IDL.Int,
+    'author' : IDL.Principal,
+    'editedAt' : IDL.Opt(IDL.Int),
+    'proposalId' : IDL.Nat,
+  });
   const ForumReply = IDL.Record({
     'id' : IDL.Nat,
     'body' : IDL.Text,
@@ -1073,6 +1366,23 @@ export const idlFactory = ({ IDL }) => {
     'txType' : TransactionType,
     'amountICP' : IDL.Float64,
   });
+  const VoteTally = IDL.Record({
+    'noVotes' : IDL.Nat,
+    'abstainWeight' : IDL.Nat,
+    'yesWeight' : IDL.Nat,
+    'totalVoters' : IDL.Nat,
+    'mechanism' : VotingMechanism,
+    'yesVotes' : IDL.Nat,
+    'quorumPercent' : IDL.Nat,
+    'totalVotesCast' : IDL.Nat,
+    'rankedResults' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+    'quorumMet' : IDL.Bool,
+    'tallyComputedAt' : IDL.Int,
+    'abstainVotes' : IDL.Nat,
+    'noWeight' : IDL.Nat,
+    'proposalId' : IDL.Nat,
+    'passed' : IDL.Bool,
+  });
   const BillingRecord = IDL.Record({
     'id' : IDL.Text,
     'status' : IDL.Text,
@@ -1110,6 +1420,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'addDebateComment' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Opt(IDL.Nat)],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        [],
+      ),
     'addTenantMember' : IDL.Func(
         [IDL.Text, IDL.Principal, IDL.Text],
         [IDL.Bool],
@@ -1137,10 +1452,25 @@ export const idlFactory = ({ IDL }) => {
     'archiveOrg' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'archiveThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'cancelProposal' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'cancelTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'castVote' : IDL.Func(
+        [IDL.Nat, VoteChoice, IDL.Vec(RankedChoiceEntry)],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'checkAndExpireTrials' : IDL.Func(
         [],
         [IDL.Record({ 'checked' : IDL.Nat, 'expired' : IDL.Nat })],
+        [],
+      ),
+    'closeProposal' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
         [],
       ),
     'createCampaign' : IDL.Func(
@@ -1179,6 +1509,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'createProposal' : IDL.Func(
+        [
+          ProposalType,
+          IDL.Text,
+          IDL.Text,
+          VotingMechanism,
+          IDL.Nat,
+          IDL.Nat,
+          IDL.Nat,
+          IDL.Opt(IDL.Text),
+          IDL.Vec(IDL.Text),
+        ],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        [],
+      ),
     'createRoyaltyPool' : IDL.Func([RoyaltyPoolType, IDL.Text], [IDL.Text], []),
     'createTenant' : IDL.Func(
         [IDL.Text, TenantTier, IDL.Opt(IDL.Nat)],
@@ -1201,8 +1546,23 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool],
         [],
       ),
+    'delegateVote' : IDL.Func(
+        [IDL.Principal, IDL.Opt(IDL.Nat)],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'distributeFSU' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'distributeRoyaltyPool' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+    'editDebateComment' : IDL.Func(
+        [IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'enactProposal' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'finalizeCrowdfundingCampaign' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -1252,6 +1612,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(MemberTierRecord)],
         ['query'],
       ),
+    'getMemberVote' : IDL.Func(
+        [IDL.Nat, IDL.Principal],
+        [IDL.Opt(Vote)],
+        ['query'],
+      ),
+    'getMyDelegation' : IDL.Func([], [IDL.Opt(DelegationRecord)], ['query']),
     'getMyDownline' : IDL.Func([], [IDL.Vec(DownlineMember)], ['query']),
     'getMyEarnings' : IDL.Func([], [IDL.Vec(EarningRecord)], ['query']),
     'getMyEarningsSummary' : IDL.Func([], [EarningsSummary], ['query']),
@@ -1271,6 +1637,30 @@ export const idlFactory = ({ IDL }) => {
     'getOrg' : IDL.Func([IDL.Text], [IDL.Opt(Organization)], ['query']),
     'getOrgMembers' : IDL.Func([IDL.Text], [IDL.Vec(OrgMember)], ['query']),
     'getPreferredLanguage' : IDL.Func([], [IDL.Text], ['query']),
+    'getProposal' : IDL.Func([IDL.Nat], [IDL.Opt(Proposal)], ['query']),
+    'getProposalComments' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(DebateComment)],
+        ['query'],
+      ),
+    'getProposalSponsors' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(IDL.Principal)],
+        ['query'],
+      ),
+    'getQuorumStatus' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Record({
+            'totalVoters' : IDL.Nat,
+            'quorumPercent' : IDL.Nat,
+            'percentVoted' : IDL.Nat,
+            'quorumMet' : IDL.Bool,
+            'votesCast' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getReplies' : IDL.Func([IDL.Nat], [IDL.Vec(ForumReply)], ['query']),
     'getRoyaltyPool' : IDL.Func([IDL.Text], [IDL.Opt(RoyaltyPool)], ['query']),
     'getTenant' : IDL.Func([IDL.Text], [IDL.Opt(Tenant)], ['query']),
@@ -1296,6 +1686,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getVoteTally' : IDL.Func([IDL.Nat], [IDL.Opt(VoteTally)], ['query']),
+    'getVotesByProposal' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
     'getWalletBalance' : IDL.Func([IDL.Text], [IDL.Float64], ['query']),
     'incrementThreadView' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'initMemberMLM' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Text], []),
@@ -1307,6 +1699,7 @@ export const idlFactory = ({ IDL }) => {
     'linkWallet' : IDL.Func([WalletType, IDL.Text, IDL.Text], [], []),
     'listActiveCampaigns' : IDL.Func([], [IDL.Vec(Campaign)], ['query']),
     'listActiveOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listActiveProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
     'listAllMemberTiers' : IDL.Func([], [IDL.Vec(MemberTierRecord)], ['query']),
     'listBillingHistory' : IDL.Func(
         [IDL.Text],
@@ -1331,6 +1724,17 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'listOrgs' : IDL.Func([], [IDL.Vec(Organization)], ['query']),
+    'listProposals' : IDL.Func([], [IDL.Vec(Proposal)], ['query']),
+    'listProposalsByStatus' : IDL.Func(
+        [ProposalStatus],
+        [IDL.Vec(Proposal)],
+        ['query'],
+      ),
+    'listProposalsByType' : IDL.Func(
+        [ProposalType],
+        [IDL.Vec(Proposal)],
+        ['query'],
+      ),
     'listRoyaltyPools' : IDL.Func([], [IDL.Vec(RoyaltyPool)], ['query']),
     'listTenantMembers' : IDL.Func(
         [IDL.Text],
@@ -1353,6 +1757,11 @@ export const idlFactory = ({ IDL }) => {
     'lockThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'markEarningPaid' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'markNotificationRead' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'openProposalForVoting' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'pinThread' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'pledgeToCrowdfundingCampaign' : IDL.Func(
         [IDL.Text, IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
@@ -1381,6 +1790,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Principal)],
         ['query'],
       ),
+    'revokeDelegation' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'runPayCycle' : IDL.Func([IDL.Principal], [IDL.Nat], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'sendTrialExpiryNotifications' : IDL.Func([], [IDL.Text], []),
@@ -1396,6 +1810,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'setPreferredLanguage' : IDL.Func([IDL.Text], [], []),
+    'sponsorProposal' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'suspendTenant' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'unlinkWallet' : IDL.Func([IDL.Text], [], []),
     'updateCampaign' : IDL.Func(
@@ -1428,6 +1847,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'upgradeMemberTier' : IDL.Func([MembershipTierLevel], [IDL.Bool], []),
+    'withdrawSponsor' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
   });
 };
 

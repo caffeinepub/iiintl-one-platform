@@ -107,6 +107,26 @@ type CrowdfundingStatus__212397832 =
 type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type DebateComment__209204920 =
+  {
+    author : Principal;
+    content : Text;
+    createdAt : Int;
+    editedAt : ?Int;
+    id : Nat;
+    isDeleted : Bool;
+    parentCommentId : ?Nat;
+    proposalId : Nat
+  };
+type DelegationRecord__135374057 =
+  {
+    createdAt : Int;
+    delegateTo : Principal;
+    delegator : Principal;
+    isActive : Bool;
+    proposalId : ?Nat;
+    revokedAt : ?Int
+  };
 type EarningRecord__4576500 =
   {
     amountUnits : Nat;
@@ -233,6 +253,33 @@ type Organization__103960640 =
     status : OrgStatus__842647271;
     website : Text
   };
+type ProposalStatus__269663618 =
+  {#cancelled; #closed; #draft; #enacted; #openVote; #rejected; #review};
+type ProposalType__230785252 =
+  {#amendment; #budget; #communityInitiative; #policy; #resolution};
+type Proposal__521768281 =
+  {
+    createdAt : Int;
+    description : Text;
+    enactedAt : ?Int;
+    id : Nat;
+    mechanism : VotingMechanism__598997647;
+    orgId : ?Text;
+    proposalType : ProposalType__230785252;
+    proposer : Principal;
+    quorumPercent : Nat;
+    sponsorThreshold : Nat;
+    sponsors : [Principal];
+    status : ProposalStatus__269663618;
+    tags : [Text];
+    tenantId : Text;
+    title : Text;
+    updatedAt : Int;
+    voteWindowHours : Nat;
+    votingClosesAt : ?Int;
+    votingOpensAt : ?Int
+  };
+type RankedChoiceEntry__110648757 = {candidateId : Text; rank : Nat};
 type Role__931309261 = {#admin; #guest; #member; #moderator};
 type RoyaltyPoolType__427016335 =
   {#event; #finFracFran; #global; #leadership};
@@ -304,6 +351,26 @@ type User__831686142 =
     joinedAt : Int;
     role : Role__931309261
   };
+type VoteChoice__700097778 = {#abstain; #no; #yes};
+type Vote__1045594672 =
+  {
+    castAt : Int;
+    choice : VoteChoice__700097778;
+    delegatedTo : ?Principal;
+    id : Nat;
+    proposalId : Nat;
+    rankedChoices : [RankedChoiceEntry__110648757];
+    voter : Principal;
+    weight : Nat
+  };
+type VotingMechanism__598997647 =
+  {
+    #liquidDelegation;
+    #rankedChoice;
+    #simpleMajority;
+    #supermajority66;
+    #supermajority75
+  };
 type WalletType__701049132 = {#internetIdentity; #plug; #stoic};
 type Wallet__442667382 =
   {
@@ -360,6 +427,16 @@ actor {
       var root : Node__46230540<Text, CrowdfundingPledge__780171264>;
       var size : Nat__490723111
     };
+  stable debateComments :
+    {
+      var root : Node__46230540<Nat, DebateComment__209204920>;
+      var size : Nat__490723111
+    };
+  stable delegations :
+    {
+      var root : Node__46230540<Principal, DelegationRecord__135374057>;
+      var size : Nat__490723111
+    };
   stable earningRecords :
     {
       var root : Node__46230540<Text, EarningRecord__4576500>;
@@ -396,17 +473,22 @@ actor {
       var root : Node__46230540<Principal, MemberTierRecord__809706739>;
       var size : Nat__490723111
     };
+  stable memberVoteIndex :
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
   stable var nextBillingId : Nat;
+  stable var nextCommentId : Nat;
   stable var nextCrowdfundingCampaignId : Nat;
   stable var nextCrowdfundingPledgeId : Nat;
   stable var nextEarningId : Nat;
   stable var nextFSUTxId : Nat;
   stable var nextNotificationId : Nat;
+  stable var nextProposalId : Nat;
   stable var nextReplyId : Nat;
   stable var nextRoyaltyPoolId : Nat;
   stable var nextTenantId : Nat;
   stable var nextThreadId : Nat;
   stable var nextTransactionId : Nat;
+  stable var nextVoteId : Nat;
   stable notifications :
     {
       var root : Node__46230540<Text, Notification__879889657>;
@@ -421,6 +503,19 @@ actor {
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
   stable principalToUserId :
     {var root : Node__46230540<Principal, Text>; var size : Nat__490723111};
+  stable proposalCommentIndex :
+    {var root : Node__46230540<Nat, [Nat]>; var size : Nat__490723111};
+  stable proposalSponsorIndex :
+    {var root : Node__46230540<Nat, [Principal]>; var size : Nat__490723111};
+  stable proposalVoteIndex :
+    {var root : Node__46230540<Nat, [Nat]>; var size : Nat__490723111};
+  stable proposals :
+    {
+      var root : Node__46230540<Nat, Proposal__521768281>;
+      var size : Nat__490723111
+    };
+  stable proposerIndex :
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
   stable recipientNotifIndex :
     {var root : Node__46230540<Principal, [Text]>; var size : Nat__490723111};
   stable referralCodeIndex :
@@ -462,6 +557,11 @@ actor {
   stable users :
     {
       var root : Node__46230540<Text, User__831686142>;
+      var size : Nat__490723111
+    };
+  stable votes :
+    {
+      var root : Node__46230540<Nat, Vote__1045594672>;
       var size : Nat__490723111
     }
 };

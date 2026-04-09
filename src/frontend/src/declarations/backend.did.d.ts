@@ -120,6 +120,24 @@ export type CrowdfundingStatus = { 'active' : null } |
   { 'pending' : null } |
   { 'funded' : null } |
   { 'failed' : null };
+export interface DebateComment {
+  'id' : bigint,
+  'isDeleted' : boolean,
+  'content' : string,
+  'parentCommentId' : [] | [bigint],
+  'createdAt' : bigint,
+  'author' : Principal,
+  'editedAt' : [] | [bigint],
+  'proposalId' : bigint,
+}
+export interface DelegationRecord {
+  'delegateTo' : Principal,
+  'createdAt' : bigint,
+  'isActive' : boolean,
+  'delegator' : Principal,
+  'proposalId' : [] | [bigint],
+  'revokedAt' : [] | [bigint],
+}
 export interface DownlineMember {
   'principal' : Principal,
   'referralCode' : string,
@@ -260,6 +278,40 @@ export interface Organization {
   'description' : string,
   'website' : string,
 }
+export interface Proposal {
+  'id' : bigint,
+  'status' : ProposalStatus,
+  'title' : string,
+  'mechanism' : VotingMechanism,
+  'enactedAt' : [] | [bigint],
+  'orgId' : [] | [string],
+  'createdAt' : bigint,
+  'tags' : Array<string>,
+  'description' : string,
+  'quorumPercent' : bigint,
+  'tenantId' : string,
+  'proposalType' : ProposalType,
+  'votingClosesAt' : [] | [bigint],
+  'updatedAt' : bigint,
+  'votingOpensAt' : [] | [bigint],
+  'voteWindowHours' : bigint,
+  'proposer' : Principal,
+  'sponsors' : Array<Principal>,
+  'sponsorThreshold' : bigint,
+}
+export type ProposalStatus = { 'review' : null } |
+  { 'closed' : null } |
+  { 'cancelled' : null } |
+  { 'enacted' : null } |
+  { 'rejected' : null } |
+  { 'draft' : null } |
+  { 'openVote' : null };
+export type ProposalType = { 'resolution' : null } |
+  { 'communityInitiative' : null } |
+  { 'amendment' : null } |
+  { 'budget' : null } |
+  { 'policy' : null };
+export interface RankedChoiceEntry { 'rank' : bigint, 'candidateId' : string }
 export type Role = { 'member' : null } |
   { 'admin' : null } |
   { 'moderator' : null } |
@@ -346,6 +398,41 @@ export interface UserSummary {
   'isActive' : boolean,
   'avatarUrl' : string,
 }
+export interface Vote {
+  'id' : bigint,
+  'weight' : bigint,
+  'voter' : Principal,
+  'delegatedTo' : [] | [Principal],
+  'castAt' : bigint,
+  'choice' : VoteChoice,
+  'proposalId' : bigint,
+  'rankedChoices' : Array<RankedChoiceEntry>,
+}
+export type VoteChoice = { 'no' : null } |
+  { 'yes' : null } |
+  { 'abstain' : null };
+export interface VoteTally {
+  'noVotes' : bigint,
+  'abstainWeight' : bigint,
+  'yesWeight' : bigint,
+  'totalVoters' : bigint,
+  'mechanism' : VotingMechanism,
+  'yesVotes' : bigint,
+  'quorumPercent' : bigint,
+  'totalVotesCast' : bigint,
+  'rankedResults' : Array<[string, bigint]>,
+  'quorumMet' : boolean,
+  'tallyComputedAt' : bigint,
+  'abstainVotes' : bigint,
+  'noWeight' : bigint,
+  'proposalId' : bigint,
+  'passed' : boolean,
+}
+export type VotingMechanism = { 'simpleMajority' : null } |
+  { 'liquidDelegation' : null } |
+  { 'supermajority66' : null } |
+  { 'supermajority75' : null } |
+  { 'rankedChoice' : null };
 export interface Wallet {
   'linkedAt' : bigint,
   'walletType' : WalletType,
@@ -359,6 +446,11 @@ export type WalletType = { 'internetIdentity' : null } |
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addBillingRecord' : ActorMethod<[string, bigint, string, string], string>,
+  'addDebateComment' : ActorMethod<
+    [bigint, string, [] | [bigint]],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
   'addTenantMember' : ActorMethod<[string, Principal, string], boolean>,
   'addToFSUPool' : ActorMethod<[bigint, string], undefined>,
   'addToRoyaltyPool' : ActorMethod<[string, bigint], boolean>,
@@ -379,7 +471,17 @@ export interface _SERVICE {
   'archiveOrg' : ActorMethod<[string], boolean>,
   'archiveThread' : ActorMethod<[bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'cancelProposal' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'cancelTenant' : ActorMethod<[string], boolean>,
+  'castVote' : ActorMethod<
+    [bigint, VoteChoice, Array<RankedChoiceEntry>],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   /**
    * / Admin-only. Iterates all tenants and suspends any that are in #trial
    * / status with a trialEndsAt timestamp that has already passed.
@@ -388,6 +490,11 @@ export interface _SERVICE {
   'checkAndExpireTrials' : ActorMethod<
     [],
     { 'checked' : bigint, 'expired' : bigint }
+  >,
+  'closeProposal' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
   >,
   'createCampaign' : ActorMethod<
     [
@@ -422,6 +529,21 @@ export interface _SERVICE {
     [string, string, string, string, string, bigint],
     string
   >,
+  'createProposal' : ActorMethod<
+    [
+      ProposalType,
+      string,
+      string,
+      VotingMechanism,
+      bigint,
+      bigint,
+      bigint,
+      [] | [string],
+      Array<string>,
+    ],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
   'createRoyaltyPool' : ActorMethod<[RoyaltyPoolType, string], string>,
   'createTenant' : ActorMethod<[string, TenantTier, [] | [bigint]], string>,
   'createThread' : ActorMethod<
@@ -432,8 +554,23 @@ export interface _SERVICE {
     [MembershipTierLevel, bigint, EarningType],
     boolean
   >,
+  'delegateVote' : ActorMethod<
+    [Principal, [] | [bigint]],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'distributeFSU' : ActorMethod<[bigint, string], undefined>,
   'distributeRoyaltyPool' : ActorMethod<[string, bigint], boolean>,
+  'editDebateComment' : ActorMethod<
+    [bigint, string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
+  'enactProposal' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'finalizeCrowdfundingCampaign' : ActorMethod<[string], boolean>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
@@ -465,6 +602,8 @@ export interface _SERVICE {
   'getLinkedWallets' : ActorMethod<[], Array<Wallet>>,
   'getMemberEarnings' : ActorMethod<[Principal], Array<EarningRecord>>,
   'getMemberTierRecord' : ActorMethod<[Principal], [] | [MemberTierRecord]>,
+  'getMemberVote' : ActorMethod<[bigint, Principal], [] | [Vote]>,
+  'getMyDelegation' : ActorMethod<[], [] | [DelegationRecord]>,
   'getMyDownline' : ActorMethod<[], Array<DownlineMember>>,
   'getMyEarnings' : ActorMethod<[], Array<EarningRecord>>,
   'getMyEarningsSummary' : ActorMethod<[], EarningsSummary>,
@@ -480,6 +619,19 @@ export interface _SERVICE {
   'getOrg' : ActorMethod<[string], [] | [Organization]>,
   'getOrgMembers' : ActorMethod<[string], Array<OrgMember>>,
   'getPreferredLanguage' : ActorMethod<[], string>,
+  'getProposal' : ActorMethod<[bigint], [] | [Proposal]>,
+  'getProposalComments' : ActorMethod<[bigint], Array<DebateComment>>,
+  'getProposalSponsors' : ActorMethod<[bigint], Array<Principal>>,
+  'getQuorumStatus' : ActorMethod<
+    [bigint],
+    {
+      'totalVoters' : bigint,
+      'quorumPercent' : bigint,
+      'percentVoted' : bigint,
+      'quorumMet' : boolean,
+      'votesCast' : bigint,
+    }
+  >,
   'getReplies' : ActorMethod<[bigint], Array<ForumReply>>,
   'getRoyaltyPool' : ActorMethod<[string], [] | [RoyaltyPool]>,
   'getTenant' : ActorMethod<[string], [] | [Tenant]>,
@@ -496,6 +648,8 @@ export interface _SERVICE {
   >,
   'getUserOrgs' : ActorMethod<[string], Array<Organization>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getVoteTally' : ActorMethod<[bigint], [] | [VoteTally]>,
+  'getVotesByProposal' : ActorMethod<[bigint], Array<Vote>>,
   'getWalletBalance' : ActorMethod<[string], number>,
   'incrementThreadView' : ActorMethod<[bigint], boolean>,
   'initMemberMLM' : ActorMethod<[[] | [string]], string>,
@@ -507,6 +661,7 @@ export interface _SERVICE {
   'linkWallet' : ActorMethod<[WalletType, string, string], undefined>,
   'listActiveCampaigns' : ActorMethod<[], Array<Campaign>>,
   'listActiveOrgs' : ActorMethod<[], Array<Organization>>,
+  'listActiveProposals' : ActorMethod<[], Array<Proposal>>,
   'listAllMemberTiers' : ActorMethod<[], Array<MemberTierRecord>>,
   'listBillingHistory' : ActorMethod<[string], Array<BillingRecord>>,
   'listCampaigns' : ActorMethod<[], Array<Campaign>>,
@@ -518,6 +673,9 @@ export interface _SERVICE {
   >,
   'listMyCrowdfundingCampaigns' : ActorMethod<[], Array<CrowdfundingCampaign>>,
   'listOrgs' : ActorMethod<[], Array<Organization>>,
+  'listProposals' : ActorMethod<[], Array<Proposal>>,
+  'listProposalsByStatus' : ActorMethod<[ProposalStatus], Array<Proposal>>,
+  'listProposalsByType' : ActorMethod<[ProposalType], Array<Proposal>>,
   'listRoyaltyPools' : ActorMethod<[], Array<RoyaltyPool>>,
   'listTenantMembers' : ActorMethod<[string], Array<TenantMember>>,
   'listTenants' : ActorMethod<[], Array<Tenant>>,
@@ -528,6 +686,11 @@ export interface _SERVICE {
   'lockThread' : ActorMethod<[bigint], boolean>,
   'markEarningPaid' : ActorMethod<[string], boolean>,
   'markNotificationRead' : ActorMethod<[string], boolean>,
+  'openProposalForVoting' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'pinThread' : ActorMethod<[bigint], boolean>,
   'pledgeToCrowdfundingCampaign' : ActorMethod<
     [string, bigint, [] | [string], [] | [string]],
@@ -549,6 +712,11 @@ export interface _SERVICE {
   'removeTenantMember' : ActorMethod<[string, Principal], boolean>,
   'replyToThread' : ActorMethod<[bigint, string], bigint>,
   'resolveReferralCode' : ActorMethod<[string], [] | [Principal]>,
+  'revokeDelegation' : ActorMethod<
+    [[] | [bigint]],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'runPayCycle' : ActorMethod<[Principal], bigint>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   /**
@@ -564,6 +732,11 @@ export interface _SERVICE {
   'setCrowdfundingConfig' : ActorMethod<[bigint, bigint, bigint], undefined>,
   'setMemberTier' : ActorMethod<[Principal, MembershipTierLevel], boolean>,
   'setPreferredLanguage' : ActorMethod<[string], undefined>,
+  'sponsorProposal' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
   'suspendTenant' : ActorMethod<[string], boolean>,
   'unlinkWallet' : ActorMethod<[string], undefined>,
   'updateCampaign' : ActorMethod<
@@ -592,6 +765,11 @@ export interface _SERVICE {
     boolean
   >,
   'upgradeMemberTier' : ActorMethod<[MembershipTierLevel], boolean>,
+  'withdrawSponsor' : ActorMethod<
+    [bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
